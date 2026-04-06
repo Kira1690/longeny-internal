@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main, staging, dev]
+  pull_request:
+    branches: [main, staging]
+
+env:
+  BUN_VERSION: '1.1.38'
+
+jobs:
+  lint-and-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun run typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint-and-typecheck
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: longeny
+          POSTGRES_PASSWORD: longeny_test
+          POSTGRES_DB: longeny_auth
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U longeny"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      # Create test databases
+      - run: |
+          PGPASSWORD=longeny_test psql -h localhost -U longeny -d longeny_auth -c "CREATE DATABASE longeny_core;"
+          PGPASSWORD=longeny_test psql -h localhost -U longeny -d longeny_auth -c "CREATE DATABASE longeny_bookings;"
+          PGPASSWORD=longeny_test psql -h localhost -U longeny -d longeny_auth -c "CREATE DATABASE longeny_ai_content;"
+          PGPASSWORD=longeny_test psql -h localhost -U longeny -d longeny_auth -c "CREATE DATABASE longeny_payments;"
+          # Enable extensions
+          for db in longeny_auth longeny_core longeny_bookings longeny_ai_content longeny_payments; do
+            PGPASSWORD=longeny_test psql -h localhost -U longeny -d $db -c "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";"
+          done
+          PGPASSWORD=longeny_test psql -h localhost -U longeny -d longeny_ai_content -c "CREATE EXTENSION IF NOT EXISTS vector;"
+      # Run migrations
+      - run: bun run db:generate
+        env:
+          AUTH_DATABASE_URL: postgresql://longeny:longeny_test@localhost:5432/longeny_auth
+          CORE_DATABASE_URL: postgresql://longeny:longeny_test@localhost:5432/longeny_core
+          BOOKING_DATABASE_URL: postgresql://longeny:longeny_test@localhost:5432/longeny_bookings
+          AI_CONTENT_DATABASE_URL: postgresql://longeny:longeny_test@localhost:5432/longeny_ai_content
+          PAYMENT_DATABASE_URL: postgresql://longeny:longeny_test@localhost:5432/longeny_payments
+      # Run tests
+      - run: bun run test
+        env:
+          NODE_ENV: test
+          AUTH_DATABASE_URL: postgresql://longeny:longeny_test@localhost:5432/longeny_auth
+          CORE_DATABASE_URL: postgresql://longeny:longeny_test@localhost:5432/longeny_core
+          BOOKING_DATABASE_URL: postgresql://longeny:longeny_test@localhost:5432/longeny_bookings
+          AI_CONTENT_DATABASE_URL: postgresql://longeny:longeny_test@localhost:5432/longeny_ai_content
+          PAYMENT_DATABASE_URL: postgresql://longeny:longeny_test@localhost:5432/longeny_payments
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          JWT_ACCESS_SECRET: test-jwt-access-secret-min-32-characters-long
+          JWT_REFRESH_SECRET: test-jwt-refresh-secret-min-32-characters-long
+          ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef
+          HMAC_SECRET: 0123456789abcdef0123456789abcdef
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - run: bun install --frozen-lockfile
+      - run: bun run build

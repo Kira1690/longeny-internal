@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.turbo/
+.env
+.env.local
+.env.*.local
+coverage/
+*.log
+.DS_Store
+infrastructure/terraform/.terraform/
+infrastructure/terraform/*.tfstate*
+prisma/*.db

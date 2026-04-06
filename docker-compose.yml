@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: longeny-postgres
+    environment:
+      POSTGRES_USER: longeny
+      POSTGRES_PASSWORD: longeny_dev_password
+      POSTGRES_DB: longeny_auth
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infrastructure/docker/init-databases.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U longeny"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: longeny-redis
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  localstack:
+    image: localstack/localstack:3
+    container_name: longeny-localstack
+    environment:
+      - SERVICES=s3,sqs,sns,ses
+      - DEBUG=0
+      - PERSISTENCE=1
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstackdata:/var/lib/localstack
+      - ./infrastructure/docker/localstack-init.sh:/etc/localstack/init/ready.d/init.sh
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: longeny-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  pgdata:
+  redisdata:
+  localstackdata:

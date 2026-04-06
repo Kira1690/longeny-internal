@@ -1,0 +1,25 @@
+{
+  "name": "@longeny/gateway",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "elysia": "^1.1.0",
+    "ioredis": "^5.4.0",
+    "@longeny/config": "workspace:*",
+    "@longeny/errors": "workspace:*",
+    "@longeny/middleware": "workspace:*",
+    "@longeny/utils": "workspace:*",
+    "@longeny/types": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "bun-types": "latest"
+  }
+}

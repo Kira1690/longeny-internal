@@ -1,0 +1,10 @@
+node_modules
+dist
+.turbo
+.git
+.github
+coverage
+tests
+*.md
+.env*
+infrastructure/terraform

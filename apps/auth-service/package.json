@@ -1,0 +1,38 @@
+{
+  "name": "@longeny/auth-service",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "bunx drizzle-kit generate",
+    "db:migrate": "bunx drizzle-kit migrate",
+    "db:push": "bunx drizzle-kit push",
+    "db:seed": "bun run src/db/seed.ts",
+    "db:studio": "bunx drizzle-kit studio"
+  },
+  "dependencies": {
+    "elysia": "^1.1.0",
+    "drizzle-orm": "^0.36.0",
+    "postgres": "^3.4.0",
+    "ioredis": "^5.4.0",
+    "jsonwebtoken": "^9.0.0",
+    "zod": "^3.23.0",
+    "@longeny/errors": "workspace:*",
+    "@longeny/types": "workspace:*",
+    "@longeny/config": "workspace:*",
+    "@longeny/utils": "workspace:*",
+    "@longeny/events": "workspace:*",
+    "@longeny/middleware": "workspace:*",
+    "@longeny/validators": "workspace:*"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.28.0",
+    "typescript": "^5.6.0",
+    "bun-types": "latest",
+    "@types/jsonwebtoken": "^9.0.0"
+  }
+}

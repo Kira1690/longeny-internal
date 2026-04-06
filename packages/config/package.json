@@ -1,0 +1,17 @@
+{
+  "name": "@longeny/config",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "bun-types": "latest"
+  }
+}
