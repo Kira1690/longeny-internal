@@ -20,7 +20,7 @@
     "postgres": "^3.4.0",
     "ioredis": "^5.4.0",
     "zod": "^3.23.0",
-    "stripe": "^17.0.0",
+    "stripe": "^22.0.0",
     "razorpay": "^2.9.0",
     "@longeny/errors": "workspace:*",
     "@longeny/types": "workspace:*",
