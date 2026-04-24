@@ -326,7 +326,7 @@ export class UserService {
       config.HMAC_SECRET,
     );
 
-    return authClient.get(`/internal/consents/${authId}`);
+    return authClient.get(`/internal/auth/consents/${authId}`);
   }
 
   // ── GDPR ──

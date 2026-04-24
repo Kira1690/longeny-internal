@@ -75,7 +75,9 @@ export function createRoutes(): Elysia {
   // ── Provider & Marketplace routes (optional auth) ──
   const providersProxy = new Elysia()
     .use(optionalAuth())
+    .all('/api/v1/providers', (ctx) => proxyRequest(ctx, USER_PROVIDER_URL))
     .all('/api/v1/providers/*', (ctx) => proxyRequest(ctx, USER_PROVIDER_URL))
+    .all('/api/v1/marketplace', (ctx) => proxyRequest(ctx, USER_PROVIDER_URL))
     .all('/api/v1/marketplace/*', (ctx) => proxyRequest(ctx, USER_PROVIDER_URL));
 
   // ── Admin routes (require auth + admin role) ──

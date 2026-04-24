@@ -4,7 +4,6 @@ import { z } from 'zod';
 export {
   uuidSchema,
   paginationSchema,
-  validate,
   updateProfileSchema,
   healthProfileSchema,
   onboardingSchema,

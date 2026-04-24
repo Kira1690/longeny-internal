@@ -77,6 +77,7 @@ export type BookingConfig = z.infer<typeof bookingConfigSchema>;
 export const aiContentConfigSchema = baseConfigSchema.extend({
   AI_CONTENT_SERVICE_PORT: z.coerce.number().default(3004),
   AI_CONTENT_DATABASE_URL: z.string().min(1),
+  AI_AGENT_URL: z.string().url().default('http://localhost:8000'),
   AWS_BEDROCK_REGION: z.string().default('us-east-1'),
   BEDROCK_MODEL_ID_PRIMARY: z.string().default('meta.llama3-1-70b-instruct-v1:0'),
   BEDROCK_MODEL_ID_LIGHT: z.string().default('meta.llama3-1-8b-instruct-v1:0'),

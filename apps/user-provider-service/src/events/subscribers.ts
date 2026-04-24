@@ -15,8 +15,8 @@ export function registerSubscribers(
 ): void {
   // ── user.registered: Create default profile for new users ──
   consumer.on(EVENT_NAMES.USER_REGISTERED, async (event: EventEnvelope) => {
-    const { authId, email, firstName, lastName } = event.payload as {
-      authId: string;
+    const { credentialId: authId, email, firstName, lastName } = event.payload as {
+      credentialId: string;
       email: string;
       firstName: string;
       lastName: string;

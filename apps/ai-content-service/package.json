@@ -16,6 +16,8 @@
   },
   "dependencies": {
     "elysia": "^1.1.0",
+    "@elysiajs/swagger": "^1.1.0",
+    "@longeny/chroma": "workspace:*",
     "drizzle-orm": "^0.36.0",
     "postgres": "^3.4.5",
     "ioredis": "^5.4.0",

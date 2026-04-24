@@ -72,6 +72,22 @@ export class S3Service {
   }
 
   /**
+   * Upload raw bytes directly to S3. Used for server-side uploads (e.g. KB ingestion).
+   */
+  async putObject(
+    key: string,
+    body: Uint8Array | Buffer,
+    contentType: string,
+    bucket?: string,
+  ): Promise<void> {
+    const targetBucket = bucket || config.S3_UPLOADS_BUCKET;
+    await s3Client.send(
+      new PutObjectCommand({ Bucket: targetBucket, Key: key, Body: body, ContentType: contentType }),
+    );
+    logger.debug({ key, bucket: targetBucket }, 'Uploaded object to S3');
+  }
+
+  /**
    * Delete an object from S3.
    */
   async deleteObject(key: string, bucket?: string): Promise<void> {

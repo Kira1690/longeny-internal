@@ -191,11 +191,31 @@ export async function blacklistAccessToken(accessToken: string): Promise<void> {
 }
 
 /**
- * Check if a token JTI is blacklisted.
+ * Check if a token JTI is blacklisted OR was issued before a logout-all.
  */
-export async function isTokenBlacklisted(jti: string): Promise<boolean> {
-  const result = await redis.get(`blacklist:${jti}`);
-  return result !== null;
+export async function isTokenBlacklisted(jti: string, userId?: string, issuedAt?: number): Promise<boolean> {
+  const jtiBlacklisted = await redis.get(`blacklist:${jti}`);
+  if (jtiBlacklisted !== null) return true;
+
+  // Check per-user invalidation timestamp (set by logout-all)
+  if (userId && issuedAt !== undefined) {
+    const invalidateBefore = await redis.get(`user_invalidated_before:${userId}`);
+    if (invalidateBefore !== null && issuedAt < parseInt(invalidateBefore, 10)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Invalidate all tokens for a user issued before now (used by logout-all).
+ * TTL matches JWT_ACCESS_EXPIRY so the key auto-clears once all tokens expire.
+ */
+export async function invalidateAllUserTokens(userId: string): Promise<void> {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  // TTL = access token lifetime (15 min = 900s) — no valid token can be older than this
+  await redis.set(`user_invalidated_before:${userId}`, String(nowSeconds), 'EX', 900);
 }
 
 /**

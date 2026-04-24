@@ -18,6 +18,7 @@ const HOP_BY_HOP_HEADERS = new Set([
 interface ProxyContext {
   request: Request;
   store: Record<string, any>;
+  body?: unknown;
 }
 
 /**
@@ -26,9 +27,11 @@ interface ProxyContext {
  * target service, injecting HMAC authentication and forwarding headers.
  */
 export async function proxyRequest(ctx: ProxyContext, targetBaseUrl: string): Promise<Response> {
-  const { request, store } = ctx;
+  const { request, store, body: elysiaBody } = ctx;
   const url = new URL(request.url);
-  const targetUrl = `${targetBaseUrl}${url.pathname}${url.search}`;
+  // Strip the /api/v1 gateway prefix before forwarding to downstream services
+  const strippedPath = url.pathname.replace(/^\/api\/v1/, '');
+  const targetUrl = `${targetBaseUrl}${strippedPath}${url.search}`;
   const config = getConfig();
 
   // Clone incoming headers
@@ -67,7 +70,14 @@ export async function proxyRequest(ctx: ProxyContext, targetBaseUrl: string): Pr
   const method = request.method.toUpperCase();
   let body: string | undefined;
   if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
-    body = await request.text();
+    // Elysia may have already consumed request.body; use the parsed body from context if available
+    if (elysiaBody !== undefined && elysiaBody !== null) {
+      body = typeof elysiaBody === 'string' ? elysiaBody : JSON.stringify(elysiaBody);
+    } else if (!request.bodyUsed) {
+      body = await request.text();
+    } else {
+      body = '';
+    }
   }
 
   // Sign request with HMAC for downstream service-to-service auth
@@ -75,7 +85,7 @@ export async function proxyRequest(ctx: ProxyContext, targetBaseUrl: string): Pr
     'gateway',
     config.HMAC_SECRET,
     method,
-    url.pathname,
+    strippedPath,
     body || '',
   );
   for (const [key, value] of Object.entries(hmacHeaders)) {

@@ -470,7 +470,7 @@ export class ProviderService {
     const whereClause = drizzleAnd(...conditions);
 
     const providersList = await db.select().from(providers).where(whereClause).orderBy(desc(providers.rating_avg)).limit(limit).offset(offset);
-    const [{ count: total }] = await db.select({ count: db.$count(providers, whereClause) }).from(providers);
+    const total = await db.$count(providers, whereClause);
 
     return {
       data: providersList,
@@ -491,7 +491,7 @@ export class ProviderService {
     const whereClause = drizzleAnd(...conditions);
 
     const programsList = await db.select().from(programs).where(whereClause).orderBy(desc(programs.created_at)).limit(limit).offset(offset);
-    const [{ count: total }] = await db.select({ count: db.$count(programs, whereClause) }).from(programs);
+    const total = await db.$count(programs, whereClause);
 
     return {
       data: programsList,
@@ -506,7 +506,7 @@ export class ProviderService {
     const where = and(eq(programs.provider_id, providerId), eq(programs.status, 'active'));
 
     const programsList = await db.select().from(programs).where(where).orderBy(desc(programs.created_at)).limit(limit).offset(offset);
-    const [{ count: total }] = await db.select({ count: db.$count(programs, where) }).from(programs);
+    const total = await db.$count(programs, where);
 
     return {
       data: programsList,
@@ -527,7 +527,7 @@ export class ProviderService {
     const whereClause = drizzleAnd(...conditions);
 
     const productsList = await db.select().from(products).where(whereClause).orderBy(desc(products.created_at)).limit(limit).offset(offset);
-    const [{ count: total }] = await db.select({ count: db.$count(products, whereClause) }).from(products);
+    const total = await db.$count(products, whereClause);
 
     return {
       data: productsList,
@@ -542,7 +542,7 @@ export class ProviderService {
     const where = and(eq(products.provider_id, providerId), eq(products.status, 'active'));
 
     const productsList = await db.select().from(products).where(where).orderBy(desc(products.created_at)).limit(limit).offset(offset);
-    const [{ count: total }] = await db.select({ count: db.$count(products, where) }).from(products);
+    const total = await db.$count(products, where);
 
     return {
       data: productsList,
@@ -574,11 +574,11 @@ export class ProviderService {
   async getProviderStats(authId: string) {
     const provider = await this.getProviderByAuthId(authId);
 
-    const [totalPrograms] = await db.select({ count: db.$count(programs, eq(programs.provider_id, provider.id)) }).from(programs);
-    const [activePrograms] = await db.select({ count: db.$count(programs, and(eq(programs.provider_id, provider.id), eq(programs.status, 'active'))) }).from(programs);
-    const [totalProducts] = await db.select({ count: db.$count(products, eq(products.provider_id, provider.id)) }).from(products);
-    const [activeProducts] = await db.select({ count: db.$count(products, and(eq(products.provider_id, provider.id), eq(products.status, 'active'))) }).from(products);
-    const [reviewCount] = await db.select({ count: db.$count(reviews, and(eq(reviews.target_type, 'PROVIDER'), eq(reviews.target_id, provider.id))) }).from(reviews);
+    const totalPrograms = await db.$count(programs, eq(programs.provider_id, provider.id));
+    const activePrograms = await db.$count(programs, and(eq(programs.provider_id, provider.id), eq(programs.status, 'active')));
+    const totalProducts = await db.$count(products, eq(products.provider_id, provider.id));
+    const activeProducts = await db.$count(products, and(eq(products.provider_id, provider.id), eq(products.status, 'active')));
+    const reviewCount = await db.$count(reviews, and(eq(reviews.target_type, 'PROVIDER'), eq(reviews.target_id, provider.id)));
 
     return {
       provider: {
@@ -588,9 +588,9 @@ export class ProviderService {
         reviewCount: provider.review_count,
         totalBookings: provider.total_bookings,
       },
-      programs: { total: Number(totalPrograms.count), active: Number(activePrograms.count) },
-      products: { total: Number(totalProducts.count), active: Number(activeProducts.count) },
-      reviews: { total: Number(reviewCount.count) },
+      programs: { total: Number(totalPrograms), active: Number(activePrograms) },
+      products: { total: Number(totalProducts), active: Number(activeProducts) },
+      reviews: { total: Number(reviewCount) },
     };
   }
 

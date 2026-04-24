@@ -4,9 +4,12 @@ dist/
 .env
 .env.local
 .env.*.local
+.env.test
+**/.env.test
 coverage/
 *.log
 .DS_Store
 infrastructure/terraform/.terraform/
 infrastructure/terraform/*.tfstate*
 prisma/*.db
+apps/ai-content-service/data/

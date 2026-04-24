@@ -1,5 +1,5 @@
 import { register, login, verifyEmail, forgotPassword, resetPassword, changePassword } from '../services/auth.service.js';
-import { rotateRefreshToken, blacklistAccessToken, revokeAllSessions, revokeSession, getActiveSessions, verifyAccessToken } from '../services/token.service.js';
+import { rotateRefreshToken, blacklistAccessToken, revokeAllSessions, revokeSession, getActiveSessions, verifyAccessToken, invalidateAllUserTokens } from '../services/token.service.js';
 import { googleAuth } from '../services/oauth.service.js';
 import { listConsents, grantConsent, revokeConsent } from '../services/consent.service.js';
 import { queryAuditLogs } from '../services/audit.service.js';
@@ -105,6 +105,7 @@ export async function handleLogoutAll({ request, store }: any) {
   }
 
   await revokeAllSessions(userId);
+  await invalidateAllUserTokens(userId);
 
   return {
     success: true,
