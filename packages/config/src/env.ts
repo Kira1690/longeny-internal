@@ -39,6 +39,7 @@ export const authConfigSchema = baseConfigSchema.extend({
   GOOGLE_CLIENT_ID: z.string().default(''),
   GOOGLE_CLIENT_SECRET: z.string().default(''),
   GOOGLE_CALLBACK_URL: z.string().default('http://localhost:3000/api/v1/auth/google/callback'),
+  AUTH_SWAGGER_SERVERS: z.string().optional(),
 });
 
 export type AuthConfig = z.infer<typeof authConfigSchema>;
