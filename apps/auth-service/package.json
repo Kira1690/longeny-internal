@@ -20,7 +20,7 @@
     "postgres": "^3.4.0",
     "ioredis": "^5.4.0",
     "jsonwebtoken": "^9.0.0",
-    "zod": "^3.23.0",
+    "zod": "^4.3.6",
     "@longeny/errors": "workspace:*",
     "@longeny/types": "workspace:*",
     "@longeny/config": "workspace:*",
