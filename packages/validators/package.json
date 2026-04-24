@@ -12,7 +12,7 @@
     "@longeny/errors": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.6.0",
+    "typescript": "^6.0.3",
     "bun-types": "latest"
   }
 }
