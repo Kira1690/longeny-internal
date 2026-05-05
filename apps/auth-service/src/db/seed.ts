@@ -42,6 +42,7 @@ const rolePermissionMap: Record<string, string[]> = {
     'payments:read', 'documents:read', 'documents:write', 'documents:share',
   ],
   admin: permissionDefs.map((p) => p.name),
+  super_admin: permissionDefs.map((p) => p.name),
 };
 
 async function upsertRole(name: string, description: string, isSystem: boolean) {
@@ -66,13 +67,15 @@ async function main() {
   const userRole = await upsertRole('user', 'Regular platform user/consumer', true);
   const providerRole = await upsertRole('provider', 'Wellness provider or coach', true);
   const adminRole = await upsertRole('admin', 'Platform administrator', true);
+  const superAdminRole = await upsertRole('super_admin', 'Super administrator with full approval authority', true);
 
   const roleMap: Record<string, string> = {
     user: userRole.id,
     provider: providerRole.id,
     admin: adminRole.id,
+    super_admin: superAdminRole.id,
   };
-  console.log(`  Created 3 roles: user, provider, admin`);
+  console.log(`  Created 4 roles: user, provider, admin, super_admin`);
 
   // --- Permissions ---
   console.log('Creating permissions...');
@@ -142,6 +145,46 @@ async function main() {
   }
 
   console.log(`  Created admin credential: admin@longeny.com`);
+
+  // --- Test super_admin credential ---
+  console.log('Creating test super_admin credential...');
+  const superPasswordHash = await Bun.password.hash('SuperAdmin123!@#', { algorithm: 'bcrypt', cost: 12 });
+
+  let [superAdminCredential] = await db
+    .select()
+    .from(credentials)
+    .where(eq(credentials.email, 'superadmin@longeny.com'))
+    .limit(1);
+
+  if (!superAdminCredential) {
+    [superAdminCredential] = await db.insert(credentials).values({
+      email: 'superadmin@longeny.com',
+      password_hash: superPasswordHash,
+      status: 'active',
+      email_verified: true,
+      last_password_change: new Date(),
+    }).returning();
+  }
+
+  const [existingSuperRole] = await db
+    .select()
+    .from(user_roles)
+    .where(
+      and(
+        eq(user_roles.credential_id, superAdminCredential.id),
+        eq(user_roles.role_id, roleMap.super_admin),
+      ),
+    )
+    .limit(1);
+
+  if (!existingSuperRole) {
+    await db.insert(user_roles).values({
+      credential_id: superAdminCredential.id,
+      role_id: roleMap.super_admin,
+    });
+  }
+
+  console.log(`  Created super_admin credential: superadmin@longeny.com`);
   console.log('\nSeed completed successfully!');
 }
 

@@ -17,6 +17,7 @@ export type BaseConfig = z.infer<typeof baseConfigSchema>;
 // ── Per-service config schemas ──
 export const gatewayConfigSchema = baseConfigSchema.extend({
   GATEWAY_PORT: z.coerce.number().default(3000),
+  GATEWAY_PUBLIC_URL: z.string().url().optional(),
   AUTH_SERVICE_URL: z.string().url().default('http://localhost:3001'),
   USER_PROVIDER_SERVICE_URL: z.string().url().default('http://localhost:3002'),
   BOOKING_SERVICE_URL: z.string().url().default('http://localhost:3003'),
@@ -51,7 +52,9 @@ export const userProviderConfigSchema = baseConfigSchema.extend({
   BOOKING_SERVICE_URL: z.string().url().default('http://localhost:3003'),
   AI_CONTENT_SERVICE_URL: z.string().url().default('http://localhost:3004'),
   PAYMENT_SERVICE_URL: z.string().url().default('http://localhost:3005'),
+  S3_UPLOADS_BUCKET: z.string().default('longeny-uploads'),
   S3_EXPORTS_BUCKET: z.string().default('longeny-exports'),
+  KMS_KEY_ID: z.string().default(''),
   AWS_REGION: z.string().default('us-east-1'),
   AWS_ACCESS_KEY_ID: z.string().default('test'),
   AWS_SECRET_ACCESS_KEY: z.string().default('test'),
