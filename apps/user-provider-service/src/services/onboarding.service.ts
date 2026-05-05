@@ -393,7 +393,7 @@ export class OnboardingService {
       await db
         .update(providers)
         .set({ status: 'verified', updated_at: new Date() })
-        .where(eq(providers.user_id, providerId));
+        .where(eq(providers.id, providerId));
     }
 
     logger.info({ providerId, status }, 'Onboarding status updated by admin');
