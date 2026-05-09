@@ -13,3 +13,5 @@ infrastructure/terraform/.terraform/
 infrastructure/terraform/*.tfstate*
 prisma/*.db
 apps/ai-content-service/data/
+# Added by code-review-graph
+.code-review-graph/
