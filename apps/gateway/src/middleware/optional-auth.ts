@@ -1,7 +1,7 @@
+import { authStore } from '@longeny/middleware';
+import type { UserRole } from '@longeny/types';
 import Elysia from 'elysia';
 import jwt from 'jsonwebtoken';
-import type { UserRole } from '@longeny/types';
-import { authStore } from '@longeny/middleware';
 
 interface JwtPayload {
   sub: string;

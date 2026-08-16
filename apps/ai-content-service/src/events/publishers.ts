@@ -53,6 +53,14 @@ export interface DocumentSharedPayload {
   permission: string;
 }
 
+export interface PatientOnboardingCompletedPayload {
+  // JWT `sub` of the patient = users.auth_id in user-provider-service.
+  authId: string;
+  sessionId: string;
+  // The full BackendMatchPayload emitted by the AI onboarding agent (finalize_match).
+  finalPayload: Record<string, unknown>;
+}
+
 // ── Publisher functions ──
 
 export async function publishRecommendationGenerated(payload: RecommendationGeneratedPayload, correlationId?: string): Promise<void> {
@@ -88,6 +96,15 @@ export async function publishDocumentShared(payload: DocumentSharedPayload, corr
     logger.debug({ eventType: EVENT_NAMES.DOCUMENT_SHARED, documentId: payload.documentId }, 'Event published');
   } catch (error) {
     logger.error({ error, eventType: EVENT_NAMES.DOCUMENT_SHARED }, 'Failed to publish event');
+  }
+}
+
+export async function publishPatientOnboardingCompleted(payload: PatientOnboardingCompletedPayload, correlationId?: string): Promise<void> {
+  try {
+    await getPublisher().publish(EVENT_NAMES.PATIENT_ONBOARDING_COMPLETED, payload, correlationId);
+    logger.debug({ eventType: EVENT_NAMES.PATIENT_ONBOARDING_COMPLETED, authId: payload.authId, sessionId: payload.sessionId }, 'Event published');
+  } catch (error) {
+    logger.error({ error, eventType: EVENT_NAMES.PATIENT_ONBOARDING_COMPLETED }, 'Failed to publish event');
   }
 }
 

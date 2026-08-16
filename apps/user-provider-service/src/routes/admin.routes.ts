@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia';
 import { requireAuth, requireRole } from '@longeny/middleware';
+import { UserRole } from '@longeny/types';
 import type { AdminController } from '../controllers/admin.controller.js';
 import {
   adminProviderStatusSchema,
@@ -12,7 +13,7 @@ import {
 export function createAdminRoutes(controller: AdminController) {
   return new Elysia({ prefix: '/admin' })
     .use(requireAuth())
-    .use(requireRole('admin'))
+    .use(requireRole(UserRole.ADMIN))
     .get('/dashboard', controller.getDashboardOverview)
     .get('/providers/pending', controller.getPendingProviders)
     .get('/providers', controller.listProviders)

@@ -133,12 +133,42 @@ export function createOnboardingRoutes(controller: OnboardingController) {
   })
     .use(requireAuth())
     .use(requireRole('admin' as any, 'super_admin' as any))
+    .get('/', controller.adminListProviders as any, {
+      detail: {
+        summary: 'List all providers with onboarding status',
+        description: 'Returns paginated list of providers with their onboarding progress, status, and basic info. Filter by onboarding status (draft, submitted, under_review, approved, rejected).',
+        ...bearer,
+      },
+    })
     .get('/:providerId', controller.adminGetOnboarding as any, {
       params: providerIdParam,
       detail: {
         summary: 'View provider onboarding (admin)',
         description: 'Returns full onboarding record for a specific provider.',
         ...bearer,
+      },
+    })
+    .get('/:providerId/documents', controller.adminGetDocumentUrls as any, {
+      params: providerIdParam,
+      detail: {
+        summary: 'Get presigned view URLs for all uploaded documents',
+        description: 'Returns presigned GET URLs (15 min) for every document the provider uploaded during onboarding. Admin can open these in a browser to view/download.',
+        ...bearer,
+      },
+      response: {
+        200: t.Object({
+          success: t.Boolean(),
+          data: t.Object({
+            provider_id: t.String(),
+            documents: t.Array(t.Object({
+              field: t.String({ description: 'Document field name (e.g. govt_id_proof_url)' }),
+              section: t.String({ description: 'Section the document belongs to' }),
+              public_url: t.String({ description: 'Stored S3 URL' }),
+              view_url: t.String({ description: 'Presigned GET URL — open in browser to view' }),
+            })),
+            expires_in: t.Number({ description: 'Seconds until view URLs expire' }),
+          }),
+        }),
       },
     })
     .get('/:providerId/checks', controller.adminGetChecks as any, {

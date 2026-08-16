@@ -1,9 +1,11 @@
+import { corsMiddleware, errorHandler, rateLimit, requestLogger } from '@longeny/middleware';
 import Elysia from 'elysia';
-import { requestLogger, corsMiddleware, rateLimit, errorHandler } from '@longeny/middleware';
 import { getConfig } from './config/index.js';
 import { createRoutes } from './routes/index.js';
+import { getMergedSpec, getSwaggerUiHtml } from './swagger.js';
 
-export function createApp(): Elysia {
+// biome-ignore lint/suspicious/noExplicitAny: Elysia's chained type cannot be expressed as bare Elysia
+export function createApp(): any {
   const config = getConfig();
   const origins = config.CORS_ORIGIN.split(',').map((o) => o.trim());
 
@@ -26,6 +28,16 @@ export function createApp(): Elysia {
     )
     // ── 5. Routes (auth middleware applied per-route inside createRoutes) ──
     .use(routes)
+    // ── 6. Aggregated Swagger UI ──
+    .get('/docs/json', async ({ set }) => {
+      set.headers['Content-Type'] = 'application/json';
+      const spec = await getMergedSpec(config);
+      return JSON.stringify(spec);
+    })
+    .get('/docs', ({ set }) => {
+      set.headers['Content-Type'] = 'text/html';
+      return getSwaggerUiHtml();
+    })
     // ── Catch-all 404 ──
     .all('*', ({ request, set }) => {
       set.status = 404;

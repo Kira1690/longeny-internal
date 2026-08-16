@@ -620,4 +620,61 @@ export class ProviderService {
   async getProviderAvailabilityForDate(providerId: string, date: string) {
     return this.getAvailableSlots(providerId, date, 'America/New_York');
   }
+
+  // Maps a providers row to the flat shape the bravelabs-agent provider-sync consumes
+  // (see ai_engine/api/routes/provider_sync.py -> upsert_provider / build_provider_embed_text).
+  private mapProviderForSync(p: typeof providers.$inferSelect) {
+    const location = (p.location as Record<string, unknown> | null) || {};
+    return {
+      provider_id: p.id,
+      business_name: p.business_name,
+      specialties: Array.isArray(p.specialties) ? (p.specialties as string[]) : [],
+      bio: p.bio ?? '',
+      offers_virtual: p.offers_virtual,
+      offers_in_person: p.offers_in_person,
+      city: (location.city as string) ?? '',
+      years_experience: p.years_experience ?? 0,
+      hourly_rate: p.hourly_rate != null ? Number(p.hourly_rate) : 0,
+      rating: p.rating_avg != null ? Number(p.rating_avg) : 0,
+      is_active: p.status === 'verified',
+    };
+  }
+
+  // Paginated list of active (verified) providers for the agent's provider-sync.
+  async listProvidersForSync(filters: { page?: number; limit?: number }) {
+    const page = filters.page && filters.page > 0 ? filters.page : 1;
+    const limit = filters.limit && filters.limit > 0 ? filters.limit : 50;
+    const offset = (page - 1) * limit;
+
+    const where = eq(providers.status, 'verified');
+
+    const rows = await db
+      .select()
+      .from(providers)
+      .where(where)
+      .orderBy(asc(providers.created_at))
+      .limit(limit)
+      .offset(offset);
+
+    const total = await db.$count(providers, where);
+
+    return {
+      data: rows.map((p) => this.mapProviderForSync(p)),
+      pagination: {
+        total: Number(total),
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(Number(total) / limit)),
+      },
+    };
+  }
+
+  // Single provider in the agent-sync shape (used by fetch_and_upsert).
+  async getProviderForSync(providerId: string) {
+    const [provider] = await db.select().from(providers).where(eq(providers.id, providerId)).limit(1);
+
+    if (!provider) throw new NotFoundError('Provider', providerId);
+
+    return this.mapProviderForSync(provider);
+  }
 }

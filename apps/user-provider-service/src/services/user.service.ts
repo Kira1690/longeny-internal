@@ -38,8 +38,13 @@ export class UserService {
 
     const [profile] = await db.select().from(user_profiles).where(eq(user_profiles.user_id, user.id)).limit(1);
     const [preferences] = await db.select().from(user_preferences).where(eq(user_preferences.user_id, user.id)).limit(1);
+    const [healthProfileRow] = await db.select().from(health_profiles).where(eq(health_profiles.user_id, user.id)).limit(1);
+    const [onboardingRow] = await db.select().from(onboarding_state).where(eq(onboarding_state.user_id, user.id)).limit(1);
 
-    return this.sanitizeUser({ ...user, profile, preferences });
+    const healthProfile = healthProfileRow ? this.decryptHealthProfile(healthProfileRow as any) : null;
+    const onboarding = onboardingRow ? this.decryptOnboardingState(onboardingRow as any) : null;
+
+    return this.sanitizeUser({ ...user, profile, preferences, healthProfile, onboarding });
   }
 
   async updateProfile(authId: string, data: {
@@ -315,6 +320,93 @@ export class UserService {
     }
 
     return state;
+  }
+
+  // ── AI onboarding persistence ──
+  //
+  // The AI onboarding agent keeps the intake only in Redis (7-day TTL) and hands back a
+  // final match payload. This maps that payload into the durable patient record so the health
+  // data survives session expiry and shows up when the patient revisits their profile.
+  // Clinical fields (conditions, medications, full payload) are stored ENCRYPTED, mirroring the
+  // manual health-profile write. Idempotent upsert — safe to call again on a re-match.
+  async applyOnboardingPayload(authId: string, payload: Record<string, unknown>) {
+    const [user] = await db.select().from(users).where(eq(users.auth_id, authId)).limit(1);
+    if (!user) {
+      throw new NotFoundError('User');
+    }
+
+    const asStrings = (v: unknown): string[] =>
+      Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim().length > 0) : [];
+    const asString = (v: unknown): string | undefined =>
+      typeof v === 'string' && v.trim().length > 0 ? v : undefined;
+
+    // ── users.gender (agent uses "other"; DB enum uses "non_binary") ──
+    const genderMap: Record<string, string> = {
+      male: 'male', female: 'female', other: 'non_binary',
+      non_binary: 'non_binary', prefer_not_to_say: 'prefer_not_to_say',
+    };
+    const gender = asString(payload.gender);
+    if (gender && genderMap[gender]) {
+      await db.update(users)
+        .set({ gender: genderMap[gender] as any, updated_at: new Date() })
+        .where(eq(users.id, user.id));
+    }
+
+    // ── user_profiles.preferred_session_type ← consultation_mode ──
+    const mode = asString(payload.consultation_mode);
+    if (mode) {
+      const [existingProfile] = await db.select({ id: user_profiles.id }).from(user_profiles).where(eq(user_profiles.user_id, user.id)).limit(1);
+      if (existingProfile) {
+        await db.update(user_profiles).set({ preferred_session_type: mode, updated_at: new Date() }).where(eq(user_profiles.user_id, user.id));
+      } else {
+        await db.insert(user_profiles).values({ user_id: user.id, preferred_session_type: mode });
+      }
+    }
+
+    // ── health_profiles: symptoms/complaints + medications, encrypted ──
+    const conditions = [...asStrings(payload.chief_complaints), ...asStrings(payload.conditions_icd_codes)];
+    const medications = asStrings(payload.medications_tried);
+    const healthData: Record<string, unknown> = { updated_at: new Date() };
+    if (conditions.length) healthData.medical_conditions_encrypted = encrypt(JSON.stringify(conditions), this.encryptionKey);
+    if (medications.length) healthData.medications_encrypted = encrypt(JSON.stringify(medications), this.encryptionKey);
+    if (Object.keys(healthData).length > 1) {
+      const [existingHealth] = await db.select({ id: health_profiles.id }).from(health_profiles).where(eq(health_profiles.user_id, user.id)).limit(1);
+      if (existingHealth) {
+        await db.update(health_profiles).set(healthData as any).where(eq(health_profiles.user_id, user.id));
+      } else {
+        await db.insert(health_profiles).values({ user_id: user.id, ...(healthData as any) });
+      }
+    }
+
+    // ── onboarding_state: mark complete + store the FULL payload encrypted inside step_data ──
+    // (encrypted string kept in the existing jsonb column — no schema migration needed).
+    const [existingState] = await db.select().from(onboarding_state).where(eq(onboarding_state.user_id, user.id)).limit(1);
+    const stepData = ((existingState?.step_data as Record<string, unknown>) || {});
+    stepData.ai_onboarding = {
+      source: 'ai_onboarding',
+      session_id: asString(payload.session_id) ?? null,
+      for_whom: asString(payload.for_whom) ?? 'self',
+      age_group: asString(payload.patient_age_group) ?? null,
+      consultation_mode: mode ?? null,
+      urgency: asString(payload.urgency) ?? null,
+      urgency_level: asString(payload.urgency_level) ?? null,
+      specialties_needed: asStrings(payload.specialties_needed),
+      language_preference: asStrings(payload.language_preference),
+    };
+    stepData.ai_onboarding_encrypted = encrypt(JSON.stringify(payload), this.encryptionKey);
+
+    if (existingState) {
+      await db.update(onboarding_state).set({
+        is_completed: true, completed_at: new Date(), step_data: stepData, updated_at: new Date(),
+      }).where(eq(onboarding_state.user_id, user.id));
+    } else {
+      await db.insert(onboarding_state).values({
+        user_id: user.id, is_completed: true, completed_at: new Date(), step_data: stepData,
+      });
+    }
+
+    logger.info({ userId: user.id, authId }, 'AI onboarding payload persisted to durable profile');
+    return { userId: user.id };
   }
 
   // ── Consents (proxy to auth service) ──
@@ -866,5 +958,27 @@ export class UserService {
     }
 
     return result;
+  }
+
+  private decryptOnboardingState(state: Record<string, unknown>) {
+    const stepData = (state.step_data as Record<string, unknown>) || {};
+    const { ai_onboarding_encrypted, ...restStep } = stepData as any;
+
+    let aiOnboardingDetail: Record<string, unknown> | null = null;
+    if (ai_onboarding_encrypted) {
+      try { aiOnboardingDetail = JSON.parse(decrypt(ai_onboarding_encrypted, this.encryptionKey)); }
+      catch { aiOnboardingDetail = null; }
+    }
+
+    return {
+      is_completed: state.is_completed,
+      current_step: state.current_step,
+      total_steps: state.total_steps,
+      completed_steps: state.completed_steps,
+      completed_at: state.completed_at,
+      updated_at: state.updated_at,
+      step_data: restStep,          // step_data without the encrypted blob
+      aiOnboarding: aiOnboardingDetail, // full decrypted AI onboarding payload (symptoms, history, summaries)
+    };
   }
 }

@@ -14,6 +14,12 @@ export function createApp(): Elysia {
         info: { title: 'Longeny AI Content Service', version: '1.0.0' },
         tags: [
           { name: 'onboarding', description: 'Patient onboarding via Aria AI agent' },
+          { name: 'sessions', description: 'Onboarding session history and tracking' },
+          { name: 'post-onboarding', description: 'Health tips and consultation prep after onboarding' },
+          { name: 'provider-profiles', description: 'Provider AI profile management' },
+          { name: 'matching', description: 'Patient-provider matching algorithm' },
+          { name: 'scheduling', description: 'Appointment availability and booking' },
+          { name: 'notifications', description: 'Provider notification management' },
           { name: 'knowledge-base', description: 'KB document upload and ingestion' },
           { name: 'rag', description: 'Patient RAG queries against knowledge base' },
         ],

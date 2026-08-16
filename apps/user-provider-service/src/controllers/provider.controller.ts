@@ -119,8 +119,6 @@ export class ProviderController {
   listProviders = async ({ query }: any) => {
     const result = await this.providerService.listProviders({
       category: query.category,
-      city: query.city,
-      state: query.state,
       offersVirtual: query.offersVirtual ? query.offersVirtual === 'true' : undefined,
       offersInPerson: query.offersInPerson ? query.offersInPerson === 'true' : undefined,
       minRating: query.minRating ? Number(query.minRating) : undefined,

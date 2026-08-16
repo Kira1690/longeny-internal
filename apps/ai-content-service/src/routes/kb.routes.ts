@@ -3,7 +3,7 @@ import { requireAuth, requireRole } from '@longeny/middleware';
 import type { KbController } from '../controllers/kb.controller.js';
 
 export function createKbRoutes(controller: KbController): Elysia {
-  return new Elysia({ prefix: '/ai/kb' })
+  return new Elysia({ prefix: '/ai/kb', detail: { tags: ['knowledge-base'] } })
     .use(requireAuth())
     .post(
       '/upload',
@@ -15,7 +15,17 @@ export function createKbRoutes(controller: KbController): Elysia {
           description: t.Optional(t.String()),
           collection_name: t.Optional(t.String()),
         }),
+        detail: {
+          summary: 'Upload document to knowledge base',
+          description:
+            'Uploads a medical document for ingestion into ChromaDB. Supports PDF, DOCX, TXT (max 50MB). Returns a job ID for tracking ingestion status.',
+        },
       },
     )
-    .get('/status/:jobId', ({ params }) => controller.getStatus({ params }));
+    .get('/status/:jobId', ({ params }) => controller.getStatus({ params }), {
+      detail: {
+        summary: 'Get ingestion job status',
+        description: 'Returns the processing status of a KB ingestion job: pending, processing, completed, or failed.',
+      },
+    });
 }

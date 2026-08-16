@@ -15,8 +15,13 @@ export interface SessionState {
 }
 
 export class OnboardingAgentService {
-  async startSession(): Promise<SessionStartResult> {
-    const res = await fetch(`${BASE}/ai/onboarding/session`, { method: 'POST' });
+  async startSession(opts?: { userId?: string; name?: string }): Promise<SessionStartResult> {
+    // Pass the account holder's name so Aria greets them by name instead of asking for it.
+    const res = await fetch(`${BASE}/ai/onboarding/session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: opts?.userId, name: opts?.name }),
+    });
     if (!res.ok) throw new Error(`Agent /session failed: ${res.status}`);
     return res.json() as Promise<SessionStartResult>;
   }

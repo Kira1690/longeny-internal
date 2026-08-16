@@ -18,7 +18,7 @@ interface ConsentCheckResult {
 export const requireConsent = (...requiredTypes: ConsentType[]) =>
   new Elysia({ name: `require-consent-${requiredTypes.join('-')}` })
     .use(authStore())
-    .onBeforeHandle(async ({ store, error }) => {
+    .onBeforeHandle(async ({ store }) => {
       const userId = store.userId;
 
       if (!userId) {

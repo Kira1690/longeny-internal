@@ -12,6 +12,7 @@
     "db:migrate": "bunx drizzle-kit migrate",
     "db:push": "bunx drizzle-kit push",
     "db:seed": "bun run src/db/seed.ts",
+    "db:seed:providers": "bun run src/db/seed-providers.ts",
     "db:studio": "bunx drizzle-kit studio"
   },
   "dependencies": {

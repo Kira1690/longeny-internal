@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia';
 import { requireAuth, requireRole } from '@longeny/middleware';
+import { UserRole } from '@longeny/types';
 import type { ProviderController } from '../controllers/provider.controller.js';
 import {
   providerRegisterSchema,
@@ -14,7 +15,7 @@ const bearer = { security: [{ BearerAuth: [] }] };
 
 export function createProviderRoutes(controller: ProviderController) {
   const authRequired = requireAuth();
-  const providerRequired = requireRole('provider');
+  const providerRequired = requireRole(UserRole.PROVIDER);
 
   return new Elysia({ prefix: '/providers' })
     // Public endpoints

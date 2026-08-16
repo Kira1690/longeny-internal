@@ -81,13 +81,7 @@ export async function proxyRequest(ctx: ProxyContext, targetBaseUrl: string): Pr
   }
 
   // Sign request with HMAC for downstream service-to-service auth
-  const hmacHeaders = signRequest(
-    'gateway',
-    config.HMAC_SECRET,
-    method,
-    strippedPath,
-    body || '',
-  );
+  const hmacHeaders = signRequest('gateway', config.HMAC_SECRET, method, strippedPath, body || '');
   for (const [key, value] of Object.entries(hmacHeaders)) {
     headers.set(key, value);
   }

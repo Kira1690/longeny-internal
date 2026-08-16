@@ -3,7 +3,7 @@ import { Value } from '@sinclair/typebox/value';
 import { createLogger } from '@longeny/utils';
 import { db } from '../db/index.js';
 import { provider_onboarding, provider_admin_checks, providers, users } from '../db/schema.js';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import {
   SECTION_KEYS,
   sectionSchemas,
@@ -292,6 +292,57 @@ export class OnboardingService {
 
   // ── Admin methods ──
 
+  async adminListProviders(filters?: { status?: string; page?: number; limit?: number }) {
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 20;
+    const offset = (page - 1) * limit;
+
+    let query = db
+      .select({
+        provider_id: providers.id,
+        business_name: providers.business_name,
+        display_name: providers.display_name,
+        provider_status: providers.status,
+        user_id: users.id,
+        first_name: users.first_name,
+        last_name: users.last_name,
+        email: users.email,
+        onboarding_id: provider_onboarding.id,
+        onboarding_status: provider_onboarding.status,
+        completed_sections: provider_onboarding.completed_sections,
+        total_sections: provider_onboarding.total_sections,
+        submitted_at: provider_onboarding.submitted_at,
+        reviewed_at: provider_onboarding.reviewed_at,
+        created_at: provider_onboarding.created_at,
+      })
+      .from(providers)
+      .innerJoin(users, eq(users.id, providers.user_id))
+      .leftJoin(provider_onboarding, eq(provider_onboarding.provider_id, providers.id))
+      .$dynamic();
+
+    if (filters?.status) {
+      query = query.where(eq(provider_onboarding.status, filters.status as any));
+    }
+
+    const rows = await query.orderBy(providers.created_at).limit(limit).offset(offset);
+
+    const [{ count }] = await db
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(providers)
+      .innerJoin(users, eq(users.id, providers.user_id))
+      .leftJoin(provider_onboarding, eq(provider_onboarding.provider_id, providers.id));
+
+    return {
+      data: rows,
+      pagination: {
+        page,
+        limit,
+        total: count,
+        totalPages: Math.ceil(count / limit),
+      },
+    };
+  }
+
   async adminGetOnboarding(providerId: string) {
     return this.getFullOnboarding(providerId);
   }
@@ -323,6 +374,12 @@ export class OnboardingService {
     isChecked: boolean,
     notes?: string,
   ) {
+    if (!ADMIN_CHECK_KEYS.includes(checkKey as any)) {
+      throw new ValidationError(
+        [{ field: 'check_key', message: `Must be one of: ${ADMIN_CHECK_KEYS.join(', ')}` }],
+      );
+    }
+
     const row = await this.getFullOnboarding(providerId);
 
     const [existing] = await db
@@ -364,6 +421,53 @@ export class OnboardingService {
       .returning();
 
     return updated;
+  }
+
+  async adminGetDocumentUrls(providerId: string) {
+    const row = await this.getFullOnboarding(providerId);
+
+    const documentFields: { field: string; section: string; sectionKey: string }[] = [
+      { field: 'profile_photo_url', section: 'basic_identity', sectionKey: 'basic_identity' },
+      { field: 'govt_id_proof_url', section: 'license_verification', sectionKey: 'license_verification' },
+      { field: 'address_proof_url', section: 'license_verification', sectionKey: 'license_verification' },
+      { field: 'insurance_proof_url', section: 'license_verification', sectionKey: 'license_verification' },
+      { field: 'profile_photo_url', section: 'marketplace_profile', sectionKey: 'marketplace_profile' },
+    ];
+
+    const { S3Client, GetObjectCommand } = await import('@aws-sdk/client-s3');
+    const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
+
+    const s3 = new S3Client({
+      region: config.AWS_REGION,
+      credentials: {
+        accessKeyId: config.AWS_ACCESS_KEY_ID,
+        secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
+      },
+    });
+
+    const bucket = config.S3_UPLOADS_BUCKET;
+    const bucketPrefix = `https://${bucket}.s3.${config.AWS_REGION}.amazonaws.com/`;
+
+    const documents: { field: string; section: string; public_url: string; view_url: string }[] = [];
+
+    for (const { field, section, sectionKey } of documentFields) {
+      const sectionData = row[sectionKey as keyof typeof row] as Record<string, unknown> | null;
+      if (!sectionData || !sectionData[field]) continue;
+
+      const publicUrl = sectionData[field] as string;
+      if (!publicUrl.startsWith(bucketPrefix)) {
+        documents.push({ field, section, public_url: publicUrl, view_url: publicUrl });
+        continue;
+      }
+
+      const key = publicUrl.replace(bucketPrefix, '');
+      const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+      const viewUrl = await getSignedUrl(s3, command, { expiresIn: 900 });
+      documents.push({ field, section, public_url: publicUrl, view_url: viewUrl });
+    }
+
+    logger.info({ providerId, count: documents.length }, 'Admin document view URLs generated');
+    return { provider_id: providerId, documents, expires_in: 900 };
   }
 
   async adminUpdateStatus(

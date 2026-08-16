@@ -18,6 +18,7 @@
 | 03 | [Error Handling](./03-error-handling.md) | Error formats, codes, validation errors, handler example |
 | 04 | [Frontend Integration](./04-frontend-integration-examples.md) | AuthContext, login/register pages, protected routes, consent banner |
 | 05 | [AI Content Service](./05-ai-content-service.md) | Onboarding, KB upload, RAG query — endpoints, auth, error codes, env vars |
+| 06 | [Onboarding Persistence & Greeting](./06-onboarding-persistence-and-greeting.md) | Onboarding data persisted to the profile; Aria greets by name; `GET /users/me` new fields |
 
 ## Auth Service — Endpoint Summary
 

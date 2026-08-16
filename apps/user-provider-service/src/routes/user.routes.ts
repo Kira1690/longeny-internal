@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia';
 import { requireAuth, requireRole } from '@longeny/middleware';
+import { UserRole } from '@longeny/types';
 import type { UserController } from '../controllers/user.controller.js';
 import {
   updateProfileSchema,
@@ -12,7 +13,7 @@ const bearer = { security: [{ BearerAuth: [] }] };
 
 export function createUserRoutes(controller: UserController) {
   const authRequired = requireAuth();
-  const adminRequired = requireRole('admin');
+  const adminRequired = requireRole(UserRole.ADMIN);
 
   return new Elysia({ prefix: '/users' })
     .use(authRequired)

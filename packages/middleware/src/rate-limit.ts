@@ -29,7 +29,7 @@ export const rateLimit = (config: RateLimitConfig) => {
   let connected = false;
 
   return new Elysia({ name: `rate-limit-${keyPrefix}` })
-    .onBeforeHandle(async ({ request, set, error }) => {
+    .onBeforeHandle(async ({ request, set }) => {
       if (!connected) {
         await redis.connect();
         connected = true;

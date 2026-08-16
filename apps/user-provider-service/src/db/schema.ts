@@ -34,6 +34,18 @@ export const priceTypeEnum = pgEnum('price_type', ['one_time', 'subscription_mon
 export const dayOfWeekEnum = pgEnum('day_of_week', ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
 
 // ─────────────────────────────────────────────────────────────
+// Enums — Provider Onboarding Module
+// ─────────────────────────────────────────────────────────────
+
+export const onboardingStatusEnum = pgEnum('onboarding_status', [
+  'draft', 'submitted', 'under_review', 'approved', 'rejected',
+]);
+
+export const sectionStatusEnum = pgEnum('section_status', [
+  'not_started', 'in_progress', 'completed',
+]);
+
+// ─────────────────────────────────────────────────────────────
 // Enums — Marketplace Module
 // ─────────────────────────────────────────────────────────────
 
@@ -287,6 +299,61 @@ export const availability_overrides = pgTable('availability_overrides', {
   end_time: time('end_time'),
   is_blocked: boolean('is_blocked').default(false).notNull(),
   reason: varchar('reason', { length: 200 }),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ─────────────────────────────────────────────────────────────
+// Tables — Provider Onboarding Module
+// ─────────────────────────────────────────────────────────────
+
+export const provider_onboarding = pgTable('provider_onboarding', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  provider_id: uuid('provider_id').notNull().unique(),
+  status: onboardingStatusEnum('status').default('draft').notNull(),
+
+  basic_identity: jsonb('basic_identity'),
+  basic_identity_status: sectionStatusEnum('basic_identity_status').default('not_started').notNull(),
+  professional_credentials: jsonb('professional_credentials'),
+  professional_credentials_status: sectionStatusEnum('professional_credentials_status').default('not_started').notNull(),
+  license_verification: jsonb('license_verification'),
+  license_verification_status: sectionStatusEnum('license_verification_status').default('not_started').notNull(),
+  practice_services: jsonb('practice_services'),
+  practice_services_status: sectionStatusEnum('practice_services_status').default('not_started').notNull(),
+  scheduling_setup: jsonb('scheduling_setup'),
+  scheduling_setup_status: sectionStatusEnum('scheduling_setup_status').default('not_started').notNull(),
+  marketplace_profile: jsonb('marketplace_profile'),
+  marketplace_profile_status: sectionStatusEnum('marketplace_profile_status').default('not_started').notNull(),
+  banking_commercial: jsonb('banking_commercial'),
+  banking_commercial_status: sectionStatusEnum('banking_commercial_status').default('not_started').notNull(),
+  platform_readiness: jsonb('platform_readiness'),
+  platform_readiness_status: sectionStatusEnum('platform_readiness_status').default('not_started').notNull(),
+  document_capability: jsonb('document_capability'),
+  document_capability_status: sectionStatusEnum('document_capability_status').default('not_started').notNull(),
+  compliance_consents: jsonb('compliance_consents'),
+  compliance_consents_status: sectionStatusEnum('compliance_consents_status').default('not_started').notNull(),
+  legal_declarations: jsonb('legal_declarations'),
+  legal_declarations_status: sectionStatusEnum('legal_declarations_status').default('not_started').notNull(),
+  trust_layer: jsonb('trust_layer'),
+  trust_layer_status: sectionStatusEnum('trust_layer_status').default('not_started').notNull(),
+
+  completed_sections: integer('completed_sections').default(0).notNull(),
+  total_sections: integer('total_sections').default(12).notNull(),
+  submitted_at: timestamp('submitted_at', { withTimezone: true }),
+  reviewed_at: timestamp('reviewed_at', { withTimezone: true }),
+  reviewer_notes: text('reviewer_notes'),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const provider_admin_checks = pgTable('provider_admin_checks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  provider_id: uuid('provider_id').notNull(),
+  onboarding_id: uuid('onboarding_id').notNull(),
+  check_key: varchar('check_key', { length: 50 }).notNull(),
+  is_checked: boolean('is_checked').default(false).notNull(),
+  checked_by: uuid('checked_by'),
+  checked_at: timestamp('checked_at', { withTimezone: true }),
+  notes: text('notes'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

@@ -5,12 +5,14 @@ import { createMarketplaceRoutes } from './marketplace.routes.js';
 import { createAdminRoutes } from './admin.routes.js';
 import { createProgressRoutes } from './progress.routes.js';
 import { createInternalRoutes } from './internal.routes.js';
+import { createOnboardingRoutes } from './onboarding.routes.js';
 import type { UserController } from '../controllers/user.controller.js';
 import type { ProviderController } from '../controllers/provider.controller.js';
 import type { MarketplaceController } from '../controllers/marketplace.controller.js';
 import type { AdminController } from '../controllers/admin.controller.js';
 import type { ProgressController } from '../controllers/progress.controller.js';
 import type { InternalController } from '../controllers/internal.controller.js';
+import type { OnboardingController } from '../controllers/onboarding.controller.js';
 
 interface Controllers {
   user: UserController;
@@ -19,6 +21,7 @@ interface Controllers {
   admin: AdminController;
   progress: ProgressController;
   internal: InternalController;
+  onboarding: OnboardingController;
 }
 
 export function buildRoutes(controllers: Controllers) {
@@ -28,5 +31,6 @@ export function buildRoutes(controllers: Controllers) {
     .use(createMarketplaceRoutes(controllers.marketplace))
     .use(createAdminRoutes(controllers.admin))
     .use(createProgressRoutes(controllers.progress))
-    .use(createInternalRoutes(controllers.internal));
+    .use(createInternalRoutes(controllers.internal))
+    .use(createOnboardingRoutes(controllers.onboarding));
 }

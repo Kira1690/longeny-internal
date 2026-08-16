@@ -12,25 +12,27 @@ const HMAC_MAX_AGE_MS = 30_000; // 30 seconds
 export const verifyHmac = (secret: string) =>
   new Elysia({ name: `verify-hmac-${secret.slice(0, 8)}` })
     .state('serviceName', '')
-    .onBeforeHandle(async ({ request, store, error }) => {
+    .onBeforeHandle(async ({ request, store, set }) => {
       const serviceName = request.headers.get('X-Service-Name');
       const timestamp = request.headers.get('X-Timestamp');
       const signature = request.headers.get('X-Signature');
 
       if (!serviceName || !timestamp || !signature) {
-        return error(401, {
+        set.status = 401;
+        return {
           success: false,
           error: { code: 'UNAUTHORIZED', message: 'Missing HMAC authentication headers' },
-        });
+        };
       }
 
       // Replay attack prevention
       const age = Date.now() - Number.parseInt(timestamp, 10);
       if (Math.abs(age) > HMAC_MAX_AGE_MS) {
-        return error(401, {
+        set.status = 401;
+        return {
           success: false,
           error: { code: 'UNAUTHORIZED', message: 'Request timestamp outside acceptable window' },
-        });
+        };
       }
 
       const method = request.method.toUpperCase();
@@ -40,10 +42,11 @@ export const verifyHmac = (secret: string) =>
       const isValid = hmacVerify(signature, method, path, timestamp, body, secret);
 
       if (!isValid) {
-        return error(401, {
+        set.status = 401;
+        return {
           success: false,
           error: { code: 'UNAUTHORIZED', message: 'Invalid HMAC signature' },
-        });
+        };
       }
 
       store.serviceName = serviceName;

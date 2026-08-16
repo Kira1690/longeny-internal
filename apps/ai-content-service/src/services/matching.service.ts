@@ -1,7 +1,10 @@
 import { config } from '../config/index.js';
 import { AppError } from '@longeny/errors';
+import { createLogger } from '@longeny/utils';
+import { publishPatientOnboardingCompleted } from '../events/publishers.js';
 
 const BASE = config.AI_AGENT_URL;
+const logger = createLogger('ai-content:matching');
 
 export interface MatchedProvider {
   provider_id: string;
@@ -32,7 +35,31 @@ export class MatchingService {
       body: JSON.stringify({ session_id: sessionId, user_id: userId }),
     });
     if (!res.ok) throw new AppError('Matching failed', 502, 'AGENT_ERROR');
-    return res.json() as Promise<MatchResult>;
+    const result = (await res.json()) as MatchResult;
+
+    // Persist the completed onboarding to the patient's durable profile. The AI agent keeps
+    // the intake only in Redis (7-day TTL); without this the health data is lost when the
+    // session expires or the patient revisits their profile. Best-effort: a persistence
+    // failure must never break matching.
+    void this.persistOnboarding(sessionId, userId);
+
+    return result;
+  }
+
+  /** Fetch the finalize payload and emit patient.onboarding.completed for durable persistence. */
+  private async persistOnboarding(sessionId: string, authId: string): Promise<void> {
+    try {
+      const res = await fetch(`${BASE}/ai/onboarding/finalize/${sessionId}`);
+      if (!res.ok) {
+        logger.warn({ sessionId, status: res.status }, 'Could not fetch final payload for persistence');
+        return;
+      }
+      const finalPayload = (await res.json()) as Record<string, unknown>;
+      if (!finalPayload || typeof finalPayload !== 'object') return;
+      await publishPatientOnboardingCompleted({ authId, sessionId, finalPayload });
+    } catch (error) {
+      logger.error({ error, sessionId }, 'Failed to publish onboarding-completed event');
+    }
   }
 
   async getMatchResult(matchId: string): Promise<MatchResult | null> {

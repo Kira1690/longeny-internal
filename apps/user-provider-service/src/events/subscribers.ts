@@ -147,5 +147,45 @@ export function registerSubscribers(
     }
   });
 
+  // ── patient.onboarding.completed: persist AI onboarding intake to the durable profile ──
+  consumer.on(EVENT_NAMES.PATIENT_ONBOARDING_COMPLETED, async (event: EventEnvelope) => {
+    const { authId, sessionId, finalPayload } = event.payload as {
+      authId: string;
+      sessionId: string;
+      finalPayload: Record<string, unknown>;
+    };
+
+    logger.info({ authId, sessionId, correlationId: event.correlationId }, 'Handling patient.onboarding.completed');
+
+    if (!authId || !finalPayload) {
+      logger.warn({ authId, correlationId: event.correlationId }, 'Missing authId or finalPayload, skipping');
+      return;
+    }
+
+    const [existing] = await db
+      .select()
+      .from(processed_events)
+      .where(eq(processed_events.event_id, event.correlationId))
+      .limit(1);
+
+    if (existing) {
+      logger.debug({ correlationId: event.correlationId }, 'Event already processed, skipping');
+      return;
+    }
+
+    try {
+      await userService.applyOnboardingPayload(authId, finalPayload);
+
+      await db.insert(processed_events).values({
+        event_id: event.correlationId,
+        event_type: EVENT_NAMES.PATIENT_ONBOARDING_COMPLETED,
+      });
+
+      logger.info({ authId, sessionId }, 'AI onboarding intake persisted to durable profile');
+    } catch (error) {
+      logger.error({ error, authId, sessionId, correlationId: event.correlationId }, 'Failed to handle patient.onboarding.completed');
+    }
+  });
+
   logger.info('Event subscribers registered');
 }

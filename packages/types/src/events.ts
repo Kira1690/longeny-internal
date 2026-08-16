@@ -16,6 +16,9 @@ export const EVENT_NAMES = {
   PROVIDER_PROGRAM_CREATED: 'provider.program.created',
   PROVIDER_PROGRAM_UPDATED: 'provider.program.updated',
   PROVIDER_PRODUCT_CREATED: 'provider.product.created',
+  PROVIDER_ONBOARDING_SUBMITTED: 'provider.onboarding.submitted',
+  PROVIDER_ONBOARDING_APPROVED: 'provider.onboarding.approved',
+  PROVIDER_ONBOARDING_REJECTED: 'provider.onboarding.rejected',
   // Booking
   BOOKING_CREATED: 'booking.created',
   BOOKING_CONFIRMED: 'booking.confirmed',
@@ -31,6 +34,7 @@ export const EVENT_NAMES = {
   // AI & Content
   AI_RECOMMENDATION_GENERATED: 'ai.recommendation.generated',
   AI_DOCUMENT_GENERATED: 'ai.document.generated',
+  PATIENT_ONBOARDING_COMPLETED: 'patient.onboarding.completed',
   DOCUMENT_UPLOADED: 'document.uploaded',
   DOCUMENT_SHARED: 'document.shared',
   // GDPR

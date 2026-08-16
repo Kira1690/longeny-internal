@@ -59,6 +59,15 @@ export class OnboardingController {
 
   // ── Admin handlers ──
 
+  adminListProviders = async ({ query }: any) => {
+    const result = await this.onboardingService.adminListProviders({
+      status: query.status,
+      page: query.page ? Number(query.page) : 1,
+      limit: query.limit ? Number(query.limit) : 20,
+    });
+    return { success: true, ...result };
+  };
+
   adminGetOnboarding = async ({ params }: any) => {
     const result = await this.onboardingService.adminGetOnboarding(params.providerId);
     return { success: true, data: result };
@@ -66,6 +75,11 @@ export class OnboardingController {
 
   adminGetChecks = async ({ params }: any) => {
     const result = await this.onboardingService.adminGetChecks(params.providerId);
+    return { success: true, data: result };
+  };
+
+  adminGetDocumentUrls = async ({ params }: any) => {
+    const result = await this.onboardingService.adminGetDocumentUrls(params.providerId);
     return { success: true, data: result };
   };
 

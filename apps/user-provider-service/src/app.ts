@@ -10,6 +10,7 @@ import { ProviderService } from './services/provider.service.js';
 import { MarketplaceService } from './services/marketplace.service.js';
 import { AdminService } from './services/admin.service.js';
 import { ProgressService } from './services/progress.service.js';
+import { OnboardingService } from './services/onboarding.service.js';
 
 // Controllers
 import { UserController } from './controllers/user.controller.js';
@@ -18,6 +19,7 @@ import { MarketplaceController } from './controllers/marketplace.controller.js';
 import { AdminController } from './controllers/admin.controller.js';
 import { ProgressController } from './controllers/progress.controller.js';
 import { InternalController } from './controllers/internal.controller.js';
+import { OnboardingController } from './controllers/onboarding.controller.js';
 
 // Routes
 import { buildRoutes } from './routes/index.js';
@@ -32,6 +34,7 @@ export function createApp() {
   const marketplaceService = new MarketplaceService(null);
   const adminService = new AdminService(null);
   const progressService = new ProgressService(null);
+  const onboardingService = new OnboardingService();
 
   // ── Controllers ──
   const userController = new UserController(userService, publisher);
@@ -40,6 +43,7 @@ export function createApp() {
   const adminController = new AdminController(adminService);
   const progressController = new ProgressController(progressService);
   const internalController = new InternalController(userService, providerService);
+  const onboardingController = new OnboardingController(onboardingService, publisher);
 
   // ── Elysia app ──
   const app = new Elysia()
@@ -58,6 +62,8 @@ export function createApp() {
           { name: 'Marketplace', description: 'Search and explore wellness marketplace' },
           { name: 'Admin', description: 'Admin moderation, provider verification, analytics' },
           { name: 'Progress', description: 'User health metrics, habits, goals' },
+          { name: 'Provider Onboarding', description: 'Multi-step physician onboarding form (12 sections)' },
+          { name: 'Admin Onboarding Review', description: 'Admin verification checklist and approval' },
         ],
         components: {
           securitySchemes: {
@@ -85,6 +91,7 @@ export function createApp() {
       admin: adminController,
       progress: progressController,
       internal: internalController,
+      onboarding: onboardingController,
     }));
 
   return { app, publisher, userService };

@@ -69,130 +69,80 @@ export class MarketplaceService {
     const limit = filters.limit || 20;
     const offset = (page - 1) * limit;
 
-    const conditions: string[] = [`si."status" = 'active'`];
-    const params: unknown[] = [];
-    let paramIndex = 1;
+    const conditions: ReturnType<typeof sql>[] = [sql`si."status" = 'active'`];
 
     if (filters.entityType) {
-      conditions.push(`si."entity_type"::text = $${paramIndex}`);
-      params.push(filters.entityType);
-      paramIndex++;
+      conditions.push(sql`si."entity_type"::text = ${filters.entityType}`);
     }
-
     if (filters.category) {
-      conditions.push(`si."category" = $${paramIndex}`);
-      params.push(filters.category);
-      paramIndex++;
+      conditions.push(sql`si."category" = ${filters.category}`);
     }
-
     if (filters.subcategory) {
-      conditions.push(`si."subcategory" = $${paramIndex}`);
-      params.push(filters.subcategory);
-      paramIndex++;
+      conditions.push(sql`si."subcategory" = ${filters.subcategory}`);
     }
-
     if (filters.minPrice !== undefined) {
-      conditions.push(`si."price_min" >= $${paramIndex}`);
-      params.push(filters.minPrice);
-      paramIndex++;
+      conditions.push(sql`si."price_min" >= ${filters.minPrice}`);
     }
-
     if (filters.maxPrice !== undefined) {
-      conditions.push(`si."price_max" <= $${paramIndex}`);
-      params.push(filters.maxPrice);
-      paramIndex++;
+      conditions.push(sql`si."price_max" <= ${filters.maxPrice}`);
     }
-
     if (filters.offersVirtual !== undefined) {
-      conditions.push(`si."offers_virtual" = $${paramIndex}`);
-      params.push(filters.offersVirtual);
-      paramIndex++;
+      conditions.push(sql`si."offers_virtual" = ${filters.offersVirtual}`);
     }
-
     if (filters.offersInPerson !== undefined) {
-      conditions.push(`si."offers_in_person" = $${paramIndex}`);
-      params.push(filters.offersInPerson);
-      paramIndex++;
+      conditions.push(sql`si."offers_in_person" = ${filters.offersInPerson}`);
     }
-
     if (filters.city) {
-      conditions.push(`si."location_city" ILIKE $${paramIndex}`);
-      params.push(`%${filters.city}%`);
-      paramIndex++;
+      conditions.push(sql`si."location_city" ILIKE ${`%${filters.city}%`}`);
     }
-
     if (filters.state) {
-      conditions.push(`si."location_state" = $${paramIndex}`);
-      params.push(filters.state);
-      paramIndex++;
+      conditions.push(sql`si."location_state" = ${filters.state}`);
     }
-
     if (filters.minRating !== undefined) {
-      conditions.push(`si."rating_avg" >= $${paramIndex}`);
-      params.push(filters.minRating);
-      paramIndex++;
+      conditions.push(sql`si."rating_avg" >= ${filters.minRating}`);
     }
 
-    let tsRankSelect = '';
-    let tsCondition = '';
+    const tsVector = sql`to_tsvector('english', coalesce(si."title", '') || ' ' || coalesce(si."description", ''))`;
+    let tsQuery: ReturnType<typeof sql> | null = null;
     if (filters.q) {
-      const tsQuery = filters.q.trim().split(/\s+/).join(' & ');
-      tsCondition = `AND to_tsvector('english', coalesce(si."title", '') || ' ' || coalesce(si."description", '')) @@ to_tsquery('english', $${paramIndex})`;
-      tsRankSelect = `, ts_rank(to_tsvector('english', coalesce(si."title", '') || ' ' || coalesce(si."description", '')), to_tsquery('english', $${paramIndex})) AS relevance`;
-      params.push(tsQuery);
-      paramIndex++;
+      tsQuery = sql`websearch_to_tsquery('english', ${filters.q.trim()})`;
+      conditions.push(sql`${tsVector} @@ ${tsQuery}`);
     }
 
-    let orderClause: string;
-    switch (filters.sortBy) {
-      case 'rating':
-        orderClause = 'ORDER BY si."rating_avg" DESC';
-        break;
-      case 'price_asc':
-        orderClause = 'ORDER BY si."price_min" ASC NULLS LAST';
-        break;
-      case 'price_desc':
-        orderClause = 'ORDER BY si."price_min" DESC NULLS LAST';
-        break;
-      case 'newest':
-        orderClause = 'ORDER BY si."created_at" DESC';
-        break;
-      case 'popularity':
-        orderClause = 'ORDER BY si."popularity_score" DESC';
-        break;
-      case 'relevance':
-      default:
-        orderClause = filters.q
-          ? 'ORDER BY relevance DESC, si."popularity_score" DESC'
-          : 'ORDER BY si."popularity_score" DESC, si."created_at" DESC';
-        break;
-    }
+    const whereClause = sql.join(conditions, sql` AND `);
 
-    const whereClause = conditions.join(' AND ');
-
-    const countQuery = `
-      SELECT COUNT(*)::int AS total
-      FROM search_index si
-      WHERE ${whereClause} ${tsCondition}
-    `;
-    const countResult = await db.execute(buildParameterizedSql(countQuery, params)) as any;
+    const countResult = await db.execute(
+      sql`SELECT COUNT(*)::int AS total FROM search_index si WHERE ${whereClause}`,
+    ) as any;
     const total = (countResult?.[0] as any)?.total || 0;
 
-    params.push(limit);
-    const limitParam = paramIndex;
-    paramIndex++;
-    params.push(offset);
-    const offsetParam = paramIndex;
+    let orderClause: ReturnType<typeof sql>;
+    switch (filters.sortBy) {
+      case 'rating':
+        orderClause = sql`si."rating_avg" DESC`; break;
+      case 'price_asc':
+        orderClause = sql`si."price_min" ASC NULLS LAST`; break;
+      case 'price_desc':
+        orderClause = sql`si."price_min" DESC NULLS LAST`; break;
+      case 'newest':
+        orderClause = sql`si."created_at" DESC`; break;
+      case 'popularity':
+        orderClause = sql`si."popularity_score" DESC`; break;
+      case 'relevance':
+      default:
+        orderClause = tsQuery
+          ? sql`ts_rank(${tsVector}, ${tsQuery}) DESC, si."popularity_score" DESC`
+          : sql`si."popularity_score" DESC, si."created_at" DESC`;
+        break;
+    }
 
-    const dataQuery = `
-      SELECT si.*${tsRankSelect}
-      FROM search_index si
-      WHERE ${whereClause} ${tsCondition}
-      ${orderClause}
-      LIMIT $${limitParam} OFFSET $${offsetParam}
-    `;
+    const selectClause = tsQuery
+      ? sql`si.*, ts_rank(${tsVector}, ${tsQuery}) AS relevance`
+      : sql`si.*`;
 
-    const results = await db.execute(buildParameterizedSql(dataQuery, params)) as any;
+    const results = await db.execute(
+      sql`SELECT ${selectClause} FROM search_index si WHERE ${whereClause} ORDER BY ${orderClause} LIMIT ${limit} OFFSET ${offset}`,
+    ) as any;
 
     return {
       data: Array.isArray(results) ? results : [],
