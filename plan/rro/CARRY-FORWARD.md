@@ -62,7 +62,7 @@ rebuild here.**
 | # | What | Why it was deferred | Where it goes |
 |---|---|---|---|
 | C1 | **R6** — ai-content's 112 TypeBox `t.*` usages across 14 route files converge on `@longeny/validators` | Mechanical, touches every legacy ai-content surface, week was over cap | Week 8, V-W7-3 remainder |
-| C2 | **D2 query conversion** — progress / habits / goals still filter on `user_id`, not `profile_id`. Columns and middleware exist; the queries do not use them | Scheduled card, never the blocking one | Week 8 (was V-W7-5, "first to cut") |
+| C2 | **D2 query conversion** — progress / habits / goals still filter on `user_id`, not `profile_id`. Columns and middleware exist; the queries do not use them | Displaced from Week 7 when V-W7-7 grew 9h → 12h | **Week 8 §8.8**, 6h. Written up in [week-08-workspace.md](./week-08-workspace.md). **Not on the board** — no Week 8 cards exist until Week 8 is planned |
 | C3 | **SMS has no transport.** Every SMS notification records `failed` with that reason — deliberate and visible, but a dependent reachable only by phone is not reachable | No carrier chosen | Needs a product decision, not an engineering one |
 | C4 | **481 `noExplicitAny` warnings**, mostly `({ body, store }: any)` in controllers | Not failing the build; the standard forbids *new* ones | Opportunistic |
 
@@ -144,8 +144,9 @@ the per-card checklist in [00-engineering-standards.md](./00-engineering-standar
 - **Migrate Week 7's 12 endpoints to `BraveLabs/`** under the Week 7 cards. Scope-scan the
   diff first: no Claude reference, no `internal-notes/` content, no `plan/rro/` content,
   nothing outside the week's cards. This is the only part of V-W7-7 not done.
-- The 44h overrun is **settled**: Week 7 stands as delivered, and D2 query conversion moved
-  out to its own Week 8 card. A1 and A2 are **decided** — see section A.
+- The 44h overrun is **settled**: Week 7 stands as delivered, and D2 moved out to
+  [week-08-workspace.md](./week-08-workspace.md) §8.8. A1 and A2 are **decided** — see
+  section A.
 
 ---
 
@@ -156,5 +157,5 @@ the per-card checklist in [00-engineering-standards.md](./00-engineering-standar
 | Week plans, capacity, open designs | `longeny-internal/plan/rro/` — internal only, never migrates to the client repo |
 | Standards gate applied per card | [00-engineering-standards.md](./00-engineering-standards.md) |
 | Scope source of truth | `prep/RRO_MVP_Gantt_Chart.xlsx`, `prep/RRO_MVP_Work_Plan.xlsx` (Week 8 row 13b is flagged PENDING) |
-| Board | Trello `LONGENY MVP — 60-Day Sprint`, lists Week 6 / Week 7 / In Progress / In Review / Done / Blocked |
+| Board | Trello `LONGENY MVP — 60-Day Sprint`, lists Week 6 / Week 7 / In Progress / In Review / Done / Blocked. **The board only ever holds the current week.** Future-week work lives in these plan files and in the XLS until that week is planned — do not create a list or cards ahead of it |
 | Secrets, AWS, PEM | `internal-notes/`, `pemKey/` — outside both repos, committed to neither |

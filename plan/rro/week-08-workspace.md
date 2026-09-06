@@ -82,6 +82,39 @@ Adding it makes Week 8's backend demand 110h against 35h of capacity. That is th
 decision to put in front of the client — and it is now a decision about *sequence and
 resourcing*, not about whether to do it, because the workspace cards depend on it.
 
+## 8.8 D2 — scope progress, habits and goals to profile_id — 6h — Vishal
+
+Carried in from Week 7, where it was displaced when V-W7-7 grew from 9h to 12h. Not new
+work found late: a known gap, scheduled, then cut when the defect fixes took its hours.
+Tracked as C2 in [CARRY-FORWARD.md](./CARRY-FORWARD.md).
+
+**The gap.** `progress_entries`, `habits`, `habit_checkins` and `goals` all gained a
+`profile_id` column in Week 6, and the profile-context middleware resolves the active
+profile on every request. **The queries still filter on `user_id`.** Column and middleware
+exist; nothing reads them.
+
+So tenancy is half applied on those four tables. A family account with a father and a
+mother sees one merged set of habits and goals, because the filter is still the account,
+not the person. Not a cross-account leak — `user_id` still scopes to the owner — but within
+an account the profiles are not separated, which is the entire point of the model built in
+Weeks 6 and 7.
+
+**Scope**
+- Convert every read and write on those four tables to filter and insert on `profile_id`,
+  taken from the request's profile context.
+- Legacy rows carry `profile_id = NULL`, meaning "the account owner's own record". Backfill
+  to the account's self profile rather than leaving two meanings of NULL in one column.
+- Any route with no profile context now needs one — check `remote-profile-context.ts`
+  covers each.
+
+**Done when**
+- Two profiles under one account keep entirely separate habits, goals and progress, with a
+  test that writes on both and asserts neither sees the other's.
+- No query on those four tables filters on `user_id` — grep is part of the review.
+- The backfill leaves no `profile_id IS NULL` row on any of the four.
+- A deactivated profile's rows are unreachable, consistent with D7.
+- typecheck 0 · lint clean · full E2E green on real infrastructure.
+
 ## Week 8 exit criteria
 - A provider can open a real profile, read intake + RRO state + summary, write a note and a
   task, all through the gateway.
