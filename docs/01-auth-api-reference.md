@@ -290,6 +290,11 @@ Revoke all active sessions for the current user.
 
 Change password for the authenticated user.
 
+**Every session ends, including this one.** A password change revokes all outstanding
+access and refresh tokens — that is the point of changing it, since the usual reason is that
+the old one may be known to someone else. The client must send the user back to login
+afterwards; the token it holds is dead the moment this returns.
+
 **Request:**
 ```json
 {
@@ -485,10 +490,22 @@ Create a new role.
 Get permissions for a role.
 
 ### PUT `/auth/roles/:id/permissions`
-Update permissions for a role.
+Update permissions for a role. **super_admin only** — an admin able to rewrite the admin
+role's permissions could grant itself anything without ever touching a role assignment.
+Reading permissions stays admin-accessible.
 
 ### GET `/auth/users/:userId/roles`
 Get roles assigned to a user.
 
 ### PUT `/auth/users/:userId/roles`
-Assign roles to a user.
+Assign roles to a user. Three rules, each returning 403:
+- nobody may change their **own** roles, at any rank;
+- nobody may grant a role ranked above their own — only a super_admin grants super_admin;
+- nobody may revoke a role ranked above their own.
+
+The actor's rank is read from the database, not from their token, so a demotion takes effect
+immediately rather than at their next refresh. Every change and every refusal writes an
+audit row naming the actor and the roles before and after.
+
+A successful change revokes the target's outstanding tokens, so a demotion is immediate
+rather than lasting until their access token expires.
