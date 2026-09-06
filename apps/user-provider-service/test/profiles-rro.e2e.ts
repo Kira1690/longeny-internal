@@ -581,6 +581,336 @@ for (const w of writes) {
   if (id) await fetch(`${BASE}/profiles/${id}`, { method: 'DELETE', headers });
 }
 
+// ── Regression: the V-W7-7 defects ───────────────────────────────────────────
+// Each of these reproduces a defect that was live in Week 7. They exist so the
+// fix cannot be undone quietly.
+
+console.log('\n29. A deactivated profile is gone from every route, not just the list');
+{
+  const created = await call(
+    await fetch(`${BASE}/profiles`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ relation: 'sibling', firstName: 'Deleted', lastName: 'Person' }),
+    }),
+  );
+  const goneId = created.body.data?.id;
+  check('fixture profile created', created.status === 201, created);
+
+  const del = await call(
+    await fetch(`${BASE}/profiles/${goneId}`, { method: 'DELETE', headers: authHeaders }),
+  );
+  check('deactivated', del.status === 200, del);
+
+  // assertOwnership used to check the owner and nothing else, so a soft-deleted
+  // profile stayed fully live on every route except the one that lists them.
+  const gets = await call(await fetch(`${BASE}/profiles/${goneId}`, { headers: authHeaders }));
+  check('GET   /profiles/:id → 404', gets.status === 404, gets);
+
+  const patch = await call(
+    await fetch(`${BASE}/profiles/${goneId}`, {
+      method: 'PATCH',
+      headers: authHeaders,
+      body: JSON.stringify({ notes: 'should not be writable' }),
+    }),
+  );
+  check('PATCH /profiles/:id → 404', patch.status === 404, patch);
+
+  const rro = await call(
+    await fetch(`${BASE}/profiles/${goneId}/rro-state`, { headers: authHeaders }),
+  );
+  check('GET   /profiles/:id/rro-state → 404', rro.status === 404, rro);
+
+  const consent = await call(
+    await fetch(`${BASE}/profiles/${goneId}/consent`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ consentType: 'health_data' }),
+    }),
+  );
+  check('POST  /profiles/:id/consent → 404', consent.status === 404, consent);
+
+  const target = await call(
+    await fetch(`${BASE}/profiles/${goneId}/notification-targets`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ channel: 'email', destination: 'ghost@family.test' }),
+    }),
+  );
+  check('POST  /profiles/:id/notification-targets → 404', target.status === 404, target);
+
+  const notifications = await call(
+    await fetch(`${BASE}/profiles/${goneId}/notifications`, { headers: authHeaders }),
+  );
+  check('GET   /profiles/:id/notifications → 404', notifications.status === 404, notifications);
+
+  const activate = await call(
+    await fetch(`${BASE}/profiles/${goneId}/activate`, { method: 'POST', headers: authHeaders }),
+  );
+  check('POST  /profiles/:id/activate → 404', activate.status === 404, activate);
+
+  // Deleting twice must stay idempotent — the caller retrying a request it
+  // already made should not be told the person never existed.
+  const delAgain = await call(
+    await fetch(`${BASE}/profiles/${goneId}`, { method: 'DELETE', headers: authHeaders }),
+  );
+  check('DELETE is still idempotent (200, not 404)', delAgain.status === 200, delAgain);
+}
+
+console.log('\n30. A message to a deactivated profile is not delivered');
+{
+  // The defect that mattered. A soft-deleted profile kept its notification
+  // targets, and the internal notify route looked the profile up directly
+  // rather than through the ownership guard — so a real email went out to a
+  // person the account had removed.
+  const created = await call(
+    await fetch(`${BASE}/profiles`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ relation: 'other', firstName: 'Unreachable', lastName: 'Person' }),
+    }),
+  );
+  const goneId = created.body.data?.id;
+  const destination = `removed-${Date.now()}@family.test`;
+
+  const target = await call(
+    await fetch(`${BASE}/profiles/${goneId}/notification-targets`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ channel: 'email', destination }),
+    }),
+  );
+  check('email target registered while active', target.status === 201, target);
+
+  await fetch(`${BASE}/profiles/${goneId}`, { method: 'DELETE', headers: authHeaders });
+
+  const path = '/internal/notify/profile';
+  const body = JSON.stringify({
+    profileId: goneId,
+    channel: 'email',
+    subject: 'Should never arrive',
+    body: 'This account holder removed this person.',
+  });
+  const notify = await call(
+    await fetch(`${BASE}${path}`, {
+      method: 'POST',
+      headers: hmacHeaders('test-suite', 'POST', path, body),
+      body,
+    }),
+  );
+  check('internal notify refuses a deactivated profile (404)', notify.status === 404, notify);
+  check('and reports nothing delivered', notify.body?.data?.delivered === undefined, notify.body);
+
+  // Database-first: ask the mail server, not the API. A 404 that still sent the
+  // message would pass every check above.
+  const MAILPIT = process.env.TEST_MAILPIT_URL ?? 'http://localhost:8026';
+  try {
+    const search = await fetch(
+      `${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:${destination}`)}`,
+    );
+    const inbox = await search.json();
+    // `messages` is what matched the query; `messages_count` is the whole
+    // mailbox, which other suites also write to.
+    const matched = (inbox.messages ?? []).length;
+    check('the mail server received nothing for the removed person', matched === 0, inbox);
+  } catch (err) {
+    check('mailpit reachable for delivery verification', false, String(err));
+  }
+}
+
+console.log('\n31. A malformed id is a 400, never a 500');
+{
+  // Postgres raises on a bad uuid cast, which surfaced as a 500 — an input
+  // error reported as a server fault, and one that leaks that the id reached a
+  // query at all.
+  const bad = 'not-a-uuid';
+  const routes: Array<[string, () => Promise<Response>]> = [
+    ['GET   /profiles/:id', () => fetch(`${BASE}/profiles/${bad}`, { headers: authHeaders })],
+    [
+      'PATCH /profiles/:id',
+      () =>
+        fetch(`${BASE}/profiles/${bad}`, {
+          method: 'PATCH',
+          headers: authHeaders,
+          body: JSON.stringify({ notes: 'x' }),
+        }),
+    ],
+    [
+      'GET   /profiles/:id/rro-state',
+      () => fetch(`${BASE}/profiles/${bad}/rro-state`, { headers: authHeaders }),
+    ],
+    [
+      'POST  /profiles/:id/consent',
+      () =>
+        fetch(`${BASE}/profiles/${bad}/consent`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({ consentType: 'health_data' }),
+        }),
+    ],
+  ];
+  for (const [name, run] of routes) {
+    const res = await call(await run());
+    check(`${name} → 400`, res.status === 400, res);
+  }
+}
+
+console.log('\n32. An untouched optional field arrives as "" and is treated as absent');
+{
+  // A form that posts every field sends "" for the ones nobody filled in. The
+  // API used to reject that on email and avatarUrl but accept it on lastName,
+  // so it disagreed with itself field by field.
+  const created = await call(
+    await fetch(`${BASE}/profiles`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        relation: 'child',
+        firstName: 'Blank',
+        lastName: '',
+        email: '',
+        phone: '',
+        dateOfBirth: '',
+        avatarUrl: '',
+      }),
+    }),
+  );
+  check('201 with empty optional fields', created.status === 201, created);
+  check('email stored as absent, not ""', !created.body.data?.email, created.body.data?.email);
+  check('has_phone is false', created.body.data?.has_phone === false, created.body.data);
+  const blankId = created.body.data?.id;
+
+  const consent = await call(
+    await fetch(`${BASE}/profiles/${blankId}/consent`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ consentType: 'health_data', documentUrl: '', notes: '' }),
+    }),
+  );
+  check('consent accepts an empty documentUrl', consent.status === 201, consent);
+
+  const patched = await call(
+    await fetch(`${BASE}/profiles/${blankId}`, {
+      method: 'PATCH',
+      headers: authHeaders,
+      body: JSON.stringify({ email: '', avatarUrl: '' }),
+    }),
+  );
+  check('PATCH accepts empty optional fields', patched.status === 200, patched);
+
+  await fetch(`${BASE}/profiles/${blankId}`, { method: 'DELETE', headers: authHeaders });
+}
+
+console.log('\n33. consent_type is a closed taxonomy, at the API and in the column');
+{
+  // Its own fixture: `profileId` was deactivated back in section 18, and a
+  // deactivated profile is now gone from every route — reusing it here would
+  // fail on ownership before it ever reached the consent taxonomy.
+  const made = await call(
+    await fetch(`${BASE}/profiles`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ relation: 'mother', firstName: 'Consent', lastName: 'Fixture' }),
+    }),
+  );
+  check('fixture profile created', made.status === 201, made);
+  const consentProfileId = made.body.data?.id;
+
+  const bad = await call(
+    await fetch(`${BASE}/profiles/${consentProfileId}/consent`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ consentType: 'banana_pudding' }),
+    }),
+  );
+  // This returned 201 and was stored, so the append-only audit table recorded a
+  // consent type nothing could ever query.
+  check('an off-list consent type is rejected (400)', bad.status === 400, bad);
+
+  for (const type of ['care_coordination', 'health_data', 'ai_analysis', 'notifications']) {
+    const ok = await call(
+      await fetch(`${BASE}/profiles/${consentProfileId}/consent`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ consentType: type }),
+      }),
+    );
+    check(`${type} is accepted`, ok.status === 201, ok);
+  }
+
+  // Database-first: the column itself must refuse, not only the validator.
+  const pg = postgres(process.env.CORE_DATABASE_URL as string);
+  const [{ data_type: columnType }] = await pg`
+    SELECT udt_name AS data_type
+      FROM information_schema.columns
+     WHERE table_name = 'caregiver_consent' AND column_name = 'consent_type'
+  `;
+  check(
+    'the column is the caregiver_consent_type enum, not varchar',
+    columnType === 'caregiver_consent_type',
+    columnType,
+  );
+  const [{ count: strays }] = await pg`
+    SELECT count(*)::int AS count FROM caregiver_consent
+     WHERE consent_type::text NOT IN
+       ('care_coordination', 'health_data', 'ai_analysis', 'notifications')
+  `;
+  check('no row holds a value outside the taxonomy', strays === 0, strays);
+  await pg.end();
+
+  await fetch(`${BASE}/profiles/${consentProfileId}`, { method: 'DELETE', headers: authHeaders });
+}
+
+console.log('\n34. Every generated Swagger example executes as sent');
+{
+  // The generated examples were empty objects, so a reader who pressed Try it
+  // out got a 400 on the first call and concluded the API was broken.
+  const spec = await (await fetch(`${BASE}/docs/json`)).json();
+  // Same reason as section 33 — the {id} routes need a live profile.
+  const made = await call(
+    await fetch(`${BASE}/profiles`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ relation: 'spouse', firstName: 'Swagger', lastName: 'Fixture' }),
+    }),
+  );
+  check('fixture profile created', made.status === 201, made);
+  const docsProfileId = made.body.data?.id;
+  const cases: Array<[string, string, string]> = [
+    ['POST', '/profiles', 'create profile'],
+    ['PATCH', '/profiles/{id}', 'update profile'],
+    ['POST', '/profiles/{id}/consent', 'record consent'],
+    ['POST', '/profiles/{id}/notification-targets', 'add notification target'],
+  ];
+  for (const [method, route, label] of cases) {
+    const op = spec.paths?.[route]?.[method.toLowerCase()];
+    const example =
+      op?.requestBody?.content?.['application/json']?.example ??
+      op?.requestBody?.content?.['application/json']?.schema?.example;
+    check(`${label}: the spec carries a request example`, Boolean(example), { route, method });
+    if (!example) continue;
+
+    const url = `${BASE}${route.replace('{id}', docsProfileId)}`;
+    const sent = await call(
+      await fetch(url, { method, headers: authHeaders, body: JSON.stringify(example) }),
+    );
+    check(
+      `${label}: the example is accepted as sent (${sent.status})`,
+      sent.status === 200 || sent.status === 201,
+      sent,
+    );
+    // A created profile from the example must not outlive the run.
+    if (route === '/profiles' && sent.body?.data?.id) {
+      await fetch(`${BASE}/profiles/${sent.body.data.id}`, {
+        method: 'DELETE',
+        headers: authHeaders,
+      });
+    }
+  }
+
+  await fetch(`${BASE}/profiles/${docsProfileId}`, { method: 'DELETE', headers: authHeaders });
+}
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 
 console.log(`\n=== RESULT: ${passed} passed, ${failed} failed ===\n`);

@@ -1,5 +1,5 @@
 import { BadRequestError, NotFoundError, UnprocessableEntityError } from '@longeny/errors';
-import { type RroState, isValidRroTransition } from '@longeny/types';
+import { type CaregiverConsentType, type RroState, isValidRroTransition } from '@longeny/types';
 import { createLogger, decrypt, encrypt } from '@longeny/utils';
 import { uuidSchema } from '@longeny/validators';
 import { and, desc, eq } from 'drizzle-orm';
@@ -320,7 +320,10 @@ export class ProfileService {
     authId: string,
     profileId: string,
     data: {
-      consentType: string;
+      // The taxonomy, not `string`. The validator already rejects anything else,
+      // but typing it loosely here is what let the free-text column survive: a
+      // second caller could reach this method without going through the route.
+      consentType: CaregiverConsentType;
       status?: 'granted' | 'revoked';
       documentUrl?: string;
       notes?: string;
@@ -435,12 +438,7 @@ export class ProfileService {
    * request triggered the classification.
    */
   async getRroStateForService(profileId: string) {
-    const [profile] = await db
-      .select({ id: profiles.id })
-      .from(profiles)
-      .where(eq(profiles.id, profileId))
-      .limit(1);
-    if (!profile) throw new NotFoundError('Profile');
+    await this.assertActiveProfileForService(profileId);
 
     const [state] = await db
       .select()
@@ -469,6 +467,32 @@ export class ProfileService {
   }
 
   /**
+   * The service-caller equivalent of `assertOwnership`.
+   *
+   * The internal HMAC routes are reached by another service, not by the account
+   * holder, so there is no account to check ownership against and they never
+   * pass through `assertOwnership`. What they still owe is its *status* rule: a
+   * deactivated profile is gone. Three of them looked the row up directly and
+   * checked only that it existed, so a removed person stayed reachable through
+   * exactly the paths that act on their behalf — including the one that emails
+   * a human being.
+   *
+   * It lives here, in one place, because the reason it was missed is that the
+   * rule was written out by hand at each call site and one copy simply never
+   * grew it.
+   */
+  private async assertActiveProfileForService(profileId: string) {
+    const [profile] = await db
+      .select({ id: profiles.id, status: profiles.status })
+      .from(profiles)
+      .where(eq(profiles.id, profileId))
+      .limit(1);
+    // Missing and deactivated answer the same way, as everywhere else.
+    if (!profile || profile.status !== 'active') throw new NotFoundError('Profile');
+    return profile;
+  }
+
+  /**
    * Record an RRO transition (internal — called by the AI classifier or a
    * clinician action via HMAC). Updates the current state and appends history.
    * No auth guard here: the caller is a trusted service. Profile existence is
@@ -489,12 +513,7 @@ export class ProfileService {
     goal?: string;
     metadata?: Record<string, unknown>;
   }) {
-    const [profile] = await db
-      .select({ id: profiles.id })
-      .from(profiles)
-      .where(eq(profiles.id, data.profileId))
-      .limit(1);
-    if (!profile) throw new NotFoundError('Profile');
+    await this.assertActiveProfileForService(data.profileId);
 
     const [current] = await db
       .select()
@@ -608,12 +627,10 @@ export class ProfileService {
     /** An ICS invite, for the calendar channel. */
     attachment?: { filename: string; contentType: string; content: string; method?: string };
   }) {
-    const [profile] = await db
-      .select({ id: profiles.id })
-      .from(profiles)
-      .where(eq(profiles.id, data.profileId))
-      .limit(1);
-    if (!profile) throw new NotFoundError('Profile');
+    // A deactivated profile keeps its notification targets — the rows are
+    // audit, not reach. Without this the account removed someone and a
+    // scheduler still emailed them; verified live before the guard existed.
+    await this.assertActiveProfileForService(data.profileId);
 
     const conditions = [
       eq(notification_targets.profile_id, data.profileId),

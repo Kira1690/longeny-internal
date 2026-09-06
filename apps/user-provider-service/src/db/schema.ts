@@ -1,4 +1,9 @@
-import type { NotificationChannel, ProfileRelation, RroState } from '@longeny/types';
+import type {
+  CaregiverConsentType,
+  NotificationChannel,
+  ProfileRelation,
+  RroState,
+} from '@longeny/types';
 import {
   boolean,
   date,
@@ -899,6 +904,16 @@ export const profileStatusEnum = pgEnum('profile_status', ['active', 'inactive']
 // state cannot be added to the model without reaching the database.
 export const rroStateEnum = pgEnum('rro_state_value', ['intake', 'reverse', 'restore', 'optimise']);
 export const consentStatusEnum = pgEnum('caregiver_consent_status', ['granted', 'revoked']);
+// What a caregiver may do on the profile's behalf. This was varchar(100) with a
+// length-only validator, so any string was stored: 'banana_pudding' returned 201
+// and the append-only audit table recorded it immutably. An audit trail that
+// faithfully preserves a value nothing can query is worse than no column.
+export const caregiverConsentTypeEnum = pgEnum('caregiver_consent_type', [
+  'care_coordination',
+  'health_data',
+  'ai_analysis',
+  'notifications',
+]);
 export const notificationChannelEnum = pgEnum('notification_channel', ['sms', 'email', 'calendar']);
 export const notificationStatusEnum = pgEnum('notification_status', ['queued', 'sent', 'failed']);
 
@@ -932,6 +947,15 @@ type _DbChannelsInTaxonomy = MustExtend<
 type _TaxonomyChannelsInDb = MustExtend<
   NotificationChannel,
   (typeof notificationChannelEnum.enumValues)[number]
+>;
+
+type _DbConsentTypesInTaxonomy = MustExtend<
+  (typeof caregiverConsentTypeEnum.enumValues)[number],
+  CaregiverConsentType
+>;
+type _TaxonomyConsentTypesInDb = MustExtend<
+  CaregiverConsentType,
+  (typeof caregiverConsentTypeEnum.enumValues)[number]
 >;
 
 // ─────────────────────────────────────────────────────────────
@@ -983,8 +1007,7 @@ export const caregiver_consent = pgTable(
     profile_id: uuid('profile_id').notNull(),
     // The account that granted consent on the profile's behalf (users.id).
     account_user_id: uuid('account_user_id').notNull(),
-    // e.g. 'health_data' | 'ai_analysis' | 'care_coordination' | 'notifications'
-    consent_type: varchar('consent_type', { length: 100 }).notNull(),
+    consent_type: caregiverConsentTypeEnum('consent_type').notNull(),
     status: consentStatusEnum('status').default('granted').notNull(),
     granted_by: uuid('granted_by').notNull(),
     granted_at: timestamp('granted_at', { withTimezone: true }).defaultNow().notNull(),
