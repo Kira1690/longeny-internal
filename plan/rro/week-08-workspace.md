@@ -1,11 +1,21 @@
 # Week 8 — Clinician Workspace
 
-> **Blocked on a model decision.** §8.1 and §8.2 below are written against "profiles
-> assigned to the calling provider" and "a provider sees only profiles linked to them".
-> **No assignment or link exists in any schema.** Provider access today is derived from a
-> booking and nothing else, which cannot carry a care team. See
-> [care-team-model.md](./care-team-model.md) — D-1 and D-2 need Vijay before these two
-> cards (45h of the week) can be built.
+> **Unblocked 2026-09-06.** §8.1 and §8.2 are written against "profiles assigned to the
+> calling provider", and no assignment existed in any schema — provider access was derived
+> from a booking and nothing else, which cannot carry a care team. The model is now decided:
+> [care-team-model.md](./care-team-model.md), all five decisions answered.
+>
+> **Read "assigned" and "linked" below as: an active `care_team_member` row, or an active
+> booking.** One resolver, both bases, the way `assertOwnership` already works for profiles.
+>
+> **Order matters.** The consent machinery in
+> [verified-consent-design.md](./verified-consent-design.md) is what the team table's
+> per-member consent is built on (D-4), and membership grants no access until that consent
+> exists. Build it in this order or the workspace is written twice:
+>
+> 1. consent machinery (§8.7) → 2. `care_team_member` + access resolver → 3. §8.1 and §8.2
+>
+> This ordering, not the hours, is the thing that will cost a rebuild if ignored.
 
 Plan rows 10–13. Endpoints 18–23. DB D8 table lands here for Week 10 use.
 Depends on: Week 7 (summary, intake, RRO state).
@@ -58,8 +68,19 @@ Consent is currently recorded by the account holder on the dependent's behalf
 than the patient's answer. Design, cost and the open legal question:
 [verified-consent-design.md](./verified-consent-design.md).
 
-Adding it makes Week 8's backend demand 110h against 35h of capacity. It needs a scope
-decision before it goes on the board, not after.
+**All four open decisions are now answered** (threshold 18/DPDP as config, `pending` usable
+but blocked for AI and provider surfaces, two reminders then expire, wording drafted).
+Two items are left to a human — legal confirmation of the threshold and the email copy —
+and neither blocks the build.
+
+It is also no longer a standalone 27h. The care-team model's per-member consent (D-4) is
+built on this same `consent_request` machinery, so this work is a **prerequisite for §8.1
+and §8.2**, not an optional extra beside them. It moved from "nice to have" to "first
+thing in the week".
+
+Adding it makes Week 8's backend demand 110h against 35h of capacity. That is the scope
+decision to put in front of the client — and it is now a decision about *sequence and
+resourcing*, not about whether to do it, because the workspace cards depend on it.
 
 ## Week 8 exit criteria
 - A provider can open a real profile, read intake + RRO state + summary, write a note and a
@@ -67,4 +88,7 @@ decision before it goes on the board, not after.
 - Cross-provider and patient-role access blocked with tests.
 - Every workspace route carries `requirePermission` and a service-layer assignment check —
   role `provider` alone never grants access to a specific patient.
+- A provider with a membership row but no patient consent sees **nothing**, with a test.
+- Deactivating a profile ends every membership in the same transaction, with a test that a
+  removed patient disappears from the provider's queue.
 - Config comes from `packages/config` everywhere; payment routes are guarded.

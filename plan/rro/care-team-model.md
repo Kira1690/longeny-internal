@@ -7,6 +7,10 @@ support — with a **Doctor appearing as a team member under the Physiotherapist
 Verdict: the flow is sound as a care model. **Nothing in the codebase supports it**, and
 Week 8 is already written as though it does. Decide before Week 8 starts, not during.
 
+> **DECIDED 2026-09-06.** All five decisions are answered in §4 below. Week 8 §8.1/§8.2 are
+> unblocked and should be built against this model. One item is deliberately *not* settled
+> here because it is not an engineering question — see §7.
+
 ---
 
 ## 1. What exists today
@@ -84,33 +88,83 @@ re-implemented per service.
 
 ---
 
-## 4. Decisions needed before Week 8
+## 4. Decisions — answered
 
-**D-1. One team per patient, or one per pathway?** The map branches twice from Patient. Is
-that two concurrent care pathways each with its own lead, or one team whose lead differs by
-context? One `is_lead` per profile is simple; per-pathway needs a `pathway` column and
-changes every query. This is the decision that most changes the build.
+### D-1. One team per patient, one lead. No pathway column. **DECIDED**
 
-**D-2. Who may add a member?** The lead clinician, an admin, or the patient. It needs a
-permission (`care_team:manage`) and an answer to whether a lead can add someone the patient
-has never met.
+The map branches twice from Patient, but that is the diagram showing *"the lead has a
+team"* twice over, not two concurrent pathways. Nothing in the product asks for a patient
+to be under two leads at once, and a `pathway` column multiplies every membership query by
+a scope we have no requirement for.
 
-**D-3. Membership must be profile-scoped, not account-scoped.** A nutritionist added for
-the father must not see the mother. This is the exact trap Weeks 6 and 7 were spent
-closing, and a team table keyed on the account would reopen it. Non-negotiable; noting it so
-it is not rediscovered later.
+Enforced by a partial unique index — exactly one `is_lead = true` per profile among
+`status = 'active'` rows — so the rule is the database's, not a service's good intentions.
 
-**D-4. Consent per member.** Today's consent is caregiver → dependent. This map puts four
-or five providers in front of one person's health data. Each addition should be consented
-and audited, or the HIPAA position is weaker than what we already have — and weaker than the
-one gap already logged in
-[verified-consent-design.md](./verified-consent-design.md). The two are the same
-conversation and should be decided together.
+The deciding argument is reversibility. Going from one-team to per-pathway later is an
+additive column plus an index change and a backfill that puts every existing row in the
+default pathway. Going the other direction is a merge of rows that disagree about who the
+lead is, with no correct answer. Take the change that stays cheap if we are wrong.
 
-**D-5. What happens to the team when a profile is deactivated?** Deleting a family member
-should not leave four clinicians holding standing access.
+If pathways are ever needed they will almost certainly align with something that already
+exists — the RRO state, or a care plan — and the column should reference that rather than
+invent a parallel taxonomy.
 
----
+### D-2. A lead or an admin adds. Membership alone grants nothing. **DECIDED**
+
+Permission `care_team:manage`, held by `admin` and by the member whose row has
+`is_lead = true` on that profile. The account holder may **remove** anyone at any time and
+needs no permission to do it — it is their family member's data.
+
+The hard half of this question — *may a lead add someone the patient has never met?* — is
+answered by taking it out of the membership decision entirely. **Adding a member does not
+grant access.** A new row lands as `status = 'pending_consent'` and resolves to no access
+at all. Access begins when a consent record for that specific provider exists (D-4). So a
+lead may refer freely, which is how referral actually works, and the patient still decides
+who reads their data.
+
+That split is what makes this safe to decide without a clinical debate: the permission
+governs *who may propose*, and consent governs *who may see*.
+
+### D-3. Profile-scoped, never account-scoped. **DECIDED — non-negotiable**
+
+`care_team_member.profile_id`, never `account_user_id`. A nutritionist added for the father
+must not see the mother. This is the exact trap Weeks 6 and 7 were spent closing, and a
+team table keyed on the account reopens all of it in one column.
+
+### D-4. One consent per member, on the same machinery as verified consent. **DECIDED**
+
+Not one blanket "I agree to a care team" — a consent that cannot name who it covers cannot
+be revoked for one person, and "I withdraw from the nutritionist" is the request that will
+actually arrive.
+
+The important part is *what it is built on*. [verified-consent-design.md](./verified-consent-design.md)
+already needs a `consent_request` table with a hashed single-use token, an expiry, an
+email send and public confirm/decline endpoints. That machinery answers "does this person
+agree to X?" and does not care what X is. Build it once with a subject, and a care-team
+invitation is the same flow with different copy:
+
+| Subject | The question asked |
+|---|---|
+| `caregiver` | May «account holder» manage your care? |
+| `care_team_member` | May «Dr Rao» join your care team as your physiotherapist? |
+
+This is why A1 and A2 are the same conversation, and it changes the order of work: **build
+A2's consent machinery first, then A1 consumes it.** Done the other way round, the team
+table gets its own bespoke consent and the two disagree within a week.
+
+### D-5. Deactivating a profile ends every membership. **DECIDED**
+
+In the same transaction as the soft delete: every `active` and `pending_consent` row for
+that profile moves to `removed`, with `removed_reason = 'profile_deactivated'`. The rows
+survive for audit; the access does not.
+
+This is the same rule Week 7 just closed for notification targets — a deactivated profile
+kept its targets and stayed contactable. A care team is the larger version of that bug:
+deleting a family member while four clinicians keep standing access is worse than an
+unwanted email. See D7 in [CARRY-FORWARD.md](./CARRY-FORWARD.md).
+
+The access resolver must also re-check profile status on every call rather than trust the
+membership row, for the same reason the internal HMAC routes now do.
 
 ## 5. Cost, and what it displaces
 
@@ -131,10 +185,26 @@ the workspace is written, or the workspace is written twice.
 
 ---
 
-## 6. Recommendation
+## 6. Recommendation — adopted
 
-The flow in the map is right. Build it as one flat membership table with the role on the
+The flow in the map is right. Built as one flat membership table with the role on the
 membership, not as the two trees the diagram draws.
 
-Answer D-1 and D-2 with Vijay this week, while Week 7 is still running, so Week 8 starts
-against a model instead of an assumption.
+Sequence, now that D-4 is answered: **A2's consent machinery → this table → Week 8 §8.1 and
+§8.2.** Building the workspace first means building it twice.
+
+---
+
+## 7. The one thing still open, and it is not engineering
+
+Everything above is decided and buildable. What is **not** settled is the *clinical* shape
+of a team — whether "Ancillary support" is one role or several, whether a coach without a
+clinical qualification may hold standing access to a diagnosis, and what a lead is
+accountable for when a member acts.
+
+None of that blocks the schema: `role` is an enum and adding a value is a migration.
+It does block going live with real patients, and it belongs to whoever carries clinical
+responsibility for the pilot, not to the person writing the table.
+
+Build against this model now. Put §7 in front of the clinical owner before the pilot, not
+before the code.

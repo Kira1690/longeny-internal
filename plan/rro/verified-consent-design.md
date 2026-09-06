@@ -5,6 +5,13 @@ defect in the published example, one structural gap in what consent currently me
 
 Gate: [00-engineering-standards.md](./00-engineering-standards.md).
 
+> **DECIDED 2026-09-06.** §4 is answered. The flow is buildable today. Two items are
+> deliberately left to a human — the legal confirmation behind the age threshold, and the
+> wording of the email — and neither blocks the build. See §4 and §6.
+>
+> This machinery is also the substrate for the care-team consent in
+> [care-team-model.md](./care-team-model.md) D-4. **Build it first.**
+
 ---
 
 ## 1. Status today — who actually gives consent
@@ -133,21 +140,65 @@ migration for existing rows; add Swagger examples and accept `""` for optional U
 
 ---
 
-## 4. Decisions needed before it is built
+## 4. Decisions — answered
 
-1. **Age threshold, and whose law.** India's DPDP Act treats under-18s as children needing
-   verifiable guardian consent; health contexts elsewhere differ. Infrastructure is in
-   ap-south-1 and the pilot is Indian, but this is Vijay's call with whatever legal advice
-   the clinic has — not an engineering guess. Everything else is built and waiting on one
-   number.
-2. **Does unverified consent restrict anything?** Either a `pending` profile is fully
-   usable and merely labelled, or some actions are blocked until it is granted. The first
-   ships sooner and is honest; the second is stricter and is a product decision.
-3. **Re-send policy.** How many reminders, how far apart, before it is harassment.
-4. **What the email says.** It reaches an elderly person who was not expecting it. The
-   wording matters more than the code.
+### 1. Threshold 18, jurisdiction India, both as configuration. **DECIDED**
 
----
+India's DPDP Act treats anyone under 18 as a child requiring verifiable guardian consent.
+The infrastructure is in ap-south-1 and the pilot is Indian, so 18 is the defensible
+default and the one to build against.
+
+It is **not** hard-coded. `GUARDIAN_AGE_THRESHOLD` (default `18`) in config, and the
+resolved jurisdiction is written onto the consent row at the moment it is recorded, next to
+`verification_method`. Two reasons, and the second is the real one:
+
+- A second market becomes a config value plus a data question, not a rewrite.
+- A consent record that does not say which rule it was taken under cannot be defended
+  later. The threshold will change; the rows taken under the old one still have to make
+  sense.
+
+**Still needs a human, and does not block anything:** confirmation from whoever holds the
+clinic's legal advice that 18/DPDP is right for this pilot. Changing the number after the
+fact costs one config value; the rows already carry the jurisdiction they were taken under.
+Get the sign-off before real patients, not before the code.
+
+### 2. Pending is usable and labelled — except where a stranger reads the data. **DECIDED**
+
+Blocking everything until an elderly parent answers an email makes the product unusable for
+exactly the family it was built for. Blocking nothing makes the label decorative. The line
+goes where the risk actually is:
+
+| While consent is `pending` | |
+|---|---|
+| The account holder records readings, notes, goals, uploads reports | **Allowed** |
+| Notifications to that person | **Allowed** — they are already being contacted; that is what the consent email *is* |
+| AI analysis of their health data | **Blocked** |
+| Any provider-facing surface — workspace, queue, care team | **Blocked** |
+
+The distinction is who is doing the reading. A daughter recording her father's blood sugar
+is the product working. A model or a clinician reading it is the thing a person would want
+to have agreed to first, and it is what a regulator will ask about.
+
+This also gives the caregiver a reason to chase the confirmation that is not nagging: the
+feature they want is behind it.
+
+### 3. Two reminders, then expire; one manual re-send, then stop. **DECIDED**
+
+Day 3 and day 10, expire at day 14. After expiry the caregiver may re-send **once**; after
+that the profile is locked to `self_attested` and the ask is over.
+
+A fourth unanswered request to someone who has not replied is harassment, and the audit
+trail of it reads badly. Silence from a person who was emailed three times is an answer.
+
+### 4. Wording — drafted in code, signed off by a human. **NOT an engineering decision**
+
+This email reaches an elderly person who was not expecting it, about their medical data,
+from a company they have never heard of. It is the single highest-risk piece of copy in the
+product and the wording matters more than the code does.
+
+The flow ships with a draft behind a template, so the build is not blocked. The draft does
+not go to a real person until someone who owns the clinical relationship has read it. That
+is §6.
 
 ## 5. Where it lands
 
@@ -161,3 +212,22 @@ That is the trade to put in front of the client, not to absorb silently. This fe
 the difference between "we record that consent was given" and "the patient gave consent",
 which is the strongest thing in the whole tenancy story — but it is a third of a
 developer-week-and-a-half, and something else moves.
+
+**Since this was written, D-4 in [care-team-model.md](./care-team-model.md) folded the
+care-team consent onto this same machinery.** That does not make Week 8 fit — it makes the
+27h buy two features instead of one, and it fixes the order: this first, the team table
+second.
+
+---
+
+## 6. What is left for a human
+
+Two things, neither of which blocks the build, both of which block going live:
+
+1. **Legal confirmation of 18 / DPDP** for this pilot's jurisdiction.
+2. **The wording of the email**, read by whoever owns the clinical relationship with these
+   patients.
+
+Everything else is decided. If neither answer arrives, the flow still ships — behind the
+default threshold and a draft template — and the two placeholders are the only things
+standing between it and real patients. Say that plainly when the trade goes to the client.

@@ -9,18 +9,42 @@ since".
 
 ---
 
-## A. Blocked on someone else — chase these first
+## A. Decided, and what is genuinely still open
 
-| # | What | Blocked on | Cost | Written up |
-|---|---|---|---|---|
-| A1 | **Care team model.** A patient has a lead clinician (Doctor or Physio) plus nutrition / coach / ancillary. No `care_team`, `assignment` or `provider_patient` table exists anywhere; provider access is booking-derived only. **Week 8 §8.1 + §8.2 (45h) are written against an assignment that does not exist and cannot be built until this lands.** | **Vijay** — one team per patient or one per pathway? who may add a member? | 23h BE + 4h Vijay (~10h net new; the rest replaces §8.1/§8.2 work) | [care-team-model.md](./care-team-model.md) |
-| A2 | **Verified consent by email.** `granted_by` is always the logged-in caller, so the platform holds a caregiver's *claim*, not the patient's answer. Email the person, they confirm; guardian consents for a minor. | **Vijay** — guardian age threshold and jurisdiction | 27h BE + 4h Vijay + 3h Milan | [verified-consent-design.md](./verified-consent-design.md) |
-| A3 | **Bedrock model id is wrong for the region.** `BEDROCK_MODEL_ID_RRO` defaults to `anthropic.claude-3-5-sonnet-20241022-v2:0`, which is not in the ap-south-1 list. Bedrock access itself is confirmed working. | Milan (M-W7-1) — pick a live model id and prove `invoke-model`, not just `list-foundation-models` | inside M-W7-1 | `internal-notes/aws/README.md` |
-| A4 | **M-W6-2 calendar invite** cannot close without shipping booking-service to the client repo, which is out of client scope. | A scope decision — ship it, or descope endpoint 10 and keep it internal | — | Trello, Blocked list |
+**A1 and A2 were decided 2026-09-06.** They had been waiting on Vijay; the architecture
+calls were made rather than left blocking Week 8. Both design docs now carry the answers
+and the reasoning.
 
-**A1 and A2 should be decided in the same conversation.** A team of four or five providers
-reading one person's health data is the same consent question, and answering them
-separately will produce two models that disagree.
+| # | What | Status | Written up |
+|---|---|---|---|
+| A1 | **Care team model.** One team per patient, one lead (partial unique index). Role lives on the membership. Profile-scoped, never account-scoped. A lead or admin may add; **membership grants no access until per-member consent exists**. Deactivating a profile ends every membership in the same transaction. | **DECIDED** — D-1…D-5 all answered | [care-team-model.md](./care-team-model.md) |
+| A2 | **Verified consent by email.** Threshold 18 / DPDP, held in config with the jurisdiction written onto each row. `pending` is usable and labelled, but blocks AI analysis and every provider surface. Two reminders, expire at 14d, one manual re-send. | **DECIDED** — all four answered | [verified-consent-design.md](./verified-consent-design.md) |
+| A3 | **Bedrock model id is wrong for the region.** `BEDROCK_MODEL_ID_RRO` defaults to a model not in the ap-south-1 list. Bedrock access itself works. | Open — Milan (M-W7-1) | `internal-notes/aws/README.md` |
+| A4 | **M-W6-2 calendar invite** cannot close without shipping booking-service to the client repo, which is out of client scope. | Open — a scope decision | Trello, Blocked list |
+
+### The consequence of A1+A2 that changes Week 8's shape
+
+They are one piece of machinery, not two features. The care team's per-member consent (A1
+D-4) is built on A2's `consent_request` table — same token, same expiry, same confirm and
+decline endpoints, different copy. So the build order is fixed:
+
+> **consent machinery → `care_team_member` + access resolver → Week 8 §8.1 and §8.2**
+
+Built the other way round, the workspace queries an assignment that does not exist yet and
+the team table grows its own bespoke consent. **Sequencing, not hours, is what would cost a
+rebuild here.**
+
+### Still needs a human — neither blocks the build
+
+1. **Legal confirmation of 18 / DPDP** for this pilot's jurisdiction. The number is a
+   config value and every row records the jurisdiction it was taken under, so changing it
+   later is cheap. Needed before real patients, not before code.
+2. **The consent email's wording.** It reaches an elderly person who was not expecting it,
+   about their medical data. Ships behind a draft template; the draft does not go to a real
+   person unread.
+3. **The clinical shape of a team** — whether a coach without a clinical qualification may
+   hold standing access to a diagnosis, what a lead is accountable for. `role` is an enum;
+   adding a value is a migration. Blocks the pilot, not the schema.
 
 ---
 
@@ -81,11 +105,13 @@ separately will produce two models that disagree.
 
 Sequencing, not hours, is what will cost a rebuild:
 
-1. **Decide A1 and A2 with Vijay while Week 7 is still running.** Both change Week 8's
-   shape. Deciding them during Week 8 means writing the workspace twice.
-2. **Close B1 and migrate it** before the client sees more of the surface — one of those
-   defects delivers email to a person the account holder deleted.
-3. **Then** build Week 8 against a model rather than an assumption.
+1. **Build A2's consent machinery before A1's team table, and both before Week 8 §8.1/§8.2.**
+   The workspace depends on an access resolver that depends on membership that depends on
+   consent. Any other order writes something twice.
+2. **Migrate B1 to the client repo** before the client sees more of the surface.
+3. **Put the Week 8 capacity trade in front of the client**, not into a developer's week.
+   110h against 35h is a resourcing decision, and it is now a decision about *sequence*
+   rather than *whether* — the workspace cards cannot be built without A2.
 
 ---
 
@@ -117,10 +143,9 @@ the per-card checklist in [00-engineering-standards.md](./00-engineering-standar
 
 - **Migrate Week 7's 12 endpoints to `BraveLabs/`** under the Week 7 cards. Scope-scan the
   diff first: no Claude reference, no `internal-notes/` content, no `plan/rro/` content,
-  nothing outside the week's cards.
-- **Vishal is at 44h against a 35h cap.** V-W7-7 added 9h. The card proposes moving
-  V-W7-5 (D2, 6h) to Week 8 and taking 3h out of R6. **Not decided.**
-- **A1 and A2 in section A need Vijay before Week 8 starts.**
+  nothing outside the week's cards. This is the only part of V-W7-7 not done.
+- The 44h overrun is **settled**: Week 7 stands as delivered, and D2 query conversion moved
+  out to its own Week 8 card. A1 and A2 are **decided** — see section A.
 
 ---
 
