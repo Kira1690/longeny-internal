@@ -9,14 +9,8 @@
     "business_name": "Pillai Multispeciality Clinic",
     "display_name": "Dr. Sanjana Pillai",
     "bio": "With over 2 years in cardiology, Dr. Sanjana Pillai focuses on treating cardiac arrhythmia, coronary artery disease, and heart failure. She leads care at Pillai Multispeciality Clinic, Hyderabad, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "cardiology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Cardiology)",
-      "FICS"
-    ],
+    "specialties": ["cardiology"],
+    "credentials": ["MBBS", "DM (Cardiology)", "FICS"],
     "years_experience": 2,
     "hourly_rate": 2300,
     "city": "Hyderabad",
@@ -41,14 +35,8 @@
     "business_name": "Malhotra Institute of Health",
     "display_name": "Dr. Aditya Malhotra",
     "bio": "Dr. Aditya Malhotra is an experienced dermatologist who has spent 9 years managing conditions such as hair loss, fungal skin infections, and eczema. Based at Malhotra Institute of Health in Lucknow, he emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "dermatology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Dermatology, Venereology & Leprosy)",
-      "DNB"
-    ],
+    "specialties": ["dermatology"],
+    "credentials": ["MBBS", "MD (Dermatology, Venereology & Leprosy)", "DNB"],
     "years_experience": 9,
     "hourly_rate": 1550,
     "city": "Lucknow",
@@ -73,13 +61,8 @@
     "business_name": "Bhattacharya Multispeciality Clinic",
     "display_name": "Dr. Manish Bhattacharya",
     "bio": "A dedicated pediatrician with 29 years of practice, Dr. Manish Bhattacharya treats patients with growth and development concerns, routine vaccinations, and childhood asthma. At Bhattacharya Multispeciality Clinic, Chennai, he blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "pediatrics"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Pediatrics)"
-    ],
+    "specialties": ["pediatrics"],
+    "credentials": ["MBBS", "MD (Pediatrics)"],
     "years_experience": 29,
     "hourly_rate": 600,
     "city": "Chennai",
@@ -104,13 +87,8 @@
     "business_name": "Chatterjee Health Clinic",
     "display_name": "Dr. Kunal Chatterjee",
     "bio": "Dr. Kunal Chatterjee is a psychiatrist with 20 years of clinical experience, specializing in the diagnosis and management of bipolar disorder, depression, and schizophrenia. Practising at Chatterjee Health Clinic in Nagpur, he combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "psychiatry"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Psychiatry)"
-    ],
+    "specialties": ["psychiatry"],
+    "credentials": ["MBBS", "MD (Psychiatry)"],
     "years_experience": 20,
     "hourly_rate": 2250,
     "city": "Nagpur",
@@ -135,13 +113,8 @@
     "business_name": "Iyer Specialty Centre",
     "display_name": "Dr. Neha Iyer",
     "bio": "With over 30 years in orthopedic surgery, Dr. Neha Iyer focuses on treating osteoarthritis, ACL and knee injuries, and joint replacement. She leads care at Iyer Specialty Centre, Amritsar, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "orthopedics"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Orthopedics)"
-    ],
+    "specialties": ["orthopedics"],
+    "credentials": ["MBBS", "MS (Orthopedics)"],
     "years_experience": 30,
     "hourly_rate": 1350,
     "city": "Amritsar",
@@ -166,13 +139,8 @@
     "business_name": "Mehta Hospital & Research Centre",
     "display_name": "Dr. Suresh Mehta",
     "bio": "Dr. Suresh Mehta is an experienced dermatologist who has spent 21 years managing conditions such as acne, hair loss, and vitiligo. Based at Mehta Hospital & Research Centre in Patna, he emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "dermatology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Dermatology, Venereology & Leprosy)"
-    ],
+    "specialties": ["dermatology"],
+    "credentials": ["MBBS", "MD (Dermatology, Venereology & Leprosy)"],
     "years_experience": 21,
     "hourly_rate": 1050,
     "city": "Patna",
@@ -197,14 +165,8 @@
     "business_name": "Chowdhury Polyclinic",
     "display_name": "Dr. Aishwarya Chowdhury",
     "bio": "A dedicated gastroenterologist with 18 years of practice, Dr. Aishwarya Chowdhury treats patients with irritable bowel syndrome, viral hepatitis, and peptic ulcers. At Chowdhury Polyclinic, Nagpur, she blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "gastroenterology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Gastroenterology)",
-      "DNB"
-    ],
+    "specialties": ["gastroenterology"],
+    "credentials": ["MBBS", "DM (Gastroenterology)", "DNB"],
     "years_experience": 18,
     "hourly_rate": 1450,
     "city": "Nagpur",
@@ -229,14 +191,8 @@
     "business_name": "Kulkarni Medical Centre",
     "display_name": "Dr. Abhishek Kulkarni",
     "bio": "Dr. Abhishek Kulkarni is a cardiologist with 24 years of clinical experience, specializing in the diagnosis and management of hypertension, valvular heart disease, and cardiac arrhythmia. Practising at Kulkarni Medical Centre in Surat, he combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "cardiology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Cardiology)",
-      "MRCP"
-    ],
+    "specialties": ["cardiology"],
+    "credentials": ["MBBS", "DM (Cardiology)", "MRCP"],
     "years_experience": 24,
     "hourly_rate": 1600,
     "city": "Surat",
@@ -261,13 +217,8 @@
     "business_name": "Verma Institute of Health",
     "display_name": "Dr. Harish Verma",
     "bio": "With over 22 years in medical oncology, Dr. Harish Verma focuses on treating colorectal cancer, leukemia, and chemotherapy planning. He leads care at Verma Institute of Health, Ahmedabad, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "oncology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Medical Oncology)"
-    ],
+    "specialties": ["oncology"],
+    "credentials": ["MBBS", "DM (Medical Oncology)"],
     "years_experience": 22,
     "hourly_rate": 1850,
     "city": "Ahmedabad",
@@ -292,14 +243,8 @@
     "business_name": "Menon Multispeciality Clinic",
     "display_name": "Dr. Divya Menon",
     "bio": "Dr. Divya Menon is an experienced orthopedic surgeon who has spent 28 years managing conditions such as osteoarthritis, joint replacement, and ACL and knee injuries. Based at Menon Multispeciality Clinic in Kolkata, she emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "orthopedics"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Orthopedics)",
-      "MRCP"
-    ],
+    "specialties": ["orthopedics"],
+    "credentials": ["MBBS", "MS (Orthopedics)", "MRCP"],
     "years_experience": 28,
     "hourly_rate": 1700,
     "city": "Kolkata",
@@ -324,13 +269,8 @@
     "business_name": "Pillai Wellness Centre",
     "display_name": "Dr. Manisha Pillai",
     "bio": "A dedicated medical oncologist with 5 years of practice, Dr. Manisha Pillai treats patients with lung cancer, colorectal cancer, and leukemia. At Pillai Wellness Centre, Chennai, she blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "oncology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Medical Oncology)"
-    ],
+    "specialties": ["oncology"],
+    "credentials": ["MBBS", "DM (Medical Oncology)"],
     "years_experience": 5,
     "hourly_rate": 1850,
     "city": "Chennai",
@@ -355,13 +295,8 @@
     "business_name": "Sethi Clinic",
     "display_name": "Dr. Sruthi Sethi",
     "bio": "Dr. Sruthi Sethi is a ENT specialist with 22 years of clinical experience, specializing in the diagnosis and management of chronic sinusitis, vertigo, and recurrent tonsillitis. Practising at Sethi Clinic in Pune, she combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "ent"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (ENT)"
-    ],
+    "specialties": ["ent"],
+    "credentials": ["MBBS", "MS (ENT)"],
     "years_experience": 22,
     "hourly_rate": 1300,
     "city": "Pune",
@@ -386,13 +321,8 @@
     "business_name": "Mehta Medical Centre",
     "display_name": "Dr. Siddharth Mehta",
     "bio": "With over 6 years in ophthalmology, Dr. Siddharth Mehta focuses on treating cataract, diabetic retinopathy, and refractive errors. He leads care at Mehta Medical Centre, Chandigarh, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "ophthalmology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Ophthalmology)"
-    ],
+    "specialties": ["ophthalmology"],
+    "credentials": ["MBBS", "MS (Ophthalmology)"],
     "years_experience": 6,
     "hourly_rate": 1100,
     "city": "Chandigarh",
@@ -417,13 +347,8 @@
     "business_name": "Kaur Care Clinic",
     "display_name": "Dr. Naveen Kaur",
     "bio": "Dr. Naveen Kaur is an experienced cardiologist who has spent 20 years managing conditions such as cardiac arrhythmia, valvular heart disease, and coronary artery disease. Based at Kaur Care Clinic in Bhubaneswar, he emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "cardiology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Cardiology)"
-    ],
+    "specialties": ["cardiology"],
+    "credentials": ["MBBS", "DM (Cardiology)"],
     "years_experience": 20,
     "hourly_rate": 1600,
     "city": "Bhubaneswar",
@@ -448,14 +373,8 @@
     "business_name": "Kulkarni Specialty Centre",
     "display_name": "Dr. Yash Kulkarni",
     "bio": "A dedicated psychiatrist with 26 years of practice, Dr. Yash Kulkarni treats patients with anxiety disorders, obsessive-compulsive disorder, and bipolar disorder. At Kulkarni Specialty Centre, Ahmedabad, he blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "psychiatry"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Psychiatry)",
-      "FICS"
-    ],
+    "specialties": ["psychiatry"],
+    "credentials": ["MBBS", "MD (Psychiatry)", "FICS"],
     "years_experience": 26,
     "hourly_rate": 2300,
     "city": "Ahmedabad",
@@ -480,13 +399,8 @@
     "business_name": "Kapoor Wellness Centre",
     "display_name": "Dr. Ananya Kapoor",
     "bio": "Dr. Ananya Kapoor is a clinical psychologist with 27 years of clinical experience, specializing in the diagnosis and management of trauma and PTSD, depression, and anxiety. Practising at Kapoor Wellness Centre in Guwahati, she combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "psychology"
-    ],
-    "credentials": [
-      "MSc (Psychology)",
-      "M.Phil (Clinical Psychology)"
-    ],
+    "specialties": ["psychology"],
+    "credentials": ["MSc (Psychology)", "M.Phil (Clinical Psychology)"],
     "years_experience": 27,
     "hourly_rate": 900,
     "city": "Guwahati",
@@ -511,13 +425,8 @@
     "business_name": "Sharma Care Clinic",
     "display_name": "Dr. Rakesh Sharma",
     "bio": "With over 11 years in neurology, Dr. Rakesh Sharma focuses on treating Parkinson's disease, migraine, and peripheral neuropathy. He leads care at Sharma Care Clinic, Bhubaneswar, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "neurology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Neurology)"
-    ],
+    "specialties": ["neurology"],
+    "credentials": ["MBBS", "DM (Neurology)"],
     "years_experience": 11,
     "hourly_rate": 1800,
     "city": "Bhubaneswar",
@@ -542,13 +451,8 @@
     "business_name": "Hegde Polyclinic",
     "display_name": "Dr. Kunal Hegde",
     "bio": "Dr. Kunal Hegde is an experienced orthopedic surgeon who has spent 24 years managing conditions such as ACL and knee injuries, joint replacement, and fractures. Based at Hegde Polyclinic in Coimbatore, he emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "orthopedics"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Orthopedics)"
-    ],
+    "specialties": ["orthopedics"],
+    "credentials": ["MBBS", "MS (Orthopedics)"],
     "years_experience": 24,
     "hourly_rate": 1850,
     "city": "Coimbatore",
@@ -573,13 +477,8 @@
     "business_name": "Trivedi Multispeciality Clinic",
     "display_name": "Dr. Deepak Trivedi",
     "bio": "A dedicated pediatrician with 8 years of practice, Dr. Deepak Trivedi treats patients with childhood asthma, growth and development concerns, and routine vaccinations. At Trivedi Multispeciality Clinic, Thiruvananthapuram, he blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "pediatrics"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Pediatrics)"
-    ],
+    "specialties": ["pediatrics"],
+    "credentials": ["MBBS", "MD (Pediatrics)"],
     "years_experience": 8,
     "hourly_rate": 2000,
     "city": "Thiruvananthapuram",
@@ -604,14 +503,8 @@
     "business_name": "Naidu Health Clinic",
     "display_name": "Dr. Rahul Naidu",
     "bio": "Dr. Rahul Naidu is a cardiologist with 20 years of clinical experience, specializing in the diagnosis and management of valvular heart disease, cardiac arrhythmia, and hypertension. Practising at Naidu Health Clinic in Chennai, he combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "cardiology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Cardiology)",
-      "Fellowship (Clinical)"
-    ],
+    "specialties": ["cardiology"],
+    "credentials": ["MBBS", "DM (Cardiology)", "Fellowship (Clinical)"],
     "years_experience": 20,
     "hourly_rate": 2750,
     "city": "Chennai",
@@ -636,13 +529,8 @@
     "business_name": "Reddy Medical Centre",
     "display_name": "Dr. Rohan Reddy",
     "bio": "With over 19 years in obstetrics and gynecology, Dr. Rohan Reddy focuses on treating infertility, high-risk pregnancy, and prenatal and antenatal care. He leads care at Reddy Medical Centre, Amritsar, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "obstetrics_gynecology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Obstetrics & Gynecology)"
-    ],
+    "specialties": ["obstetrics_gynecology"],
+    "credentials": ["MBBS", "MS (Obstetrics & Gynecology)"],
     "years_experience": 19,
     "hourly_rate": 1350,
     "city": "Amritsar",
@@ -667,14 +555,8 @@
     "business_name": "Rao Care Clinic",
     "display_name": "Dr. Harish Rao",
     "bio": "Dr. Harish Rao is an experienced orthopedic surgeon who has spent 30 years managing conditions such as fractures, joint replacement, and osteoarthritis. Based at Rao Care Clinic in Amritsar, he emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "orthopedics"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Orthopedics)",
-      "MRCP"
-    ],
+    "specialties": ["orthopedics"],
+    "credentials": ["MBBS", "MS (Orthopedics)", "MRCP"],
     "years_experience": 30,
     "hourly_rate": 2100,
     "city": "Amritsar",
@@ -699,13 +581,8 @@
     "business_name": "Hegde Polyclinic",
     "display_name": "Dr. Priya Hegde",
     "bio": "A dedicated general physician with 22 years of practice, Dr. Priya Hegde treats patients with hypertension, routine health checkups, and fever and common infections. At Hegde Polyclinic, Chandigarh, she blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "general_medicine"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (General Medicine)"
-    ],
+    "specialties": ["general_medicine"],
+    "credentials": ["MBBS", "MD (General Medicine)"],
     "years_experience": 22,
     "hourly_rate": 1500,
     "city": "Chandigarh",
@@ -730,13 +607,8 @@
     "business_name": "Mehta Institute of Health",
     "display_name": "Dr. Divya Mehta",
     "bio": "Dr. Divya Mehta is a general physician with 27 years of clinical experience, specializing in the diagnosis and management of diabetes, routine health checkups, and lifestyle diseases. Practising at Mehta Institute of Health in Dehradun, she combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "general_medicine"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (General Medicine)"
-    ],
+    "specialties": ["general_medicine"],
+    "credentials": ["MBBS", "MD (General Medicine)"],
     "years_experience": 27,
     "hourly_rate": 550,
     "city": "Dehradun",
@@ -761,14 +633,8 @@
     "business_name": "Joshi Specialty Centre",
     "display_name": "Dr. Kritika Joshi",
     "bio": "With over 15 years in obstetrics and gynecology, Dr. Kritika Joshi focuses on treating PCOS, infertility, and high-risk pregnancy. She leads care at Joshi Specialty Centre, Dehradun, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "obstetrics_gynecology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Obstetrics & Gynecology)",
-      "Fellowship (Clinical)"
-    ],
+    "specialties": ["obstetrics_gynecology"],
+    "credentials": ["MBBS", "MS (Obstetrics & Gynecology)", "Fellowship (Clinical)"],
     "years_experience": 15,
     "hourly_rate": 2200,
     "city": "Dehradun",
@@ -793,13 +659,8 @@
     "business_name": "Desai Polyclinic",
     "display_name": "Dr. Kunal Desai",
     "bio": "Dr. Kunal Desai is an experienced nephrologist who has spent 29 years managing conditions such as glomerulonephritis, dialysis management, and resistant hypertension. Based at Desai Polyclinic in Bhubaneswar, he emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "nephrology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Nephrology)"
-    ],
+    "specialties": ["nephrology"],
+    "credentials": ["MBBS", "DM (Nephrology)"],
     "years_experience": 29,
     "hourly_rate": 2200,
     "city": "Bhubaneswar",
@@ -824,13 +685,8 @@
     "business_name": "Gill Health Clinic",
     "display_name": "Dr. Ananya Gill",
     "bio": "A dedicated pediatrician with 25 years of practice, Dr. Ananya Gill treats patients with growth and development concerns, routine vaccinations, and neonatal care. At Gill Health Clinic, Patna, she blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "pediatrics"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Pediatrics)"
-    ],
+    "specialties": ["pediatrics"],
+    "credentials": ["MBBS", "MD (Pediatrics)"],
     "years_experience": 25,
     "hourly_rate": 600,
     "city": "Patna",
@@ -855,13 +711,8 @@
     "business_name": "Desai Health Clinic",
     "display_name": "Dr. Manish Desai",
     "bio": "Dr. Manish Desai is a neurologist with 17 years of clinical experience, specializing in the diagnosis and management of peripheral neuropathy, Parkinson's disease, and stroke recovery. Practising at Desai Health Clinic in Delhi, he combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "neurology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Neurology)"
-    ],
+    "specialties": ["neurology"],
+    "credentials": ["MBBS", "DM (Neurology)"],
     "years_experience": 17,
     "hourly_rate": 2200,
     "city": "Delhi",
@@ -886,13 +737,8 @@
     "business_name": "Chatterjee Medical Centre",
     "display_name": "Dr. Neha Chatterjee",
     "bio": "With over 4 years in gynecology, Dr. Neha Chatterjee focuses on treating PCOS, uterine fibroids, and menopause management. She leads care at Chatterjee Medical Centre, Bengaluru, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "gynecology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Obstetrics & Gynecology)"
-    ],
+    "specialties": ["gynecology"],
+    "credentials": ["MBBS", "MS (Obstetrics & Gynecology)"],
     "years_experience": 4,
     "hourly_rate": 2100,
     "city": "Bengaluru",
@@ -917,13 +763,8 @@
     "business_name": "Trivedi Polyclinic",
     "display_name": "Dr. Trisha Trivedi",
     "bio": "Dr. Trisha Trivedi is an experienced gynecologist who has spent 16 years managing conditions such as menstrual disorders, infertility, and PCOS. Based at Trivedi Polyclinic in Chennai, she emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "gynecology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Obstetrics & Gynecology)"
-    ],
+    "specialties": ["gynecology"],
+    "credentials": ["MBBS", "MS (Obstetrics & Gynecology)"],
     "years_experience": 16,
     "hourly_rate": 1450,
     "city": "Chennai",
@@ -948,14 +789,8 @@
     "business_name": "Kaur Polyclinic",
     "display_name": "Dr. Vikram Kaur",
     "bio": "A dedicated endocrinologist with 24 years of practice, Dr. Vikram Kaur treats patients with thyroid disorders, PCOS, and type 2 diabetes. At Kaur Polyclinic, Mumbai, he blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "endocrinology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Endocrinology)",
-      "FICS"
-    ],
+    "specialties": ["endocrinology"],
+    "credentials": ["MBBS", "DM (Endocrinology)", "FICS"],
     "years_experience": 24,
     "hourly_rate": 2800,
     "city": "Mumbai",
@@ -980,13 +815,8 @@
     "business_name": "Kaur Medical Centre",
     "display_name": "Dr. Bhavana Kaur",
     "bio": "Dr. Bhavana Kaur is a dermatologist with 1 years of clinical experience, specializing in the diagnosis and management of psoriasis, acne, and vitiligo. Practising at Kaur Medical Centre in Amritsar, she combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "dermatology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Dermatology, Venereology & Leprosy)"
-    ],
+    "specialties": ["dermatology"],
+    "credentials": ["MBBS", "MD (Dermatology, Venereology & Leprosy)"],
     "years_experience": 1,
     "hourly_rate": 1950,
     "city": "Amritsar",
@@ -1011,13 +841,8 @@
     "business_name": "Sharma Institute of Health",
     "display_name": "Dr. Siddharth Sharma",
     "bio": "With over 30 years in internal medicine, Dr. Siddharth Sharma focuses on treating diabetes, hypertension, and infectious diseases. He leads care at Sharma Institute of Health, Patna, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "internal_medicine"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Internal Medicine)"
-    ],
+    "specialties": ["internal_medicine"],
+    "credentials": ["MBBS", "MD (Internal Medicine)"],
     "years_experience": 30,
     "hourly_rate": 750,
     "city": "Patna",
@@ -1042,13 +867,8 @@
     "business_name": "Chatterjee Medical Centre",
     "display_name": "Dr. Sanjana Chatterjee",
     "bio": "Dr. Sanjana Chatterjee is an experienced orthopedic surgeon who has spent 24 years managing conditions such as spinal disorders, fractures, and joint replacement. Based at Chatterjee Medical Centre in Ahmedabad, she emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "orthopedics"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Orthopedics)"
-    ],
+    "specialties": ["orthopedics"],
+    "credentials": ["MBBS", "MS (Orthopedics)"],
     "years_experience": 24,
     "hourly_rate": 1250,
     "city": "Ahmedabad",
@@ -1073,13 +893,8 @@
     "business_name": "Roy Institute of Health",
     "display_name": "Dr. Tarun Roy",
     "bio": "A dedicated obstetrician and gynecologist with 20 years of practice, Dr. Tarun Roy treats patients with menstrual disorders, prenatal and antenatal care, and high-risk pregnancy. At Roy Institute of Health, Thiruvananthapuram, he blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "obstetrics_gynecology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Obstetrics & Gynecology)"
-    ],
+    "specialties": ["obstetrics_gynecology"],
+    "credentials": ["MBBS", "MS (Obstetrics & Gynecology)"],
     "years_experience": 20,
     "hourly_rate": 2150,
     "city": "Thiruvananthapuram",
@@ -1104,13 +919,8 @@
     "business_name": "Joshi Specialty Centre",
     "display_name": "Dr. Deepak Joshi",
     "bio": "Dr. Deepak Joshi is a neurologist with 27 years of clinical experience, specializing in the diagnosis and management of stroke recovery, migraine, and Parkinson's disease. Practising at Joshi Specialty Centre in Thiruvananthapuram, he combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "neurology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Neurology)"
-    ],
+    "specialties": ["neurology"],
+    "credentials": ["MBBS", "DM (Neurology)"],
     "years_experience": 27,
     "hourly_rate": 2800,
     "city": "Thiruvananthapuram",
@@ -1135,13 +945,8 @@
     "business_name": "Mishra Clinic",
     "display_name": "Dr. Sanjana Mishra",
     "bio": "With over 8 years in pediatrics, Dr. Sanjana Mishra focuses on treating neonatal care, childhood infections, and growth and development concerns. She leads care at Mishra Clinic, Guwahati, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "pediatrics"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Pediatrics)"
-    ],
+    "specialties": ["pediatrics"],
+    "credentials": ["MBBS", "MD (Pediatrics)"],
     "years_experience": 8,
     "hourly_rate": 1250,
     "city": "Guwahati",
@@ -1166,13 +971,8 @@
     "business_name": "Roy Care Clinic",
     "display_name": "Dr. Meera Roy",
     "bio": "Dr. Meera Roy is an experienced pulmonologist who has spent 27 years managing conditions such as pneumonia, obstructive sleep apnea, and asthma. Based at Roy Care Clinic in Thiruvananthapuram, she emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "pulmonology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Pulmonary Medicine)"
-    ],
+    "specialties": ["pulmonology"],
+    "credentials": ["MBBS", "MD (Pulmonary Medicine)"],
     "years_experience": 27,
     "hourly_rate": 1450,
     "city": "Thiruvananthapuram",
@@ -1197,13 +997,8 @@
     "business_name": "Malhotra Multispeciality Clinic",
     "display_name": "Dr. Prakash Malhotra",
     "bio": "A dedicated pediatrician with 22 years of practice, Dr. Prakash Malhotra treats patients with childhood infections, childhood asthma, and routine vaccinations. At Malhotra Multispeciality Clinic, Indore, he blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "pediatrics"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Pediatrics)"
-    ],
+    "specialties": ["pediatrics"],
+    "credentials": ["MBBS", "MD (Pediatrics)"],
     "years_experience": 22,
     "hourly_rate": 1350,
     "city": "Indore",
@@ -1228,14 +1023,8 @@
     "business_name": "Gill Clinic",
     "display_name": "Dr. Priya Gill",
     "bio": "Dr. Priya Gill is a gastroenterologist with 17 years of clinical experience, specializing in the diagnosis and management of acid reflux and GERD, viral hepatitis, and peptic ulcers. Practising at Gill Clinic in Hyderabad, she combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "gastroenterology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Gastroenterology)",
-      "Fellowship (Clinical)"
-    ],
+    "specialties": ["gastroenterology"],
+    "credentials": ["MBBS", "DM (Gastroenterology)", "Fellowship (Clinical)"],
     "years_experience": 17,
     "hourly_rate": 1950,
     "city": "Hyderabad",
@@ -1260,14 +1049,8 @@
     "business_name": "Hegde Clinic",
     "display_name": "Dr. Arjun Hegde",
     "bio": "With over 5 years in psychiatry, Dr. Arjun Hegde focuses on treating anxiety disorders, obsessive-compulsive disorder, and schizophrenia. He leads care at Hegde Clinic, Visakhapatnam, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "psychiatry"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Psychiatry)",
-      "MRCP"
-    ],
+    "specialties": ["psychiatry"],
+    "credentials": ["MBBS", "MD (Psychiatry)", "MRCP"],
     "years_experience": 5,
     "hourly_rate": 2100,
     "city": "Visakhapatnam",
@@ -1292,13 +1075,8 @@
     "business_name": "Mishra Health Clinic",
     "display_name": "Dr. Nikhil Mishra",
     "bio": "Dr. Nikhil Mishra is an experienced dermatologist who has spent 27 years managing conditions such as acne, psoriasis, and vitiligo. Based at Mishra Health Clinic in Visakhapatnam, he emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "dermatology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Dermatology, Venereology & Leprosy)"
-    ],
+    "specialties": ["dermatology"],
+    "credentials": ["MBBS", "MD (Dermatology, Venereology & Leprosy)"],
     "years_experience": 27,
     "hourly_rate": 1900,
     "city": "Visakhapatnam",
@@ -1323,13 +1101,8 @@
     "business_name": "Bhat Clinic",
     "display_name": "Dr. Ananya Bhat",
     "bio": "A dedicated gastroenterologist with 21 years of practice, Dr. Ananya Bhat treats patients with inflammatory bowel disease, acid reflux and GERD, and irritable bowel syndrome. At Bhat Clinic, Mumbai, she blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "gastroenterology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Gastroenterology)"
-    ],
+    "specialties": ["gastroenterology"],
+    "credentials": ["MBBS", "DM (Gastroenterology)"],
     "years_experience": 21,
     "hourly_rate": 2750,
     "city": "Mumbai",
@@ -1354,14 +1127,8 @@
     "business_name": "Das Health Clinic",
     "display_name": "Dr. Meera Das",
     "bio": "Dr. Meera Das is a obstetrician and gynecologist with 2 years of clinical experience, specializing in the diagnosis and management of infertility, high-risk pregnancy, and PCOS. Practising at Das Health Clinic in Guwahati, she combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "obstetrics_gynecology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Obstetrics & Gynecology)",
-      "MRCP"
-    ],
+    "specialties": ["obstetrics_gynecology"],
+    "credentials": ["MBBS", "MS (Obstetrics & Gynecology)", "MRCP"],
     "years_experience": 2,
     "hourly_rate": 1500,
     "city": "Guwahati",
@@ -1386,13 +1153,8 @@
     "business_name": "Saxena Institute of Health",
     "display_name": "Dr. Rohan Saxena",
     "bio": "With over 27 years in dermatology, Dr. Rohan Saxena focuses on treating acne, fungal skin infections, and psoriasis. He leads care at Saxena Institute of Health, Hyderabad, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "dermatology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Dermatology, Venereology & Leprosy)"
-    ],
+    "specialties": ["dermatology"],
+    "credentials": ["MBBS", "MD (Dermatology, Venereology & Leprosy)"],
     "years_experience": 27,
     "hourly_rate": 2050,
     "city": "Hyderabad",
@@ -1417,13 +1179,8 @@
     "business_name": "Malhotra Specialty Centre",
     "display_name": "Dr. Lakshmi Malhotra",
     "bio": "Dr. Lakshmi Malhotra is an experienced medical oncologist who has spent 25 years managing conditions such as colorectal cancer, lung cancer, and breast cancer. Based at Malhotra Specialty Centre in Guwahati, she emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "oncology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Medical Oncology)"
-    ],
+    "specialties": ["oncology"],
+    "credentials": ["MBBS", "DM (Medical Oncology)"],
     "years_experience": 25,
     "hourly_rate": 1700,
     "city": "Guwahati",
@@ -1448,14 +1205,8 @@
     "business_name": "Naidu Care Clinic",
     "display_name": "Dr. Sameer Naidu",
     "bio": "A dedicated gynecologist with 12 years of practice, Dr. Sameer Naidu treats patients with uterine fibroids, PCOS, and menstrual disorders. At Naidu Care Clinic, Jaipur, he blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "gynecology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Obstetrics & Gynecology)",
-      "Fellowship (Clinical)"
-    ],
+    "specialties": ["gynecology"],
+    "credentials": ["MBBS", "MS (Obstetrics & Gynecology)", "Fellowship (Clinical)"],
     "years_experience": 12,
     "hourly_rate": 2200,
     "city": "Jaipur",
@@ -1480,13 +1231,8 @@
     "business_name": "Desai Clinic",
     "display_name": "Dr. Vidya Desai",
     "bio": "Dr. Vidya Desai is a pulmonologist with 1 years of clinical experience, specializing in the diagnosis and management of tuberculosis, asthma, and COPD. Practising at Desai Clinic in Mumbai, she combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "pulmonology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Pulmonary Medicine)"
-    ],
+    "specialties": ["pulmonology"],
+    "credentials": ["MBBS", "MD (Pulmonary Medicine)"],
     "years_experience": 1,
     "hourly_rate": 2350,
     "city": "Mumbai",
@@ -1511,13 +1257,8 @@
     "business_name": "Iyer Care Clinic",
     "display_name": "Dr. Ananya Iyer",
     "bio": "With over 17 years in rheumatology, Dr. Ananya Iyer focuses on treating ankylosing spondylitis, gout, and psoriatic arthritis. She leads care at Iyer Care Clinic, Bhopal, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "rheumatology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Rheumatology)"
-    ],
+    "specialties": ["rheumatology"],
+    "credentials": ["MBBS", "DM (Rheumatology)"],
     "years_experience": 17,
     "hourly_rate": 1500,
     "city": "Bhopal",
@@ -1542,13 +1283,8 @@
     "business_name": "Bose Polyclinic",
     "display_name": "Dr. Arjun Bose",
     "bio": "Dr. Arjun Bose is an experienced ENT specialist who has spent 28 years managing conditions such as recurrent tonsillitis, vertigo, and hearing loss. Based at Bose Polyclinic in Kolkata, he emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "ent"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (ENT)"
-    ],
+    "specialties": ["ent"],
+    "credentials": ["MBBS", "MS (ENT)"],
     "years_experience": 28,
     "hourly_rate": 750,
     "city": "Kolkata",
@@ -1573,14 +1309,8 @@
     "business_name": "Mukherjee Health Clinic",
     "display_name": "Dr. Anjali Mukherjee",
     "bio": "A dedicated psychiatrist with 28 years of practice, Dr. Anjali Mukherjee treats patients with schizophrenia, bipolar disorder, and depression. At Mukherjee Health Clinic, Indore, she blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "psychiatry"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Psychiatry)",
-      "MRCP"
-    ],
+    "specialties": ["psychiatry"],
+    "credentials": ["MBBS", "MD (Psychiatry)", "MRCP"],
     "years_experience": 28,
     "hourly_rate": 1850,
     "city": "Indore",
@@ -1605,13 +1335,8 @@
     "business_name": "Pandey Institute of Health",
     "display_name": "Dr. Aparna Pandey",
     "bio": "Dr. Aparna Pandey is a ophthalmologist with 8 years of clinical experience, specializing in the diagnosis and management of refractive errors, dry eye disease, and diabetic retinopathy. Practising at Pandey Institute of Health in Mumbai, she combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "ophthalmology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Ophthalmology)"
-    ],
+    "specialties": ["ophthalmology"],
+    "credentials": ["MBBS", "MS (Ophthalmology)"],
     "years_experience": 8,
     "hourly_rate": 1750,
     "city": "Mumbai",
@@ -1636,13 +1361,8 @@
     "business_name": "Kapoor Polyclinic",
     "display_name": "Dr. Prakash Kapoor",
     "bio": "With over 16 years in gastroenterology, Dr. Prakash Kapoor focuses on treating acid reflux and GERD, irritable bowel syndrome, and peptic ulcers. He leads care at Kapoor Polyclinic, Pune, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "gastroenterology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Gastroenterology)"
-    ],
+    "specialties": ["gastroenterology"],
+    "credentials": ["MBBS", "DM (Gastroenterology)"],
     "years_experience": 16,
     "hourly_rate": 2250,
     "city": "Pune",
@@ -1667,13 +1387,8 @@
     "business_name": "Sinha Multispeciality Clinic",
     "display_name": "Dr. Pranav Sinha",
     "bio": "Dr. Pranav Sinha is an experienced gastroenterologist who has spent 8 years managing conditions such as acid reflux and GERD, peptic ulcers, and viral hepatitis. Based at Sinha Multispeciality Clinic in Amritsar, he emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "gastroenterology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Gastroenterology)"
-    ],
+    "specialties": ["gastroenterology"],
+    "credentials": ["MBBS", "DM (Gastroenterology)"],
     "years_experience": 8,
     "hourly_rate": 1750,
     "city": "Amritsar",
@@ -1698,13 +1413,8 @@
     "business_name": "Saxena Multispeciality Clinic",
     "display_name": "Dr. Manisha Saxena",
     "bio": "A dedicated nephrologist with 27 years of practice, Dr. Manisha Saxena treats patients with kidney stones, chronic kidney disease, and dialysis management. At Saxena Multispeciality Clinic, Delhi, she blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "nephrology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Nephrology)"
-    ],
+    "specialties": ["nephrology"],
+    "credentials": ["MBBS", "DM (Nephrology)"],
     "years_experience": 27,
     "hourly_rate": 1600,
     "city": "Delhi",
@@ -1729,13 +1439,8 @@
     "business_name": "Mishra Wellness Centre",
     "display_name": "Dr. Deepak Mishra",
     "bio": "Dr. Deepak Mishra is a clinical psychologist with 12 years of clinical experience, specializing in the diagnosis and management of workplace stress, anxiety, and trauma and PTSD. Practising at Mishra Wellness Centre in Lucknow, he combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "psychology"
-    ],
-    "credentials": [
-      "MA (Psychology)",
-      "M.Phil (Clinical Psychology)"
-    ],
+    "specialties": ["psychology"],
+    "credentials": ["MA (Psychology)", "M.Phil (Clinical Psychology)"],
     "years_experience": 12,
     "hourly_rate": 1800,
     "city": "Lucknow",
@@ -1760,14 +1465,8 @@
     "business_name": "Nair Care Clinic",
     "display_name": "Dr. Abhishek Nair",
     "bio": "With over 20 years in general medicine, Dr. Abhishek Nair focuses on treating fever and common infections, hypertension, and lifestyle diseases. He leads care at Nair Care Clinic, Mumbai, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "general_medicine"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (General Medicine)",
-      "MRCP"
-    ],
+    "specialties": ["general_medicine"],
+    "credentials": ["MBBS", "MD (General Medicine)", "MRCP"],
     "years_experience": 20,
     "hourly_rate": 1150,
     "city": "Mumbai",
@@ -1792,13 +1491,8 @@
     "business_name": "Chauhan Institute of Health",
     "display_name": "Dr. Anjali Chauhan",
     "bio": "Dr. Anjali Chauhan is an experienced medical oncologist who has spent 28 years managing conditions such as colorectal cancer, chemotherapy planning, and leukemia. Based at Chauhan Institute of Health in Visakhapatnam, she emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "oncology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Medical Oncology)"
-    ],
+    "specialties": ["oncology"],
+    "credentials": ["MBBS", "DM (Medical Oncology)"],
     "years_experience": 28,
     "hourly_rate": 2350,
     "city": "Visakhapatnam",
@@ -1823,13 +1517,8 @@
     "business_name": "Menon Health Clinic",
     "display_name": "Dr. Deepa Menon",
     "bio": "A dedicated pulmonologist with 21 years of practice, Dr. Deepa Menon treats patients with COPD, pneumonia, and tuberculosis. At Menon Health Clinic, Mumbai, she blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "pulmonology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Pulmonary Medicine)"
-    ],
+    "specialties": ["pulmonology"],
+    "credentials": ["MBBS", "MD (Pulmonary Medicine)"],
     "years_experience": 21,
     "hourly_rate": 2300,
     "city": "Mumbai",
@@ -1854,13 +1543,8 @@
     "business_name": "Patel Health Clinic",
     "display_name": "Dr. Rajesh Patel",
     "bio": "Dr. Rajesh Patel is a orthopedic surgeon with 18 years of clinical experience, specializing in the diagnosis and management of fractures, spinal disorders, and ACL and knee injuries. Practising at Patel Health Clinic in Kochi, he combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "orthopedics"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Orthopedics)"
-    ],
+    "specialties": ["orthopedics"],
+    "credentials": ["MBBS", "MS (Orthopedics)"],
     "years_experience": 18,
     "hourly_rate": 2150,
     "city": "Kochi",
@@ -1885,13 +1569,8 @@
     "business_name": "Verma Medical Centre",
     "display_name": "Dr. Ashwin Verma",
     "bio": "With over 22 years in family medicine, Dr. Ashwin Verma focuses on treating diabetes, chronic disease management, and preventive health. He leads care at Verma Medical Centre, Mumbai, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "family_medicine"
-    ],
-    "credentials": [
-      "MBBS",
-      "DNB (Family Medicine)"
-    ],
+    "specialties": ["family_medicine"],
+    "credentials": ["MBBS", "DNB (Family Medicine)"],
     "years_experience": 22,
     "hourly_rate": 450,
     "city": "Mumbai",
@@ -1916,13 +1595,8 @@
     "business_name": "Kapoor Clinic",
     "display_name": "Dr. Kunal Kapoor",
     "bio": "Dr. Kunal Kapoor is an experienced ENT specialist who has spent 19 years managing conditions such as vertigo, recurrent tonsillitis, and allergic rhinitis. Based at Kapoor Clinic in Chandigarh, he emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "ent"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (ENT)"
-    ],
+    "specialties": ["ent"],
+    "credentials": ["MBBS", "MS (ENT)"],
     "years_experience": 19,
     "hourly_rate": 2000,
     "city": "Chandigarh",
@@ -1947,13 +1621,8 @@
     "business_name": "Roy Wellness Centre",
     "display_name": "Dr. Rakesh Roy",
     "bio": "A dedicated cardiologist with 6 years of practice, Dr. Rakesh Roy treats patients with coronary artery disease, hypertension, and valvular heart disease. At Roy Wellness Centre, Guwahati, he blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "cardiology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Cardiology)"
-    ],
+    "specialties": ["cardiology"],
+    "credentials": ["MBBS", "DM (Cardiology)"],
     "years_experience": 6,
     "hourly_rate": 2000,
     "city": "Guwahati",
@@ -1978,13 +1647,8 @@
     "business_name": "Mukherjee Institute of Health",
     "display_name": "Dr. Manish Mukherjee",
     "bio": "Dr. Manish Mukherjee is a rheumatologist with 14 years of clinical experience, specializing in the diagnosis and management of psoriatic arthritis, rheumatoid arthritis, and ankylosing spondylitis. Practising at Mukherjee Institute of Health in Visakhapatnam, he combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "rheumatology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Rheumatology)"
-    ],
+    "specialties": ["rheumatology"],
+    "credentials": ["MBBS", "DM (Rheumatology)"],
     "years_experience": 14,
     "hourly_rate": 1650,
     "city": "Visakhapatnam",
@@ -2009,14 +1673,8 @@
     "business_name": "Malhotra Care Clinic",
     "display_name": "Dr. Harish Malhotra",
     "bio": "With over 15 years in dermatology, Dr. Harish Malhotra focuses on treating fungal skin infections, acne, and eczema. He leads care at Malhotra Care Clinic, Delhi, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "dermatology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Dermatology, Venereology & Leprosy)",
-      "FICS"
-    ],
+    "specialties": ["dermatology"],
+    "credentials": ["MBBS", "MD (Dermatology, Venereology & Leprosy)", "FICS"],
     "years_experience": 15,
     "hourly_rate": 1500,
     "city": "Delhi",
@@ -2041,13 +1699,8 @@
     "business_name": "Bose Hospital & Research Centre",
     "display_name": "Dr. Rekha Bose",
     "bio": "Dr. Rekha Bose is an experienced endocrinologist who has spent 8 years managing conditions such as type 2 diabetes, thyroid disorders, and obesity. Based at Bose Hospital & Research Centre in Nagpur, she emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "endocrinology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Endocrinology)"
-    ],
+    "specialties": ["endocrinology"],
+    "credentials": ["MBBS", "DM (Endocrinology)"],
     "years_experience": 8,
     "hourly_rate": 2700,
     "city": "Nagpur",
@@ -2072,14 +1725,8 @@
     "business_name": "Banerjee Polyclinic",
     "display_name": "Dr. Arjun Banerjee",
     "bio": "A dedicated cardiologist with 9 years of practice, Dr. Arjun Banerjee treats patients with coronary artery disease, cardiac arrhythmia, and valvular heart disease. At Banerjee Polyclinic, Delhi, he blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "cardiology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Cardiology)",
-      "Fellowship (Clinical)"
-    ],
+    "specialties": ["cardiology"],
+    "credentials": ["MBBS", "DM (Cardiology)", "Fellowship (Clinical)"],
     "years_experience": 9,
     "hourly_rate": 1800,
     "city": "Delhi",
@@ -2104,13 +1751,8 @@
     "business_name": "Sharma Health Clinic",
     "display_name": "Dr. Manisha Sharma",
     "bio": "Dr. Manisha Sharma is a ENT specialist with 26 years of clinical experience, specializing in the diagnosis and management of recurrent tonsillitis, hearing loss, and allergic rhinitis. Practising at Sharma Health Clinic in Dehradun, she combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "ent"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (ENT)"
-    ],
+    "specialties": ["ent"],
+    "credentials": ["MBBS", "MS (ENT)"],
     "years_experience": 26,
     "hourly_rate": 800,
     "city": "Dehradun",
@@ -2135,13 +1777,8 @@
     "business_name": "Das Care Clinic",
     "display_name": "Dr. Anjali Das",
     "bio": "With over 2 years in pediatrics, Dr. Anjali Das focuses on treating routine vaccinations, childhood asthma, and growth and development concerns. She leads care at Das Care Clinic, Indore, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "pediatrics"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Pediatrics)"
-    ],
+    "specialties": ["pediatrics"],
+    "credentials": ["MBBS", "MD (Pediatrics)"],
     "years_experience": 2,
     "hourly_rate": 700,
     "city": "Indore",
@@ -2166,14 +1803,8 @@
     "business_name": "Bhat Wellness Centre",
     "display_name": "Dr. Rakesh Bhat",
     "bio": "Dr. Rakesh Bhat is an experienced gastroenterologist who has spent 6 years managing conditions such as inflammatory bowel disease, peptic ulcers, and acid reflux and GERD. Based at Bhat Wellness Centre in Kolkata, he emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "gastroenterology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Gastroenterology)",
-      "MRCP"
-    ],
+    "specialties": ["gastroenterology"],
+    "credentials": ["MBBS", "DM (Gastroenterology)", "MRCP"],
     "years_experience": 6,
     "hourly_rate": 1700,
     "city": "Kolkata",
@@ -2198,14 +1829,8 @@
     "business_name": "Bhat Hospital & Research Centre",
     "display_name": "Dr. Bhavana Bhat",
     "bio": "A dedicated orthopedic surgeon with 1 years of practice, Dr. Bhavana Bhat treats patients with joint replacement, ACL and knee injuries, and spinal disorders. At Bhat Hospital & Research Centre, Lucknow, she blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "orthopedics"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Orthopedics)",
-      "MRCP"
-    ],
+    "specialties": ["orthopedics"],
+    "credentials": ["MBBS", "MS (Orthopedics)", "MRCP"],
     "years_experience": 1,
     "hourly_rate": 1400,
     "city": "Lucknow",
@@ -2230,13 +1855,8 @@
     "business_name": "Nair Multispeciality Clinic",
     "display_name": "Dr. Deepak Nair",
     "bio": "Dr. Deepak Nair is a clinical psychologist with 6 years of clinical experience, specializing in the diagnosis and management of trauma and PTSD, workplace stress, and depression. Practising at Nair Multispeciality Clinic in Ahmedabad, he combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "psychology"
-    ],
-    "credentials": [
-      "MA (Clinical Psychology)",
-      "PhD (Psychology)"
-    ],
+    "specialties": ["psychology"],
+    "credentials": ["MA (Clinical Psychology)", "PhD (Psychology)"],
     "years_experience": 6,
     "hourly_rate": 1650,
     "city": "Ahmedabad",
@@ -2261,14 +1881,8 @@
     "business_name": "Deshpande Hospital & Research Centre",
     "display_name": "Dr. Pranav Deshpande",
     "bio": "With over 2 years in psychiatry, Dr. Pranav Deshpande focuses on treating bipolar disorder, obsessive-compulsive disorder, and schizophrenia. He leads care at Deshpande Hospital & Research Centre, Hyderabad, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "psychiatry"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Psychiatry)",
-      "Fellowship (Clinical)"
-    ],
+    "specialties": ["psychiatry"],
+    "credentials": ["MBBS", "MD (Psychiatry)", "Fellowship (Clinical)"],
     "years_experience": 2,
     "hourly_rate": 1950,
     "city": "Hyderabad",
@@ -2293,13 +1907,8 @@
     "business_name": "Iyer Health Clinic",
     "display_name": "Dr. Kritika Iyer",
     "bio": "Dr. Kritika Iyer is an experienced endocrinologist who has spent 12 years managing conditions such as obesity, PCOS, and osteoporosis. Based at Iyer Health Clinic in Surat, she emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "endocrinology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Endocrinology)"
-    ],
+    "specialties": ["endocrinology"],
+    "credentials": ["MBBS", "DM (Endocrinology)"],
     "years_experience": 12,
     "hourly_rate": 1600,
     "city": "Surat",
@@ -2324,13 +1933,8 @@
     "business_name": "Gill Care Clinic",
     "display_name": "Dr. Swati Gill",
     "bio": "A dedicated cardiologist with 21 years of practice, Dr. Swati Gill treats patients with heart failure, valvular heart disease, and coronary artery disease. At Gill Care Clinic, Delhi, she blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "cardiology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Cardiology)"
-    ],
+    "specialties": ["cardiology"],
+    "credentials": ["MBBS", "DM (Cardiology)"],
     "years_experience": 21,
     "hourly_rate": 2600,
     "city": "Delhi",
@@ -2355,14 +1959,8 @@
     "business_name": "Pillai Multispeciality Clinic",
     "display_name": "Dr. Pooja Pillai",
     "bio": "Dr. Pooja Pillai is a dermatologist with 7 years of clinical experience, specializing in the diagnosis and management of eczema, fungal skin infections, and acne. Practising at Pillai Multispeciality Clinic in Delhi, she combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "dermatology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Dermatology, Venereology & Leprosy)",
-      "MRCP"
-    ],
+    "specialties": ["dermatology"],
+    "credentials": ["MBBS", "MD (Dermatology, Venereology & Leprosy)", "MRCP"],
     "years_experience": 7,
     "hourly_rate": 1300,
     "city": "Delhi",
@@ -2387,13 +1985,8 @@
     "business_name": "Agarwal Health Clinic",
     "display_name": "Dr. Rajesh Agarwal",
     "bio": "With over 23 years in ophthalmology, Dr. Rajesh Agarwal focuses on treating cataract, refractive errors, and glaucoma. He leads care at Agarwal Health Clinic, Bengaluru, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "ophthalmology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Ophthalmology)"
-    ],
+    "specialties": ["ophthalmology"],
+    "credentials": ["MBBS", "MS (Ophthalmology)"],
     "years_experience": 23,
     "hourly_rate": 1900,
     "city": "Bengaluru",
@@ -2418,13 +2011,8 @@
     "business_name": "Trivedi Institute of Health",
     "display_name": "Dr. Sruthi Trivedi",
     "bio": "Dr. Sruthi Trivedi is an experienced gynecologist who has spent 13 years managing conditions such as uterine fibroids, menopause management, and PCOS. Based at Trivedi Institute of Health in Indore, she emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "gynecology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Obstetrics & Gynecology)"
-    ],
+    "specialties": ["gynecology"],
+    "credentials": ["MBBS", "MS (Obstetrics & Gynecology)"],
     "years_experience": 13,
     "hourly_rate": 1950,
     "city": "Indore",
@@ -2449,13 +2037,8 @@
     "business_name": "Das Wellness Centre",
     "display_name": "Dr. Preeti Das",
     "bio": "A dedicated neurologist with 3 years of practice, Dr. Preeti Das treats patients with migraine, epilepsy, and multiple sclerosis. At Das Wellness Centre, Thiruvananthapuram, she blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "neurology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Neurology)"
-    ],
+    "specialties": ["neurology"],
+    "credentials": ["MBBS", "DM (Neurology)"],
     "years_experience": 3,
     "hourly_rate": 2300,
     "city": "Thiruvananthapuram",
@@ -2480,13 +2063,8 @@
     "business_name": "Pandey Multispeciality Clinic",
     "display_name": "Dr. Kritika Pandey",
     "bio": "Dr. Kritika Pandey is a rheumatologist with 23 years of clinical experience, specializing in the diagnosis and management of systemic lupus, ankylosing spondylitis, and gout. Practising at Pandey Multispeciality Clinic in Guwahati, she combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "rheumatology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Rheumatology)"
-    ],
+    "specialties": ["rheumatology"],
+    "credentials": ["MBBS", "DM (Rheumatology)"],
     "years_experience": 23,
     "hourly_rate": 1400,
     "city": "Guwahati",
@@ -2511,13 +2089,8 @@
     "business_name": "Deshpande Medical Centre",
     "display_name": "Dr. Nitin Deshpande",
     "bio": "With over 25 years in endocrinology, Dr. Nitin Deshpande focuses on treating thyroid disorders, PCOS, and type 2 diabetes. He leads care at Deshpande Medical Centre, Mumbai, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "endocrinology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Endocrinology)"
-    ],
+    "specialties": ["endocrinology"],
+    "credentials": ["MBBS", "DM (Endocrinology)"],
     "years_experience": 25,
     "hourly_rate": 1600,
     "city": "Mumbai",
@@ -2542,13 +2115,8 @@
     "business_name": "Mehta Institute of Health",
     "display_name": "Dr. Nandini Mehta",
     "bio": "Dr. Nandini Mehta is an experienced neurologist who has spent 11 years managing conditions such as multiple sclerosis, peripheral neuropathy, and epilepsy. Based at Mehta Institute of Health in Surat, she emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "neurology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Neurology)"
-    ],
+    "specialties": ["neurology"],
+    "credentials": ["MBBS", "DM (Neurology)"],
     "years_experience": 11,
     "hourly_rate": 2250,
     "city": "Surat",
@@ -2573,13 +2141,8 @@
     "business_name": "Krishnan Care Clinic",
     "display_name": "Dr. Naveen Krishnan",
     "bio": "A dedicated general physician with 18 years of practice, Dr. Naveen Krishnan treats patients with diabetes, hypertension, and lifestyle diseases. At Krishnan Care Clinic, Amritsar, he blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "general_medicine"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (General Medicine)"
-    ],
+    "specialties": ["general_medicine"],
+    "credentials": ["MBBS", "MD (General Medicine)"],
     "years_experience": 18,
     "hourly_rate": 500,
     "city": "Amritsar",
@@ -2604,14 +2167,8 @@
     "business_name": "Patel Specialty Centre",
     "display_name": "Dr. Ritu Patel",
     "bio": "Dr. Ritu Patel is a family physician with 21 years of clinical experience, specializing in the diagnosis and management of hypertension, chronic disease management, and diabetes. Practising at Patel Specialty Centre in Surat, she combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "family_medicine"
-    ],
-    "credentials": [
-      "MBBS",
-      "DNB (Family Medicine)",
-      "MRCP"
-    ],
+    "specialties": ["family_medicine"],
+    "credentials": ["MBBS", "DNB (Family Medicine)", "MRCP"],
     "years_experience": 21,
     "hourly_rate": 1250,
     "city": "Surat",
@@ -2636,14 +2193,8 @@
     "business_name": "Chowdhury Polyclinic",
     "display_name": "Dr. Rakesh Chowdhury",
     "bio": "With over 19 years in pulmonology, Dr. Rakesh Chowdhury focuses on treating pneumonia, tuberculosis, and obstructive sleep apnea. He leads care at Chowdhury Polyclinic, Pune, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "pulmonology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Pulmonary Medicine)",
-      "FICS"
-    ],
+    "specialties": ["pulmonology"],
+    "credentials": ["MBBS", "MD (Pulmonary Medicine)", "FICS"],
     "years_experience": 19,
     "hourly_rate": 1850,
     "city": "Pune",
@@ -2668,13 +2219,8 @@
     "business_name": "Joshi Multispeciality Clinic",
     "display_name": "Dr. Sameer Joshi",
     "bio": "Dr. Sameer Joshi is an experienced obstetrician and gynecologist who has spent 26 years managing conditions such as PCOS, infertility, and menstrual disorders. Based at Joshi Multispeciality Clinic in Nagpur, he emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "obstetrics_gynecology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Obstetrics & Gynecology)"
-    ],
+    "specialties": ["obstetrics_gynecology"],
+    "credentials": ["MBBS", "MS (Obstetrics & Gynecology)"],
     "years_experience": 26,
     "hourly_rate": 2450,
     "city": "Nagpur",
@@ -2699,13 +2245,8 @@
     "business_name": "Malhotra Hospital & Research Centre",
     "display_name": "Dr. Ishita Malhotra",
     "bio": "A dedicated pediatrician with 28 years of practice, Dr. Ishita Malhotra treats patients with childhood asthma, routine vaccinations, and childhood infections. At Malhotra Hospital & Research Centre, Kochi, she blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "pediatrics"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Pediatrics)"
-    ],
+    "specialties": ["pediatrics"],
+    "credentials": ["MBBS", "MD (Pediatrics)"],
     "years_experience": 28,
     "hourly_rate": 1800,
     "city": "Kochi",
@@ -2730,13 +2271,8 @@
     "business_name": "Hegde Institute of Health",
     "display_name": "Dr. Varun Hegde",
     "bio": "Dr. Varun Hegde is a clinical psychologist with 20 years of clinical experience, specializing in the diagnosis and management of depression, anxiety, and relationship difficulties. Practising at Hegde Institute of Health in Delhi, he combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "psychology"
-    ],
-    "credentials": [
-      "MSc (Psychology)",
-      "M.Phil (Clinical Psychology)"
-    ],
+    "specialties": ["psychology"],
+    "credentials": ["MSc (Psychology)", "M.Phil (Clinical Psychology)"],
     "years_experience": 20,
     "hourly_rate": 1500,
     "city": "Delhi",
@@ -2761,13 +2297,8 @@
     "business_name": "Chauhan Multispeciality Clinic",
     "display_name": "Dr. Rahul Chauhan",
     "bio": "With over 21 years in cardiology, Dr. Rahul Chauhan focuses on treating coronary artery disease, heart failure, and valvular heart disease. He leads care at Chauhan Multispeciality Clinic, Mumbai, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "cardiology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Cardiology)"
-    ],
+    "specialties": ["cardiology"],
+    "credentials": ["MBBS", "DM (Cardiology)"],
     "years_experience": 21,
     "hourly_rate": 2750,
     "city": "Mumbai",
@@ -2792,13 +2323,8 @@
     "business_name": "Desai Clinic",
     "display_name": "Dr. Yash Desai",
     "bio": "Dr. Yash Desai is an experienced neurologist who has spent 3 years managing conditions such as epilepsy, multiple sclerosis, and migraine. Based at Desai Clinic in Bhopal, he emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "neurology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Neurology)"
-    ],
+    "specialties": ["neurology"],
+    "credentials": ["MBBS", "DM (Neurology)"],
     "years_experience": 3,
     "hourly_rate": 1950,
     "city": "Bhopal",
@@ -2823,13 +2349,8 @@
     "business_name": "Malhotra Polyclinic",
     "display_name": "Dr. Nikhil Malhotra",
     "bio": "A dedicated internal medicine specialist with 3 years of practice, Dr. Nikhil Malhotra treats patients with infectious diseases, hypertension, and preventive care. At Malhotra Polyclinic, Delhi, he blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "internal_medicine"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Internal Medicine)"
-    ],
+    "specialties": ["internal_medicine"],
+    "credentials": ["MBBS", "MD (Internal Medicine)"],
     "years_experience": 3,
     "hourly_rate": 1550,
     "city": "Delhi",
@@ -2854,14 +2375,8 @@
     "business_name": "Sinha Hospital & Research Centre",
     "display_name": "Dr. Manisha Sinha",
     "bio": "Dr. Manisha Sinha is a nephrologist with 6 years of clinical experience, specializing in the diagnosis and management of dialysis management, glomerulonephritis, and kidney stones. Practising at Sinha Hospital & Research Centre in Visakhapatnam, she combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "nephrology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Nephrology)",
-      "DNB"
-    ],
+    "specialties": ["nephrology"],
+    "credentials": ["MBBS", "DM (Nephrology)", "DNB"],
     "years_experience": 6,
     "hourly_rate": 2650,
     "city": "Visakhapatnam",
@@ -2886,13 +2401,8 @@
     "business_name": "Chauhan Multispeciality Clinic",
     "display_name": "Dr. Rakesh Chauhan",
     "bio": "With over 12 years in gynecology, Dr. Rakesh Chauhan focuses on treating menstrual disorders, infertility, and menopause management. He leads care at Chauhan Multispeciality Clinic, Nagpur, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "gynecology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Obstetrics & Gynecology)"
-    ],
+    "specialties": ["gynecology"],
+    "credentials": ["MBBS", "MS (Obstetrics & Gynecology)"],
     "years_experience": 12,
     "hourly_rate": 1750,
     "city": "Nagpur",
@@ -2917,14 +2427,8 @@
     "business_name": "Malhotra Institute of Health",
     "display_name": "Dr. Abhishek Malhotra",
     "bio": "Dr. Abhishek Malhotra is an experienced neurologist who has spent 6 years managing conditions such as multiple sclerosis, stroke recovery, and Parkinson's disease. Based at Malhotra Institute of Health in Mumbai, he emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "neurology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Neurology)",
-      "Fellowship (Clinical)"
-    ],
+    "specialties": ["neurology"],
+    "credentials": ["MBBS", "DM (Neurology)", "Fellowship (Clinical)"],
     "years_experience": 6,
     "hourly_rate": 1750,
     "city": "Mumbai",
@@ -2949,13 +2453,8 @@
     "business_name": "Gupta Wellness Centre",
     "display_name": "Dr. Vidya Gupta",
     "bio": "A dedicated pediatrician with 1 years of practice, Dr. Vidya Gupta treats patients with growth and development concerns, routine vaccinations, and neonatal care. At Gupta Wellness Centre, Jaipur, she blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "pediatrics"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Pediatrics)"
-    ],
+    "specialties": ["pediatrics"],
+    "credentials": ["MBBS", "MD (Pediatrics)"],
     "years_experience": 1,
     "hourly_rate": 1700,
     "city": "Jaipur",
@@ -2980,13 +2479,8 @@
     "business_name": "Rao Institute of Health",
     "display_name": "Dr. Aditya Rao",
     "bio": "Dr. Aditya Rao is a internal medicine specialist with 6 years of clinical experience, specializing in the diagnosis and management of hypertension, diabetes, and thyroid disorders. Practising at Rao Institute of Health in Bhopal, he combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "internal_medicine"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Internal Medicine)"
-    ],
+    "specialties": ["internal_medicine"],
+    "credentials": ["MBBS", "MD (Internal Medicine)"],
     "years_experience": 6,
     "hourly_rate": 1050,
     "city": "Bhopal",
@@ -3011,13 +2505,8 @@
     "business_name": "Kulkarni Wellness Centre",
     "display_name": "Dr. Anjali Kulkarni",
     "bio": "With over 20 years in ophthalmology, Dr. Anjali Kulkarni focuses on treating dry eye disease, refractive errors, and diabetic retinopathy. She leads care at Kulkarni Wellness Centre, Jaipur, and is known for clear communication, individualized treatment plans, and accessible online consultations.",
-    "specialties": [
-      "ophthalmology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MS (Ophthalmology)"
-    ],
+    "specialties": ["ophthalmology"],
+    "credentials": ["MBBS", "MS (Ophthalmology)"],
     "years_experience": 20,
     "hourly_rate": 1050,
     "city": "Jaipur",
@@ -3042,13 +2531,8 @@
     "business_name": "Pillai Multispeciality Clinic",
     "display_name": "Dr. Kavya Pillai",
     "bio": "Dr. Kavya Pillai is an experienced dermatologist who has spent 3 years managing conditions such as eczema, vitiligo, and acne. Based at Pillai Multispeciality Clinic in Bhopal, she emphasizes preventive care, early intervention, and thorough follow-up through both in-person and telehealth visits.",
-    "specialties": [
-      "dermatology"
-    ],
-    "credentials": [
-      "MBBS",
-      "MD (Dermatology, Venereology & Leprosy)"
-    ],
+    "specialties": ["dermatology"],
+    "credentials": ["MBBS", "MD (Dermatology, Venereology & Leprosy)"],
     "years_experience": 3,
     "hourly_rate": 1700,
     "city": "Bhopal",
@@ -3073,13 +2557,8 @@
     "business_name": "Pillai Health Clinic",
     "display_name": "Dr. Sruthi Pillai",
     "bio": "A dedicated cardiologist with 21 years of practice, Dr. Sruthi Pillai treats patients with valvular heart disease, heart failure, and coronary artery disease. At Pillai Health Clinic, Bhopal, she blends modern diagnostics with compassionate, long-term care and provides remote consultations for patients across India.",
-    "specialties": [
-      "cardiology"
-    ],
-    "credentials": [
-      "MBBS",
-      "DM (Cardiology)"
-    ],
+    "specialties": ["cardiology"],
+    "credentials": ["MBBS", "DM (Cardiology)"],
     "years_experience": 21,
     "hourly_rate": 2650,
     "city": "Bhopal",
@@ -3104,14 +2583,8 @@
     "business_name": "Shetty Care Clinic",
     "display_name": "Dr. Siddharth Shetty",
     "bio": "Dr. Siddharth Shetty is a family physician with 15 years of clinical experience, specializing in the diagnosis and management of common infections, chronic disease management, and diabetes. Practising at Shetty Care Clinic in Surat, he combines evidence-based protocols with a patient-first approach and offers virtual consultations for follow-up and second opinions.",
-    "specialties": [
-      "family_medicine"
-    ],
-    "credentials": [
-      "MBBS",
-      "DNB (Family Medicine)",
-      "DNB"
-    ],
+    "specialties": ["family_medicine"],
+    "credentials": ["MBBS", "DNB (Family Medicine)", "DNB"],
     "years_experience": 15,
     "hourly_rate": 350,
     "city": "Surat",

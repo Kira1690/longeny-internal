@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createLogger } from '@longeny/utils';
 import { inArray } from 'drizzle-orm';
 import { db } from './index.js';
-import { users, providers } from './schema.js';
-import { createLogger } from '@longeny/utils';
+import { providers, users } from './schema.js';
 
 const logger = createLogger('user-provider-seed-providers');
 

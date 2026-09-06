@@ -1,5 +1,5 @@
+import type { TSchema } from '@sinclair/typebox';
 import { t } from 'elysia';
-import { type TSchema } from '@sinclair/typebox';
 
 export const SECTION_KEYS = [
   'basic_identity',
@@ -19,7 +19,10 @@ export const SECTION_KEYS = [
 export type SectionKey = (typeof SECTION_KEYS)[number];
 
 export const sectionKeySchema = t.Union(
-  SECTION_KEYS.map((k) => t.Literal(k)) as [ReturnType<typeof t.Literal>, ...ReturnType<typeof t.Literal>[]],
+  SECTION_KEYS.map((k) => t.Literal(k)) as [
+    ReturnType<typeof t.Literal>,
+    ...ReturnType<typeof t.Literal>[],
+  ],
 );
 
 // ── Section 1: Basic Identity ──
@@ -78,10 +81,9 @@ export const licenseVerificationSchema = t.Object({
 // ── Section 4: Practice & Services ──
 
 export const practiceServicesSchema = t.Object({
-  consultation_modes: t.Array(
-    t.Union([t.Literal('online'), t.Literal('offline')]),
-    { minItems: 1 },
-  ),
+  consultation_modes: t.Array(t.Union([t.Literal('online'), t.Literal('offline')]), {
+    minItems: 1,
+  }),
   initial_consultation_fee: t.Number({ minimum: 0 }),
   followup_consultation_fee: t.Number({ minimum: 0 }),
   available_duration_minutes: t.Integer({ minimum: 5, maximum: 240 }),
@@ -174,11 +176,21 @@ const consentItemSchema = t.Object({
 });
 
 export const CONSENT_KEYS = [
-  'platform_terms', 'privacy_policy', 'telemedicine_guidelines',
-  'store_profile_data', 'store_consultation_records', 'receive_bookings',
-  'payout_processing', 'platform_communications', 'review_ratings_display',
-  'credential_verification', 'fraud_kyc_screening', 'service_fee_commission',
-  'cancellation_refund_policies', 'response_time_obligations', 'code_of_conduct',
+  'platform_terms',
+  'privacy_policy',
+  'telemedicine_guidelines',
+  'store_profile_data',
+  'store_consultation_records',
+  'receive_bookings',
+  'payout_processing',
+  'platform_communications',
+  'review_ratings_display',
+  'credential_verification',
+  'fraud_kyc_screening',
+  'service_fee_commission',
+  'cancellation_refund_policies',
+  'response_time_obligations',
+  'code_of_conduct',
 ] as const;
 
 export const complianceConsentsSchema = t.Array(consentItemSchema);
@@ -193,8 +205,12 @@ const declarationItemSchema = t.Object({
 });
 
 export const DECLARATION_KEYS = [
-  'valid_medical_license', 'accurate_information', 'professional_standards',
-  'comply_local_laws', 'no_patient_data_misuse', 'understand_violations_suspension',
+  'valid_medical_license',
+  'accurate_information',
+  'professional_standards',
+  'comply_local_laws',
+  'no_patient_data_misuse',
+  'understand_violations_suspension',
 ] as const;
 
 export const legalDeclarationsSchema = t.Array(declarationItemSchema);
@@ -254,15 +270,24 @@ export function getPartialSchema(key: SectionKey): TSchema {
 // ── Admin check schema ──
 
 export const ADMIN_CHECK_KEYS = [
-  'credential_verified', 'license_verified', 'identity_verified',
-  'banking_verified', 'profile_reviewed', 'fees_confirmed',
-  'availability_confirmed', 'documents_reviewed', 'compliance_confirmed',
+  'credential_verified',
+  'license_verified',
+  'identity_verified',
+  'banking_verified',
+  'profile_reviewed',
+  'fees_confirmed',
+  'availability_confirmed',
+  'documents_reviewed',
+  'compliance_confirmed',
   'admin_activated',
 ] as const;
 
 export const adminCheckUpdateSchema = t.Object({
   check_key: t.Union(
-    ADMIN_CHECK_KEYS.map((k) => t.Literal(k)) as [ReturnType<typeof t.Literal>, ...ReturnType<typeof t.Literal>[]],
+    ADMIN_CHECK_KEYS.map((k) => t.Literal(k)) as [
+      ReturnType<typeof t.Literal>,
+      ...ReturnType<typeof t.Literal>[],
+    ],
   ),
   is_checked: t.Boolean(),
   notes: t.Optional(t.String({ maxLength: 1000 })),

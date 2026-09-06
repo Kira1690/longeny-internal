@@ -1,29 +1,31 @@
+import { ConflictError, ForbiddenError, NotFoundError } from '@longeny/errors';
+import { buildPaginationMeta, createLogger } from '@longeny/utils';
+import { type InferSelectModel, type SQL, and, eq, gte, lte, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { sql, eq, and, gte, lte, inArray } from 'drizzle-orm';
 import {
-  progress_entries,
-  habits,
-  habit_checkins,
   achievements,
-  reviews,
-  review_responses,
-  review_helpful_votes,
   goals,
-  reminders,
-  users,
+  habit_checkins,
+  habits,
+  progress_entries,
   providers,
+  reminders,
+  review_helpful_votes,
+  review_responses,
+  reviews,
+  users,
 } from '../db/schema.js';
-import { NotFoundError, ConflictError, ForbiddenError } from '@longeny/errors';
-import { createLogger, buildPaginationMeta } from '@longeny/utils';
 
 const logger = createLogger('progress-service');
 
 export class ProgressService {
-  constructor(_prismaUnused: unknown) {}
-
   // ── Dashboard ──
 
-  async getDashboard(userId: string) {
+  /**
+   * Health data (entries, habits, checkins) belongs to the profile being cared
+   * for; achievements are earned by the account and stay account-wide.
+   */
+  async getDashboard(userId: string, profileId: string) {
     const today = new Date().toISOString().split('T')[0];
 
     const [
@@ -35,24 +37,27 @@ export class ProgressService {
       db
         .select()
         .from(progress_entries)
-        .where(eq(progress_entries.user_id, userId))
+        .where(eq(progress_entries.profile_id, profileId))
         .orderBy(sql`${progress_entries.date} DESC`)
         .limit(10),
       db
         .select()
         .from(habits)
-        .where(and(eq(habits.user_id, userId), eq(habits.is_active, true))),
+        .where(and(eq(habits.profile_id, profileId), eq(habits.is_active, true))),
       db
         .select()
         .from(achievements)
         .where(eq(achievements.user_id, userId))
         .orderBy(sql`${achievements.earned_at} DESC`)
         .limit(5),
-      db.select({
-        totalStreak: sql<number>`COALESCE(SUM(streak), 0)::int`,
-        totalCompletions: sql<number>`COALESCE(SUM(total_completions), 0)::int`,
-        longestStreak: sql<number>`COALESCE(MAX(longest_streak), 0)::int`,
-      }).from(habits).where(and(eq(habits.user_id, userId), eq(habits.is_active, true))),
+      db
+        .select({
+          totalStreak: sql<number>`COALESCE(SUM(streak), 0)::int`,
+          totalCompletions: sql<number>`COALESCE(SUM(total_completions), 0)::int`,
+          longestStreak: sql<number>`COALESCE(MAX(longest_streak), 0)::int`,
+        })
+        .from(habits)
+        .where(and(eq(habits.profile_id, profileId), eq(habits.is_active, true))),
     ]);
 
     // Enrich habits with recent checkins
@@ -68,16 +73,7 @@ export class ProgressService {
       }),
     );
 
-    const [{ todayCheckins }] = await db
-      .select({ todayCheckins: sql<number>`COUNT(*)::int` })
-      .from(habit_checkins)
-      .where(
-        and(
-          eq(habit_checkins.user_id, userId),
-          sql`${habit_checkins.date}::text = ${today}`,
-          eq(habit_checkins.completed, true),
-        ),
-      );
+    const todayCheckins = await this.countCheckinsOn(profileId, today);
 
     return {
       recentEntries,
@@ -88,38 +84,41 @@ export class ProgressService {
         longestStreak,
         totalCompletions,
       },
-      todayCompletionRate: activeHabits.length > 0
-        ? Math.round((todayCheckins / activeHabits.length) * 100)
-        : 0,
+      todayCompletionRate:
+        activeHabits.length > 0 ? Math.round((todayCheckins / activeHabits.length) * 100) : 0,
     };
   }
 
   // ── Progress entries ──
 
-  async createEntry(userId: string, data: {
-    metricType: string;
-    value: number;
-    unit?: string;
-    notes?: string;
-    recordedAt?: string;
-  }) {
+  async createEntry(
+    userId: string,
+    profileId: string,
+    data: {
+      metricType: string;
+      value: number;
+      unit?: string;
+      notes?: string;
+      recordedAt?: string;
+    },
+  ) {
     const dateObj = data.recordedAt ? new Date(data.recordedAt) : new Date();
     const dateStr = dateObj.toISOString().split('T')[0];
 
-    // Upsert: find existing entry for this user/type/date, update or insert
+    // Upsert: find existing entry for this profile/type/date, update or insert
     const [existing] = await db
       .select()
       .from(progress_entries)
       .where(
         and(
-          eq(progress_entries.user_id, userId),
+          eq(progress_entries.profile_id, profileId),
           sql`${progress_entries.type}::text = ${data.metricType}`,
           sql`${progress_entries.date}::text = ${dateStr}`,
         ),
       )
       .limit(1);
 
-    let entry;
+    let entry: InferSelectModel<typeof progress_entries> | undefined;
     if (existing) {
       [entry] = await db
         .update(progress_entries)
@@ -130,8 +129,10 @@ export class ProgressService {
       [entry] = await db
         .insert(progress_entries)
         .values({
+          // user_id still records the owning account; profile_id is the subject.
           user_id: userId,
-          type: data.metricType as any,
+          profile_id: profileId,
+          type: data.metricType as (typeof progress_entries.$inferInsert)['type'],
           metric: data.metricType,
           value: data.value,
           unit: data.unit,
@@ -141,26 +142,32 @@ export class ProgressService {
         .returning();
     }
 
-    await this.checkProgressAchievements(userId);
+    await this.checkProgressAchievements(userId, profileId);
 
     return entry;
   }
 
-  async listEntries(userId: string, filters: {
-    type?: string;
-    startDate?: string;
-    endDate?: string;
-    page?: number;
-    limit?: number;
-  }) {
+  async listEntries(
+    userId: string,
+    profileId: string,
+    filters: {
+      type?: string;
+      startDate?: string;
+      endDate?: string;
+      page?: number;
+      limit?: number;
+    },
+  ) {
     const page = filters.page || 1;
     const limit = filters.limit || 20;
     const offset = (page - 1) * limit;
 
-    const conditions: any[] = [eq(progress_entries.user_id, userId)];
+    const conditions: SQL[] = [eq(progress_entries.profile_id, profileId)];
     if (filters.type) conditions.push(sql`${progress_entries.type}::text = ${filters.type}`);
-    if (filters.startDate) conditions.push(sql`${progress_entries.date}::date >= ${filters.startDate}::date`);
-    if (filters.endDate) conditions.push(sql`${progress_entries.date}::date <= ${filters.endDate}::date`);
+    if (filters.startDate)
+      conditions.push(sql`${progress_entries.date}::date >= ${filters.startDate}::date`);
+    if (filters.endDate)
+      conditions.push(sql`${progress_entries.date}::date <= ${filters.endDate}::date`);
 
     const whereClause = and(...conditions);
 
@@ -181,11 +188,11 @@ export class ProgressService {
     };
   }
 
-  async deleteEntry(userId: string, entryId: string) {
+  async deleteEntry(userId: string, profileId: string, entryId: string) {
     const [entry] = await db
       .select()
       .from(progress_entries)
-      .where(and(eq(progress_entries.id, entryId), eq(progress_entries.user_id, userId)))
+      .where(and(eq(progress_entries.id, entryId), eq(progress_entries.profile_id, profileId)))
       .limit(1);
 
     if (!entry) {
@@ -199,24 +206,30 @@ export class ProgressService {
 
   // ── Habits ──
 
-  async createHabit(userId: string, data: {
-    name: string;
-    description?: string;
-    frequency: string;
-    targetCount?: number;
-    customDays?: string[];
-    reminderTime?: string;
-    category?: string;
-    unit?: string;
-  }) {
+  async createHabit(
+    userId: string,
+    profileId: string,
+    data: {
+      name: string;
+      description?: string;
+      frequency: string;
+      targetCount?: number;
+      customDays?: string[];
+      reminderTime?: string;
+      category?: string;
+      unit?: string;
+    },
+  ) {
     const [habit] = await db
       .insert(habits)
       .values({
+        // user_id still records the owning account; profile_id is the subject.
         user_id: userId,
+        profile_id: profileId,
         title: data.name,
         description: data.description,
         category: data.category,
-        frequency: data.frequency as any,
+        frequency: data.frequency as (typeof habits.$inferInsert)['frequency'],
         target_count: data.targetCount || 1,
         unit: data.unit,
         reminder_time: data.reminderTime ?? null,
@@ -226,8 +239,8 @@ export class ProgressService {
     return habit;
   }
 
-  async listHabits(userId: string, includeInactive = false) {
-    const conditions: any[] = [eq(habits.user_id, userId)];
+  async listHabits(userId: string, profileId: string, includeInactive = false) {
+    const conditions: SQL[] = [eq(habits.profile_id, profileId)];
     if (!includeInactive) conditions.push(eq(habits.is_active, true));
 
     const habitRows = await db
@@ -251,31 +264,29 @@ export class ProgressService {
     return enriched;
   }
 
-  async updateHabit(userId: string, habitId: string, data: {
-    name?: string;
-    description?: string;
-    frequency?: string;
-    targetCount?: number;
-    reminderTime?: string;
-    isActive?: boolean;
-    category?: string;
-    unit?: string;
-  }) {
-    const [habit] = await db
-      .select()
-      .from(habits)
-      .where(and(eq(habits.id, habitId), eq(habits.user_id, userId)))
-      .limit(1);
+  async updateHabit(
+    userId: string,
+    profileId: string,
+    habitId: string,
+    data: {
+      name?: string;
+      description?: string;
+      frequency?: string;
+      targetCount?: number;
+      reminderTime?: string;
+      isActive?: boolean;
+      category?: string;
+      unit?: string;
+    },
+  ) {
+    await this.assertHabitOwnership(profileId, habitId);
 
-    if (!habit) {
-      throw new NotFoundError('Habit', habitId);
-    }
-
-    const updateData: Record<string, unknown> = { updated_at: new Date() };
+    const updateData: Partial<typeof habits.$inferInsert> = { updated_at: new Date() };
     if (data.name !== undefined) updateData.title = data.name;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.category !== undefined) updateData.category = data.category;
-    if (data.frequency !== undefined) updateData.frequency = data.frequency;
+    if (data.frequency !== undefined)
+      updateData.frequency = data.frequency as (typeof habits.$inferInsert)['frequency'];
     if (data.targetCount !== undefined) updateData.target_count = data.targetCount;
     if (data.unit !== undefined) updateData.unit = data.unit;
     if (data.isActive !== undefined) updateData.is_active = data.isActive;
@@ -283,43 +294,35 @@ export class ProgressService {
 
     const [updated] = await db
       .update(habits)
-      .set(updateData as any)
+      .set(updateData)
       .where(eq(habits.id, habitId))
       .returning();
 
     return updated;
   }
 
-  async deleteHabit(userId: string, habitId: string) {
-    const [habit] = await db
-      .select()
-      .from(habits)
-      .where(and(eq(habits.id, habitId), eq(habits.user_id, userId)))
-      .limit(1);
+  async deleteHabit(userId: string, profileId: string, habitId: string) {
+    await this.assertHabitOwnership(profileId, habitId);
 
-    if (!habit) {
-      throw new NotFoundError('Habit', habitId);
-    }
-
-    await db.update(habits).set({ is_active: false, updated_at: new Date() }).where(eq(habits.id, habitId));
+    await db
+      .update(habits)
+      .set({ is_active: false, updated_at: new Date() })
+      .where(eq(habits.id, habitId));
 
     return { success: true };
   }
 
-  async habitCheckin(userId: string, habitId: string, data?: {
-    notes?: string;
-    value?: number;
-    date?: string;
-  }) {
-    const [habit] = await db
-      .select()
-      .from(habits)
-      .where(and(eq(habits.id, habitId), eq(habits.user_id, userId), eq(habits.is_active, true)))
-      .limit(1);
-
-    if (!habit) {
-      throw new NotFoundError('Habit', habitId);
-    }
+  async habitCheckin(
+    userId: string,
+    profileId: string,
+    habitId: string,
+    data?: {
+      notes?: string;
+      value?: number;
+      date?: string;
+    },
+  ) {
+    await this.assertHabitOwnership(profileId, habitId, { activeOnly: true });
 
     const checkinDate = data?.date
       ? data.date.split('T')[0]
@@ -336,7 +339,7 @@ export class ProgressService {
       )
       .limit(1);
 
-    let checkin;
+    let checkin: InferSelectModel<typeof habit_checkins> | undefined;
     if (existing) {
       [checkin] = await db
         .update(habit_checkins)
@@ -353,6 +356,9 @@ export class ProgressService {
         .values({
           habit_id: habitId,
           user_id: userId,
+          // Denormalised from the habit so a per-profile count is one indexed
+          // predicate instead of an IN (…) over the profile's habit ids.
+          profile_id: profileId,
           date: checkinDate,
           count: data?.value || 1,
           completed: true,
@@ -367,29 +373,28 @@ export class ProgressService {
     return checkin;
   }
 
-  async getCheckinHistory(userId: string, habitId: string, filters: {
-    startDate?: string;
-    endDate?: string;
-    page?: number;
-    limit?: number;
-  }) {
-    const [habit] = await db
-      .select()
-      .from(habits)
-      .where(and(eq(habits.id, habitId), eq(habits.user_id, userId)))
-      .limit(1);
-
-    if (!habit) {
-      throw new NotFoundError('Habit', habitId);
-    }
+  async getCheckinHistory(
+    userId: string,
+    profileId: string,
+    habitId: string,
+    filters: {
+      startDate?: string;
+      endDate?: string;
+      page?: number;
+      limit?: number;
+    },
+  ) {
+    const habit = await this.assertHabitOwnership(profileId, habitId);
 
     const page = filters.page || 1;
     const limit = filters.limit || 30;
     const offset = (page - 1) * limit;
 
-    const conditions: any[] = [eq(habit_checkins.habit_id, habitId)];
-    if (filters.startDate) conditions.push(sql`${habit_checkins.date}::date >= ${filters.startDate}::date`);
-    if (filters.endDate) conditions.push(sql`${habit_checkins.date}::date <= ${filters.endDate}::date`);
+    const conditions: SQL[] = [eq(habit_checkins.habit_id, habitId)];
+    if (filters.startDate)
+      conditions.push(sql`${habit_checkins.date}::date >= ${filters.startDate}::date`);
+    if (filters.endDate)
+      conditions.push(sql`${habit_checkins.date}::date <= ${filters.endDate}::date`);
 
     const whereClause = and(...conditions);
 
@@ -406,7 +411,12 @@ export class ProgressService {
 
     return {
       data: checkins,
-      habit: { id: habit.id, title: habit.title, streak: habit.streak, longestStreak: habit.longest_streak },
+      habit: {
+        id: habit.id,
+        title: habit.title,
+        streak: habit.streak,
+        longestStreak: habit.longest_streak,
+      },
       pagination: buildPaginationMeta(count, page, limit),
     };
   }
@@ -423,13 +433,16 @@ export class ProgressService {
 
   // ── Reviews ──
 
-  async createReview(userId: string, data: {
-    targetType: string;
-    targetId: string;
-    rating: number;
-    title?: string;
-    comment?: string;
-  }) {
+  async createReview(
+    userId: string,
+    data: {
+      targetType: string;
+      targetId: string;
+      rating: number;
+      title?: string;
+      comment?: string;
+    },
+  ) {
     const [existing] = await db
       .select()
       .from(reviews)
@@ -479,7 +492,8 @@ export class ProgressService {
     const offset = (page - 1) * limit;
 
     const conditions: any[] = [];
-    if (filters.targetType) conditions.push(sql`${reviews.target_type}::text = ${filters.targetType}`);
+    if (filters.targetType)
+      conditions.push(sql`${reviews.target_type}::text = ${filters.targetType}`);
     if (filters.targetId) conditions.push(eq(reviews.target_id, filters.targetId));
     if (filters.userId) conditions.push(eq(reviews.user_id, filters.userId));
     if (filters.status) conditions.push(sql`${reviews.status}::text = ${filters.status}`);
@@ -500,7 +514,11 @@ export class ProgressService {
     const enriched = await Promise.all(
       reviewRows.map(async (r) => {
         const [user] = await db
-          .select({ first_name: users.first_name, last_name: users.last_name, avatar_url: users.avatar_url })
+          .select({
+            first_name: users.first_name,
+            last_name: users.last_name,
+            avatar_url: users.avatar_url,
+          })
           .from(users)
           .where(eq(users.id, r.user_id))
           .limit(1);
@@ -514,11 +532,15 @@ export class ProgressService {
     };
   }
 
-  async updateReview(userId: string, reviewId: string, data: {
-    rating?: number;
-    title?: string;
-    comment?: string;
-  }) {
+  async updateReview(
+    userId: string,
+    reviewId: string,
+    data: {
+      rating?: number;
+      title?: string;
+      comment?: string;
+    },
+  ) {
     const [review] = await db
       .select()
       .from(reviews)
@@ -569,12 +591,16 @@ export class ProgressService {
 
   // ── Progress trends ──
 
-  async getProgressTrends(userId: string, filters: {
-    type?: string;
-    startDate?: string;
-    endDate?: string;
-    granularity?: 'day' | 'week' | 'month';
-  }) {
+  async getProgressTrends(
+    userId: string,
+    profileId: string,
+    filters: {
+      type?: string;
+      startDate?: string;
+      endDate?: string;
+      granularity?: 'day' | 'week' | 'month';
+    },
+  ) {
     const startDate = filters.startDate
       ? filters.startDate
       : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -602,7 +628,7 @@ export class ProgressService {
          MAX("value")::float AS max_value,
          COUNT(*)::int AS count
          FROM progress_entries
-         WHERE "user_id" = ${userId}::uuid AND "date"::date >= ${startDate}::date AND "date"::date <= ${endDate}::date
+         WHERE "profile_id" = ${profileId}::uuid AND "date"::date >= ${startDate}::date AND "date"::date <= ${endDate}::date
          ${typeFilter}
          GROUP BY ${sql.raw(dateGroup)}, "type"
          ORDER BY period ASC`,
@@ -613,19 +639,25 @@ export class ProgressService {
 
   // ── Goals ──
 
-  async createGoal(userId: string, data: {
-    title: string;
-    description?: string;
-    targetValue?: number;
-    unit?: string;
-    category?: string;
-    startDate: string;
-    targetDate?: string;
-  }) {
+  async createGoal(
+    userId: string,
+    profileId: string,
+    data: {
+      title: string;
+      description?: string;
+      targetValue?: number;
+      unit?: string;
+      category?: string;
+      startDate: string;
+      targetDate?: string;
+    },
+  ) {
     const [goal] = await db
       .insert(goals)
       .values({
+        // user_id still records the owning account; profile_id is the subject.
         user_id: userId,
+        profile_id: profileId,
         title: data.title,
         description: data.description,
         target_value: data.targetValue?.toString(),
@@ -640,12 +672,16 @@ export class ProgressService {
     return goal;
   }
 
-  async listGoals(userId: string, filters: { status?: string; page?: number; limit?: number }) {
+  async listGoals(
+    userId: string,
+    profileId: string,
+    filters: { status?: string; page?: number; limit?: number },
+  ) {
     const page = filters.page || 1;
     const limit = filters.limit || 20;
     const offset = (page - 1) * limit;
 
-    const conditions: any[] = [eq(goals.user_id, userId)];
+    const conditions: SQL[] = [eq(goals.profile_id, profileId)];
     if (filters.status) conditions.push(sql`${goals.status}::text = ${filters.status}`);
 
     const whereClause = and(...conditions);
@@ -667,26 +703,23 @@ export class ProgressService {
     };
   }
 
-  async updateGoal(userId: string, goalId: string, data: {
-    title?: string;
-    description?: string;
-    targetValue?: number;
-    unit?: string;
-    category?: string;
-    targetDate?: string;
-    status?: string;
-  }) {
-    const [goal] = await db
-      .select()
-      .from(goals)
-      .where(and(eq(goals.id, goalId), eq(goals.user_id, userId)))
-      .limit(1);
+  async updateGoal(
+    userId: string,
+    profileId: string,
+    goalId: string,
+    data: {
+      title?: string;
+      description?: string;
+      targetValue?: number;
+      unit?: string;
+      category?: string;
+      targetDate?: string;
+      status?: string;
+    },
+  ) {
+    await this.assertGoalOwnership(profileId, goalId);
 
-    if (!goal) {
-      throw new NotFoundError('Goal', goalId);
-    }
-
-    const updateData: Record<string, unknown> = { updated_at: new Date() };
+    const updateData: Partial<typeof goals.$inferInsert> = { updated_at: new Date() };
     if (data.title !== undefined) updateData.title = data.title;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.targetValue !== undefined) updateData.target_value = data.targetValue.toString();
@@ -694,33 +727,28 @@ export class ProgressService {
     if (data.category !== undefined) updateData.category = data.category;
     if (data.targetDate !== undefined) updateData.target_date = data.targetDate ?? null;
     if (data.status !== undefined) {
-      updateData.status = data.status;
+      updateData.status = data.status as (typeof goals.$inferInsert)['status'];
       if (data.status === 'completed') updateData.completed_at = new Date();
     }
 
     const [updated] = await db
       .update(goals)
-      .set(updateData as any)
+      .set(updateData)
       .where(eq(goals.id, goalId))
       .returning();
 
     return updated;
   }
 
-  async updateGoalProgress(userId: string, goalId: string, data: { currentValue: number }) {
-    const [goal] = await db
-      .select()
-      .from(goals)
-      .where(and(eq(goals.id, goalId), eq(goals.user_id, userId)))
-      .limit(1);
+  async updateGoalProgress(
+    userId: string,
+    profileId: string,
+    goalId: string,
+    data: { currentValue: number },
+  ) {
+    const goal = await this.assertGoalOwnership(profileId, goalId);
 
-    if (!goal) {
-      throw new NotFoundError('Goal', goalId);
-    }
-
-    const isCompleted = goal.target_value
-      ? data.currentValue >= Number(goal.target_value)
-      : false;
+    const isCompleted = goal.target_value ? data.currentValue >= Number(goal.target_value) : false;
 
     const [updated] = await db
       .update(goals)
@@ -763,7 +791,11 @@ export class ProgressService {
     const enriched = await Promise.all(
       reviewRows.map(async (r) => {
         const [user] = await db
-          .select({ first_name: users.first_name, last_name: users.last_name, avatar_url: users.avatar_url })
+          .select({
+            first_name: users.first_name,
+            last_name: users.last_name,
+            avatar_url: users.avatar_url,
+          })
           .from(users)
           .where(eq(users.id, r.user_id))
           .limit(1);
@@ -792,11 +824,7 @@ export class ProgressService {
   // ── Provider responds to review ──
 
   async createReviewResponse(userId: string, reviewId: string, data: { responseText: string }) {
-    const [review] = await db
-      .select()
-      .from(reviews)
-      .where(eq(reviews.id, reviewId))
-      .limit(1);
+    const [review] = await db.select().from(reviews).where(eq(reviews.id, reviewId)).limit(1);
 
     if (!review) {
       throw new NotFoundError('Review', reviewId);
@@ -851,11 +879,7 @@ export class ProgressService {
   // ── Vote review as helpful ──
 
   async voteReviewHelpful(userId: string, reviewId: string) {
-    const [review] = await db
-      .select()
-      .from(reviews)
-      .where(eq(reviews.id, reviewId))
-      .limit(1);
+    const [review] = await db.select().from(reviews).where(eq(reviews.id, reviewId)).limit(1);
 
     if (!review) {
       throw new NotFoundError('Review', reviewId);
@@ -888,13 +912,16 @@ export class ProgressService {
 
   // ── Reminders ──
 
-  async createReminder(userId: string, data: {
-    title: string;
-    message?: string;
-    reminderType: string;
-    relatedId?: string;
-    scheduledAt: string;
-  }) {
+  async createReminder(
+    userId: string,
+    data: {
+      title: string;
+      message?: string;
+      reminderType: string;
+      relatedId?: string;
+      scheduledAt: string;
+    },
+  ) {
     const [user] = await db
       .select({ id: users.id })
       .from(users)
@@ -920,7 +947,10 @@ export class ProgressService {
     return reminder;
   }
 
-  async listReminders(userId: string, filters: { active?: boolean; page?: number; limit?: number }) {
+  async listReminders(
+    userId: string,
+    filters: { active?: boolean; page?: number; limit?: number },
+  ) {
     const [user] = await db
       .select({ id: users.id })
       .from(users)
@@ -957,12 +987,16 @@ export class ProgressService {
     };
   }
 
-  async updateReminder(userId: string, reminderId: string, data: {
-    title?: string;
-    message?: string;
-    scheduledAt?: string;
-    isActive?: boolean;
-  }) {
+  async updateReminder(
+    userId: string,
+    reminderId: string,
+    data: {
+      title?: string;
+      message?: string;
+      scheduledAt?: string;
+      isActive?: boolean;
+    },
+  ) {
     const [user] = await db
       .select({ id: users.id })
       .from(users)
@@ -1026,6 +1060,65 @@ export class ProgressService {
 
   // ── Private helpers ──
 
+  /**
+   * Ownership choke point for habits. The active profile was already proved to
+   * belong to the account by profileContext, so the profile is the whole check.
+   * A habit belonging to another profile answers 404, not 403 — a 403 would
+   * confirm the id exists.
+   */
+  private async assertHabitOwnership(
+    profileId: string,
+    habitId: string,
+    opts?: { activeOnly?: boolean },
+  ) {
+    const conditions: SQL[] = [eq(habits.id, habitId), eq(habits.profile_id, profileId)];
+    if (opts?.activeOnly) conditions.push(eq(habits.is_active, true));
+
+    const [habit] = await db
+      .select()
+      .from(habits)
+      .where(and(...conditions))
+      .limit(1);
+
+    if (!habit) {
+      throw new NotFoundError('Habit', habitId);
+    }
+
+    return habit;
+  }
+
+  /** Ownership choke point for goals — same 404-not-403 rule as habits. */
+  private async assertGoalOwnership(profileId: string, goalId: string) {
+    const [goal] = await db
+      .select()
+      .from(goals)
+      .where(and(eq(goals.id, goalId), eq(goals.profile_id, profileId)))
+      .limit(1);
+
+    if (!goal) {
+      throw new NotFoundError('Goal', goalId);
+    }
+
+    return goal;
+  }
+
+  /** Completed checkins on the given habits for one day. */
+  /** Completed check-ins for one profile on one day, straight off the index. */
+  private async countCheckinsOn(profileId: string, date: string) {
+    const [{ count }] = await db
+      .select({ count: sql<number>`COUNT(*)::int` })
+      .from(habit_checkins)
+      .where(
+        and(
+          eq(habit_checkins.profile_id, profileId),
+          sql`${habit_checkins.date}::text = ${date}`,
+          eq(habit_checkins.completed, true),
+        ),
+      );
+
+    return count;
+  }
+
   private async updateStreak(habitId: string, _userId: string) {
     const checkins = await db
       .select()
@@ -1053,18 +1146,17 @@ export class ProgressService {
       }
     }
 
-    const [habit] = await db
-      .select()
-      .from(habits)
-      .where(eq(habits.id, habitId))
-      .limit(1);
+    const [habit] = await db.select().from(habits).where(eq(habits.id, habitId)).limit(1);
 
-    await db.update(habits).set({
-      streak,
-      longest_streak: Math.max(streak, habit?.longest_streak || 0),
-      total_completions: (habit?.total_completions || 0) + 1,
-      updated_at: new Date(),
-    }).where(eq(habits.id, habitId));
+    await db
+      .update(habits)
+      .set({
+        streak,
+        longest_streak: Math.max(streak, habit?.longest_streak || 0),
+        total_completions: (habit?.total_completions || 0) + 1,
+        updated_at: new Date(),
+      })
+      .where(eq(habits.id, habitId));
   }
 
   private async updateProviderRating(providerId: string) {
@@ -1095,17 +1187,45 @@ export class ProgressService {
       });
   }
 
-  private async checkProgressAchievements(userId: string) {
+  /**
+   * Milestones are counted over the profile's own entries, but the badge is
+   * awarded to the account — achievements are not health data about one person.
+   */
+  private async checkProgressAchievements(userId: string, profileId: string) {
     const [{ entryCount }] = await db
       .select({ entryCount: sql<number>`COUNT(*)::int` })
       .from(progress_entries)
-      .where(eq(progress_entries.user_id, userId));
+      .where(eq(progress_entries.profile_id, profileId));
 
     const milestones = [
-      { count: 1, type: 'first_entry', title: 'First Step', description: 'Logged your first progress entry', icon: 'star' },
-      { count: 10, type: 'ten_entries', title: 'Getting Started', description: 'Logged 10 progress entries', icon: 'trending_up' },
-      { count: 50, type: 'fifty_entries', title: 'Committed', description: 'Logged 50 progress entries', icon: 'fire' },
-      { count: 100, type: 'hundred_entries', title: 'Century', description: 'Logged 100 progress entries', icon: 'trophy' },
+      {
+        count: 1,
+        type: 'first_entry',
+        title: 'First Step',
+        description: 'Logged your first progress entry',
+        icon: 'star',
+      },
+      {
+        count: 10,
+        type: 'ten_entries',
+        title: 'Getting Started',
+        description: 'Logged 10 progress entries',
+        icon: 'trending_up',
+      },
+      {
+        count: 50,
+        type: 'fifty_entries',
+        title: 'Committed',
+        description: 'Logged 50 progress entries',
+        icon: 'fire',
+      },
+      {
+        count: 100,
+        type: 'hundred_entries',
+        title: 'Century',
+        description: 'Logged 100 progress entries',
+        icon: 'trophy',
+      },
     ];
 
     for (const milestone of milestones) {
@@ -1117,31 +1237,50 @@ export class ProgressService {
           .limit(1);
 
         if (!existing) {
-          await db.insert(achievements).values({
-            user_id: userId,
-            type: milestone.type,
-            title: milestone.title,
-            description: milestone.description,
-            icon: milestone.icon,
-          }).catch(() => { /* ignore duplicates */ });
+          await db
+            .insert(achievements)
+            .values({
+              user_id: userId,
+              type: milestone.type,
+              title: milestone.title,
+              description: milestone.description,
+              icon: milestone.icon,
+            })
+            .catch(() => {
+              /* ignore duplicates */
+            });
         }
       }
     }
   }
 
   private async checkHabitAchievements(userId: string, habitId: string) {
-    const [habit] = await db
-      .select()
-      .from(habits)
-      .where(eq(habits.id, habitId))
-      .limit(1);
+    const [habit] = await db.select().from(habits).where(eq(habits.id, habitId)).limit(1);
 
     if (!habit) return;
 
     const streakMilestones = [
-      { count: 7, type: 'week_streak', title: 'Week Warrior', description: '7-day streak', icon: 'calendar' },
-      { count: 30, type: 'month_streak', title: 'Monthly Master', description: '30-day streak', icon: 'calendar_month' },
-      { count: 100, type: 'century_streak', title: 'Unstoppable', description: '100-day streak', icon: 'bolt' },
+      {
+        count: 7,
+        type: 'week_streak',
+        title: 'Week Warrior',
+        description: '7-day streak',
+        icon: 'calendar',
+      },
+      {
+        count: 30,
+        type: 'month_streak',
+        title: 'Monthly Master',
+        description: '30-day streak',
+        icon: 'calendar_month',
+      },
+      {
+        count: 100,
+        type: 'century_streak',
+        title: 'Unstoppable',
+        description: '100-day streak',
+        icon: 'bolt',
+      },
     ];
 
     for (const milestone of streakMilestones) {
@@ -1153,14 +1292,19 @@ export class ProgressService {
           .limit(1);
 
         if (!existing) {
-          await db.insert(achievements).values({
-            user_id: userId,
-            type: milestone.type,
-            title: milestone.title,
-            description: milestone.description,
-            icon: milestone.icon,
-            metadata: { habitId, habitTitle: habit.title },
-          }).catch(() => { /* ignore duplicates */ });
+          await db
+            .insert(achievements)
+            .values({
+              user_id: userId,
+              type: milestone.type,
+              title: milestone.title,
+              description: milestone.description,
+              icon: milestone.icon,
+              metadata: { habitId, habitTitle: habit.title },
+            })
+            .catch(() => {
+              /* ignore duplicates */
+            });
         }
       }
     }

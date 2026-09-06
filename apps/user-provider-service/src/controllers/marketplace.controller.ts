@@ -97,7 +97,11 @@ export class MarketplaceController {
   };
 
   saveItem = async ({ body, store, set }: any) => {
-    const item = await this.marketplaceService.saveItem(store.userId, body.entityType, body.entityId);
+    const item = await this.marketplaceService.saveItem(
+      store.userId,
+      body.entityType,
+      body.entityId,
+    );
     set.status = 201;
     return { success: true, data: item };
   };

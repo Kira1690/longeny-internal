@@ -1,20 +1,20 @@
-import { db } from '../db/index.js';
+import { ConflictError, NotFoundError } from '@longeny/errors';
+import { buildPaginationMeta, createLogger } from '@longeny/utils';
 import { sql } from 'drizzle-orm';
-import { eq, and, gte, lte, ilike, inArray } from 'drizzle-orm';
-import {
-  search_index,
-  featured_listings,
-  categories,
-  saved_items,
-  providers,
-  programs,
-  products,
-  users,
-  user_profiles,
-} from '../db/schema.js';
-import { NotFoundError, ConflictError } from '@longeny/errors';
-import { createLogger, buildPaginationMeta } from '@longeny/utils';
+import { and, eq, gte, ilike, inArray, lte } from 'drizzle-orm';
 import postgres from 'postgres';
+import { db } from '../db/index.js';
+import {
+  categories,
+  featured_listings,
+  products,
+  programs,
+  providers,
+  saved_items,
+  search_index,
+  user_profiles,
+  users,
+} from '../db/schema.js';
 
 const logger = createLogger('marketplace-service');
 
@@ -56,12 +56,10 @@ async function execRaw<T = Record<string, unknown>>(
     // fallback: use drizzle sql tagged
     return db.execute(sql.raw(queryStr));
   });
-  return (result as any).rows ?? result as T[];
+  return (result as any).rows ?? (result as T[]);
 }
 
 export class MarketplaceService {
-  constructor(_prismaUnused: unknown) {}
-
   // ── Unified search with tsvector ──
 
   async search(filters: SearchFilters) {
@@ -111,24 +109,28 @@ export class MarketplaceService {
 
     const whereClause = sql.join(conditions, sql` AND `);
 
-    const countResult = await db.execute(
+    const countResult = (await db.execute(
       sql`SELECT COUNT(*)::int AS total FROM search_index si WHERE ${whereClause}`,
-    ) as any;
+    )) as any;
     const total = (countResult?.[0] as any)?.total || 0;
 
     let orderClause: ReturnType<typeof sql>;
     switch (filters.sortBy) {
       case 'rating':
-        orderClause = sql`si."rating_avg" DESC`; break;
+        orderClause = sql`si."rating_avg" DESC`;
+        break;
       case 'price_asc':
-        orderClause = sql`si."price_min" ASC NULLS LAST`; break;
+        orderClause = sql`si."price_min" ASC NULLS LAST`;
+        break;
       case 'price_desc':
-        orderClause = sql`si."price_min" DESC NULLS LAST`; break;
+        orderClause = sql`si."price_min" DESC NULLS LAST`;
+        break;
       case 'newest':
-        orderClause = sql`si."created_at" DESC`; break;
+        orderClause = sql`si."created_at" DESC`;
+        break;
       case 'popularity':
-        orderClause = sql`si."popularity_score" DESC`; break;
-      case 'relevance':
+        orderClause = sql`si."popularity_score" DESC`;
+        break;
       default:
         orderClause = tsQuery
           ? sql`ts_rank(${tsVector}, ${tsQuery}) DESC, si."popularity_score" DESC`
@@ -140,9 +142,9 @@ export class MarketplaceService {
       ? sql`si.*, ts_rank(${tsVector}, ${tsQuery}) AS relevance`
       : sql`si.*`;
 
-    const results = await db.execute(
+    const results = (await db.execute(
       sql`SELECT ${selectClause} FROM search_index si WHERE ${whereClause} ORDER BY ${orderClause} LIMIT ${limit} OFFSET ${offset}`,
-    ) as any;
+    )) as any;
 
     return {
       data: Array.isArray(results) ? results : [],
@@ -173,7 +175,11 @@ export class MarketplaceService {
     }
 
     const [user] = await db
-      .select({ first_name: users.first_name, last_name: users.last_name, avatar_url: users.avatar_url })
+      .select({
+        first_name: users.first_name,
+        last_name: users.last_name,
+        avatar_url: users.avatar_url,
+      })
       .from(users)
       .where(eq(users.id, provider.user_id))
       .limit(1);
@@ -200,11 +206,7 @@ export class MarketplaceService {
   }
 
   async getProgramDetail(programId: string) {
-    const [program] = await db
-      .select()
-      .from(programs)
-      .where(eq(programs.id, programId))
-      .limit(1);
+    const [program] = await db.select().from(programs).where(eq(programs.id, programId)).limit(1);
 
     if (!program || program.status === 'archived') {
       throw new NotFoundError('Program', programId);
@@ -219,7 +221,11 @@ export class MarketplaceService {
     let user = null;
     if (provider) {
       const [u] = await db
-        .select({ first_name: users.first_name, last_name: users.last_name, avatar_url: users.avatar_url })
+        .select({
+          first_name: users.first_name,
+          last_name: users.last_name,
+          avatar_url: users.avatar_url,
+        })
         .from(users)
         .where(eq(users.id, provider.user_id))
         .limit(1);
@@ -236,11 +242,7 @@ export class MarketplaceService {
   }
 
   async getProductDetail(productId: string) {
-    const [product] = await db
-      .select()
-      .from(products)
-      .where(eq(products.id, productId))
-      .limit(1);
+    const [product] = await db.select().from(products).where(eq(products.id, productId)).limit(1);
 
     if (!product || product.status === 'archived') {
       throw new NotFoundError('Product', productId);
@@ -255,7 +257,11 @@ export class MarketplaceService {
     let user = null;
     if (provider) {
       const [u] = await db
-        .select({ first_name: users.first_name, last_name: users.last_name, avatar_url: users.avatar_url })
+        .select({
+          first_name: users.first_name,
+          last_name: users.last_name,
+          avatar_url: users.avatar_url,
+        })
         .from(users)
         .where(eq(users.id, provider.user_id))
         .limit(1);
@@ -305,28 +311,39 @@ export class MarketplaceService {
     const whereClause = conditions.join(' AND ');
 
     const [categoryCounts, typeCounts, priceRange, ratingDist] = await Promise.all([
-      db.execute(buildParameterizedSql(
-        `SELECT "category", COUNT(*)::int AS count FROM search_index WHERE ${whereClause} AND "category" IS NOT NULL GROUP BY "category" ORDER BY count DESC`,
-        params,
-      )),
-      db.execute(buildParameterizedSql(
-        `SELECT "entity_type"::text, COUNT(*)::int AS count FROM search_index WHERE ${whereClause} GROUP BY "entity_type" ORDER BY count DESC`,
-        params,
-      )),
-      db.execute(buildParameterizedSql(
-        `SELECT MIN("price_min")::float AS min_price, MAX("price_max")::float AS max_price FROM search_index WHERE ${whereClause}`,
-        params,
-      )),
-      db.execute(buildParameterizedSql(
-        `SELECT FLOOR("rating_avg")::int AS rating_bucket, COUNT(*)::int AS count FROM search_index WHERE ${whereClause} AND "rating_avg" > 0 GROUP BY rating_bucket ORDER BY rating_bucket DESC`,
-        params,
-      )),
+      db.execute(
+        buildParameterizedSql(
+          `SELECT "category", COUNT(*)::int AS count FROM search_index WHERE ${whereClause} AND "category" IS NOT NULL GROUP BY "category" ORDER BY count DESC`,
+          params,
+        ),
+      ),
+      db.execute(
+        buildParameterizedSql(
+          `SELECT "entity_type"::text, COUNT(*)::int AS count FROM search_index WHERE ${whereClause} GROUP BY "entity_type" ORDER BY count DESC`,
+          params,
+        ),
+      ),
+      db.execute(
+        buildParameterizedSql(
+          `SELECT MIN("price_min")::float AS min_price, MAX("price_max")::float AS max_price FROM search_index WHERE ${whereClause}`,
+          params,
+        ),
+      ),
+      db.execute(
+        buildParameterizedSql(
+          `SELECT FLOOR("rating_avg")::int AS rating_bucket, COUNT(*)::int AS count FROM search_index WHERE ${whereClause} AND "rating_avg" > 0 GROUP BY rating_bucket ORDER BY rating_bucket DESC`,
+          params,
+        ),
+      ),
     ]);
 
     return {
       categories: Array.isArray(categoryCounts) ? categoryCounts : [],
       entityTypes: Array.isArray(typeCounts) ? typeCounts : [],
-      priceRange: (Array.isArray(priceRange) ? priceRange[0] : null) || { min_price: 0, max_price: 0 },
+      priceRange: (Array.isArray(priceRange) ? priceRange[0] : null) || {
+        min_price: 0,
+        max_price: 0,
+      },
       ratingDistribution: Array.isArray(ratingDist) ? ratingDist : [],
     };
   }
@@ -334,11 +351,7 @@ export class MarketplaceService {
   // ── Category detail ──
 
   async getCategoryBySlug(slug: string) {
-    const [category] = await db
-      .select()
-      .from(categories)
-      .where(eq(categories.slug, slug))
-      .limit(1);
+    const [category] = await db.select().from(categories).where(eq(categories.slug, slug)).limit(1);
 
     if (!category) {
       throw new NotFoundError('Category');
@@ -354,7 +367,10 @@ export class MarketplaceService {
       sql`SELECT * FROM search_index WHERE "category" = ${category.name} AND "status" = 'active' ORDER BY "popularity_score" DESC LIMIT 20`,
     );
 
-    return { category: { ...category, children }, providers: Array.isArray(catProviders) ? catProviders : [] };
+    return {
+      category: { ...category, children },
+      providers: Array.isArray(catProviders) ? catProviders : [],
+    };
   }
 
   // ── Featured listings ──
@@ -444,12 +460,38 @@ export class MarketplaceService {
 
   // ── Saved items ──
 
-  async saveItem(userId: string, entityType: string, entityId: string) {
+  /**
+   * Translate the JWT `sub` into the account row id.
+   *
+   * `saved_items.user_id` holds `users.id`, like every other account-scoped
+   * table — the standing rule is that `user_id` is always the paying account.
+   * These three methods used to write the auth id straight from the token
+   * instead, so the GDPR export (which reads by `users.id`) came back empty and
+   * the erasure DELETE matched nothing: a user asked to be forgotten and their
+   * saved items stayed. getRecommendations() already resolved it this way.
+   */
+  private async resolveAccountId(authId: string): Promise<string> {
+    const [user] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.auth_id, authId))
+      .limit(1);
+
+    if (!user) {
+      throw new NotFoundError('User', authId);
+    }
+
+    return user.id;
+  }
+
+  async saveItem(authId: string, entityType: string, entityId: string) {
+    const accountId = await this.resolveAccountId(authId);
+
     try {
       const [item] = await db
         .insert(saved_items)
         .values({
-          user_id: userId,
+          user_id: accountId,
           entity_type: entityType as any,
           entity_id: entityId,
         })
@@ -464,21 +506,22 @@ export class MarketplaceService {
     }
   }
 
-  async listSavedItems(userId: string, page = 1, limit = 20) {
+  async listSavedItems(authId: string, page = 1, limit = 20) {
+    const accountId = await this.resolveAccountId(authId);
     const offset = (page - 1) * limit;
 
     const [items, [{ count }]] = await Promise.all([
       db
         .select()
         .from(saved_items)
-        .where(eq(saved_items.user_id, userId))
+        .where(eq(saved_items.user_id, accountId))
         .orderBy(sql`${saved_items.created_at} DESC`)
         .limit(limit)
         .offset(offset),
       db
         .select({ count: sql<number>`COUNT(*)::int` })
         .from(saved_items)
-        .where(eq(saved_items.user_id, userId)),
+        .where(eq(saved_items.user_id, accountId)),
     ]);
 
     return {
@@ -487,11 +530,15 @@ export class MarketplaceService {
     };
   }
 
-  async removeSavedItem(userId: string, itemId: string) {
+  async removeSavedItem(authId: string, itemId: string) {
+    const accountId = await this.resolveAccountId(authId);
+
+    // Ownership is part of the lookup, so someone else's saved item answers 404
+    // rather than 403 — a 403 would confirm the row exists.
     const [item] = await db
       .select()
       .from(saved_items)
-      .where(and(eq(saved_items.id, itemId), eq(saved_items.user_id, userId)))
+      .where(and(eq(saved_items.id, itemId), eq(saved_items.user_id, accountId)))
       .limit(1);
 
     if (!item) {
@@ -507,7 +554,7 @@ export class MarketplaceService {
 // Helper: build a SQL object from a parameterized query string + params array
 // Drizzle's sql.raw doesn't support params; we convert $1/$2/... to inline values
 function buildParameterizedSql(queryStr: string, params: unknown[]) {
-  let i = 0;
+  const i = 0;
   const chunks: any[] = [];
   const parts = queryStr.split(/\$\d+/);
   for (let idx = 0; idx < parts.length; idx++) {

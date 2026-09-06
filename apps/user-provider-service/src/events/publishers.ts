@@ -1,4 +1,4 @@
-import { EventPublisher } from '@longeny/events';
+import type { EventPublisher } from '@longeny/events';
 import { EVENT_NAMES } from '@longeny/types';
 import { createLogger } from '@longeny/utils';
 
@@ -22,7 +22,12 @@ export function createEventPublishers(publisher: EventPublisher) {
     },
 
     // Provider events
-    async providerRegistered(providerId: string, authId: string, businessName: string, correlationId?: string) {
+    async providerRegistered(
+      providerId: string,
+      authId: string,
+      businessName: string,
+      correlationId?: string,
+    ) {
       await publisher.publish(
         EVENT_NAMES.PROVIDER_REGISTERED,
         { providerId, authId, businessName },
@@ -37,16 +42,17 @@ export function createEventPublishers(publisher: EventPublisher) {
     },
 
     async providerUpdated(providerId: string, changes: string[], correlationId?: string) {
-      await publisher.publish(
-        EVENT_NAMES.PROVIDER_UPDATED,
-        { providerId, changes },
-        correlationId,
-      );
+      await publisher.publish(EVENT_NAMES.PROVIDER_UPDATED, { providerId, changes }, correlationId);
       logger.debug({ providerId }, 'Published provider.updated');
     },
 
     // Program events
-    async programCreated(programId: string, providerId: string, title: string, correlationId?: string) {
+    async programCreated(
+      programId: string,
+      providerId: string,
+      title: string,
+      correlationId?: string,
+    ) {
       await publisher.publish(
         EVENT_NAMES.PROVIDER_PROGRAM_CREATED,
         { programId, providerId, title },
@@ -55,7 +61,12 @@ export function createEventPublishers(publisher: EventPublisher) {
       logger.debug({ programId, providerId }, 'Published provider.program.created');
     },
 
-    async programUpdated(programId: string, providerId: string, changes: string[], correlationId?: string) {
+    async programUpdated(
+      programId: string,
+      providerId: string,
+      changes: string[],
+      correlationId?: string,
+    ) {
       await publisher.publish(
         EVENT_NAMES.PROVIDER_PROGRAM_UPDATED,
         { programId, providerId, changes },
@@ -65,7 +76,12 @@ export function createEventPublishers(publisher: EventPublisher) {
     },
 
     // Product events
-    async productCreated(productId: string, providerId: string, title: string, correlationId?: string) {
+    async productCreated(
+      productId: string,
+      providerId: string,
+      title: string,
+      correlationId?: string,
+    ) {
       await publisher.publish(
         EVENT_NAMES.PROVIDER_PRODUCT_CREATED,
         { productId, providerId, title },
@@ -84,7 +100,12 @@ export function createEventPublishers(publisher: EventPublisher) {
       logger.debug({ authId, requestId }, 'Published user.gdpr.erasure.requested');
     },
 
-    async gdprExportReady(authId: string, exportId: string, fileUrl: string, correlationId?: string) {
+    async gdprExportReady(
+      authId: string,
+      exportId: string,
+      fileUrl: string,
+      correlationId?: string,
+    ) {
       await publisher.publish(
         EVENT_NAMES.GDPR_EXPORT_READY,
         { authId, exportId, fileUrl },

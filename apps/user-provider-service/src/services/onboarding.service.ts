@@ -1,19 +1,19 @@
-import { NotFoundError, ConflictError, ValidationError } from '@longeny/errors';
-import { Value } from '@sinclair/typebox/value';
+import { ConflictError, NotFoundError, ValidationError } from '@longeny/errors';
 import { createLogger } from '@longeny/utils';
+import { Value } from '@sinclair/typebox/value';
+import { and, eq, sql } from 'drizzle-orm';
+import { config } from '../config/index.js';
 import { db } from '../db/index.js';
-import { provider_onboarding, provider_admin_checks, providers, users } from '../db/schema.js';
-import { eq, and, sql } from 'drizzle-orm';
+import { provider_admin_checks, provider_onboarding, providers, users } from '../db/schema.js';
 import {
-  SECTION_KEYS,
-  sectionSchemas,
-  getPartialSchema,
   ADMIN_CHECK_KEYS,
   CONSENT_KEYS,
   DECLARATION_KEYS,
+  SECTION_KEYS,
   type SectionKey,
+  getPartialSchema,
+  sectionSchemas,
 } from '../validators/onboarding.validators.js';
-import { config } from '../config/index.js';
 
 const logger = createLogger('onboarding-service');
 
@@ -24,7 +24,7 @@ const UPLOAD_ALLOWED_FIELDS = [
   'insurance_proof_url',
 ] as const;
 
-type UploadField = typeof UPLOAD_ALLOWED_FIELDS[number];
+type UploadField = (typeof UPLOAD_ALLOWED_FIELDS)[number];
 
 const CONTENT_TYPE_EXT: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -35,10 +35,18 @@ const CONTENT_TYPE_EXT: Record<string, string> = {
 
 export class OnboardingService {
   private async resolveProviderId(authId: string): Promise<string> {
-    const [user] = await db.select({ id: users.id }).from(users).where(eq(users.auth_id, authId)).limit(1);
+    const [user] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.auth_id, authId))
+      .limit(1);
     if (!user) throw new NotFoundError('User not found');
 
-    const [provider] = await db.select({ id: providers.id }).from(providers).where(eq(providers.user_id, user.id)).limit(1);
+    const [provider] = await db
+      .select({ id: providers.id })
+      .from(providers)
+      .where(eq(providers.user_id, user.id))
+      .limit(1);
     if (!provider) throw new NotFoundError('Provider profile not found');
 
     return provider.id;
@@ -68,16 +76,16 @@ export class OnboardingService {
 
   async getUploadUrl(authId: string, fieldName: string, contentType: string) {
     if (!UPLOAD_ALLOWED_FIELDS.includes(fieldName as UploadField)) {
-      throw new ValidationError(
-        [{ field: 'field_name', message: `Must be one of: ${UPLOAD_ALLOWED_FIELDS.join(', ')}` }],
-      );
+      throw new ValidationError([
+        { field: 'field_name', message: `Must be one of: ${UPLOAD_ALLOWED_FIELDS.join(', ')}` },
+      ]);
     }
 
     const allowedContentTypes = Object.keys(CONTENT_TYPE_EXT);
     if (!allowedContentTypes.includes(contentType)) {
-      throw new ValidationError(
-        [{ field: 'content_type', message: `Must be one of: ${allowedContentTypes.join(', ')}` }],
-      );
+      throw new ValidationError([
+        { field: 'content_type', message: `Must be one of: ${allowedContentTypes.join(', ')}` },
+      ]);
     }
 
     const providerId = await this.resolveProviderId(authId);
@@ -103,7 +111,7 @@ export class OnboardingService {
     };
 
     if (config.KMS_KEY_ID) {
-      commandParams['SSEKMSKeyId'] = config.KMS_KEY_ID;
+      commandParams.SSEKMSKeyId = config.KMS_KEY_ID;
     }
 
     const command = new PutObjectCommand(commandParams as any);
@@ -280,7 +288,12 @@ export class OnboardingService {
     return this.getSection(providerId, sectionKey);
   }
 
-  async saveSectionByAuthId(authId: string, sectionKey: SectionKey, data: unknown, markComplete: boolean) {
+  async saveSectionByAuthId(
+    authId: string,
+    sectionKey: SectionKey,
+    data: unknown,
+    markComplete: boolean,
+  ) {
     const providerId = await this.resolveProviderId(authId);
     return this.saveSection(providerId, sectionKey, data, markComplete);
   }
@@ -375,9 +388,9 @@ export class OnboardingService {
     notes?: string,
   ) {
     if (!ADMIN_CHECK_KEYS.includes(checkKey as any)) {
-      throw new ValidationError(
-        [{ field: 'check_key', message: `Must be one of: ${ADMIN_CHECK_KEYS.join(', ')}` }],
-      );
+      throw new ValidationError([
+        { field: 'check_key', message: `Must be one of: ${ADMIN_CHECK_KEYS.join(', ')}` },
+      ]);
     }
 
     const row = await this.getFullOnboarding(providerId);
@@ -428,10 +441,26 @@ export class OnboardingService {
 
     const documentFields: { field: string; section: string; sectionKey: string }[] = [
       { field: 'profile_photo_url', section: 'basic_identity', sectionKey: 'basic_identity' },
-      { field: 'govt_id_proof_url', section: 'license_verification', sectionKey: 'license_verification' },
-      { field: 'address_proof_url', section: 'license_verification', sectionKey: 'license_verification' },
-      { field: 'insurance_proof_url', section: 'license_verification', sectionKey: 'license_verification' },
-      { field: 'profile_photo_url', section: 'marketplace_profile', sectionKey: 'marketplace_profile' },
+      {
+        field: 'govt_id_proof_url',
+        section: 'license_verification',
+        sectionKey: 'license_verification',
+      },
+      {
+        field: 'address_proof_url',
+        section: 'license_verification',
+        sectionKey: 'license_verification',
+      },
+      {
+        field: 'insurance_proof_url',
+        section: 'license_verification',
+        sectionKey: 'license_verification',
+      },
+      {
+        field: 'profile_photo_url',
+        section: 'marketplace_profile',
+        sectionKey: 'marketplace_profile',
+      },
     ];
 
     const { S3Client, GetObjectCommand } = await import('@aws-sdk/client-s3');
@@ -448,7 +477,8 @@ export class OnboardingService {
     const bucket = config.S3_UPLOADS_BUCKET;
     const bucketPrefix = `https://${bucket}.s3.${config.AWS_REGION}.amazonaws.com/`;
 
-    const documents: { field: string; section: string; public_url: string; view_url: string }[] = [];
+    const documents: { field: string; section: string; public_url: string; view_url: string }[] =
+      [];
 
     for (const { field, section, sectionKey } of documentFields) {
       const sectionData = row[sectionKey as keyof typeof row] as Record<string, unknown> | null;

@@ -1,5 +1,6 @@
-import type { OnboardingService } from '../services/onboarding.service.js';
+import { errorEnvelope } from '@longeny/errors';
 import type { EventPublisher } from '@longeny/events';
+import type { OnboardingService } from '../services/onboarding.service.js';
 import type { SectionKey } from '../validators/onboarding.validators.js';
 
 export class OnboardingController {
@@ -95,12 +96,16 @@ export class OnboardingController {
   };
 
   adminUpdateStatus = async ({ params, body, store, set }: any) => {
-    if (store.userRole !== 'super_admin') {
+    // Checked against every role on the token, not just the highest one: an
+    // account that holds both `admin` and `super_admin` presents `admin` as
+    // `userRole` in some orderings, and would have been refused its own access.
+    const roles: string[] = store.userRoles ?? [store.userRole];
+    if (!roles.includes('super_admin')) {
       set.status = 403;
-      return {
-        success: false,
-        error: { code: 'FORBIDDEN', message: 'Approving or rejecting onboarding requires super_admin role' },
-      };
+      return errorEnvelope(
+        'FORBIDDEN',
+        'Approving or rejecting onboarding requires super_admin role',
+      );
     }
     const result = await this.onboardingService.adminUpdateStatus(
       params.providerId,

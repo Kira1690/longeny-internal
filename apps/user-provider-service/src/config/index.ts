@@ -1,4 +1,4 @@
-import { loadConfig, userProviderConfigSchema, type UserProviderConfig } from '@longeny/config';
+import { type UserProviderConfig, loadConfig, userProviderConfigSchema } from '@longeny/config';
 
 export const config = loadConfig(userProviderConfigSchema) as UserProviderConfig;
 

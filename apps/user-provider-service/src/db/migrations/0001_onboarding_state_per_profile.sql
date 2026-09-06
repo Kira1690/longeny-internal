@@ -1,0 +1,2 @@
+ALTER TABLE "onboarding_state" DROP CONSTRAINT "onboarding_state_user_id_unique";--> statement-breakpoint
+ALTER TABLE "onboarding_state" ADD CONSTRAINT "onboarding_state_user_profile_unique" UNIQUE("user_id","profile_id");

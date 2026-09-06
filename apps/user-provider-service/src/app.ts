@@ -1,25 +1,28 @@
-import { Elysia } from 'elysia';
 import { swagger } from '@elysiajs/swagger';
 import { EventPublisher } from '@longeny/events';
-import { errorHandler, requestLogger, corsMiddleware } from '@longeny/middleware';
+import { corsMiddleware, errorHandler, requestContext, requestLogger } from '@longeny/middleware';
+import { Elysia } from 'elysia';
 import { config, redisUrl } from './config/index.js';
 
+import { AdminService } from './services/admin.service.js';
+import { MailerService } from './services/mailer.service.js';
+import { MarketplaceService } from './services/marketplace.service.js';
+import { OnboardingService } from './services/onboarding.service.js';
+import { ProfileService } from './services/profile.service.js';
+import { ProgressService } from './services/progress.service.js';
+import { ProviderService } from './services/provider.service.js';
 // Services
 import { UserService } from './services/user.service.js';
-import { ProviderService } from './services/provider.service.js';
-import { MarketplaceService } from './services/marketplace.service.js';
-import { AdminService } from './services/admin.service.js';
-import { ProgressService } from './services/progress.service.js';
-import { OnboardingService } from './services/onboarding.service.js';
 
+import { AdminController } from './controllers/admin.controller.js';
+import { InternalController } from './controllers/internal.controller.js';
+import { MarketplaceController } from './controllers/marketplace.controller.js';
+import { OnboardingController } from './controllers/onboarding.controller.js';
+import { ProfileController } from './controllers/profile.controller.js';
+import { ProgressController } from './controllers/progress.controller.js';
+import { ProviderController } from './controllers/provider.controller.js';
 // Controllers
 import { UserController } from './controllers/user.controller.js';
-import { ProviderController } from './controllers/provider.controller.js';
-import { MarketplaceController } from './controllers/marketplace.controller.js';
-import { AdminController } from './controllers/admin.controller.js';
-import { ProgressController } from './controllers/progress.controller.js';
-import { InternalController } from './controllers/internal.controller.js';
-import { OnboardingController } from './controllers/onboarding.controller.js';
 
 // Routes
 import { buildRoutes } from './routes/index.js';
@@ -29,12 +32,14 @@ export function createApp() {
   const publisher = new EventPublisher(redisUrl, 'user-provider-service');
 
   // ── Services (no PrismaClient — Drizzle db is module-level) ──
-  const userService = new UserService(null, config.ENCRYPTION_KEY);
-  const providerService = new ProviderService(null);
-  const marketplaceService = new MarketplaceService(null);
-  const adminService = new AdminService(null);
-  const progressService = new ProgressService(null);
+  const userService = new UserService(config.ENCRYPTION_KEY);
+  const providerService = new ProviderService();
+  const marketplaceService = new MarketplaceService();
+  const adminService = new AdminService();
+  const progressService = new ProgressService();
   const onboardingService = new OnboardingService();
+  const mailerService = new MailerService();
+  const profileService = new ProfileService(config.ENCRYPTION_KEY, mailerService);
 
   // ── Controllers ──
   const userController = new UserController(userService, publisher);
@@ -44,39 +49,67 @@ export function createApp() {
   const progressController = new ProgressController(progressService);
   const internalController = new InternalController(userService, providerService);
   const onboardingController = new OnboardingController(onboardingService, publisher);
+  const profileController = new ProfileController(profileService, publisher);
 
   // ── Elysia app ──
   const app = new Elysia()
-    .use(swagger({
-      path: '/docs',
-      documentation: {
-        info: {
-          title: 'LONGENY User & Provider Service API',
-          version: '1.0.0',
-          description: 'User profiles, onboarding, health data, provider management, marketplace, admin, and progress tracking',
-        },
-        tags: [
-          { name: 'Users', description: 'User profile, health profile, preferences, onboarding, GDPR' },
-          { name: 'Providers', description: 'Public provider listings, categories, slots' },
-          { name: 'Provider Management', description: 'Provider registration, profile, availability, programs, products, stats' },
-          { name: 'Marketplace', description: 'Search and explore wellness marketplace' },
-          { name: 'Admin', description: 'Admin moderation, provider verification, analytics' },
-          { name: 'Progress', description: 'User health metrics, habits, goals' },
-          { name: 'Provider Onboarding', description: 'Multi-step physician onboarding form (12 sections)' },
-          { name: 'Admin Onboarding Review', description: 'Admin verification checklist and approval' },
-        ],
-        components: {
-          securitySchemes: {
-            BearerAuth: {
-              type: 'http',
-              scheme: 'bearer',
-              bearerFormat: 'JWT',
+    .use(
+      swagger({
+        path: '/docs',
+        documentation: {
+          info: {
+            title: 'LONGENY User & Provider Service API',
+            version: '1.0.0',
+            description:
+              'User profiles, onboarding, health data, provider management, marketplace, admin, and progress tracking',
+          },
+          tags: [
+            {
+              name: 'Users',
+              description: 'User profile, health profile, preferences, onboarding, GDPR',
+            },
+            {
+              name: 'Profiles',
+              description:
+                'Multi-profile / family (RRO) — dependent profiles, consent, RRO state, notifications',
+            },
+            { name: 'Providers', description: 'Public provider listings, categories, slots' },
+            {
+              name: 'Provider Management',
+              description:
+                'Provider registration, profile, availability, programs, products, stats',
+            },
+            { name: 'Marketplace', description: 'Search and explore wellness marketplace' },
+            { name: 'Admin', description: 'Admin moderation, provider verification, analytics' },
+            { name: 'Progress', description: 'User health metrics, habits, goals' },
+            {
+              name: 'Provider Onboarding',
+              description: 'Multi-step physician onboarding form (12 sections)',
+            },
+            {
+              name: 'Admin Onboarding Review',
+              description: 'Admin verification checklist and approval',
+            },
+            {
+              name: 'Internal',
+              description:
+                'Service-to-service endpoints (HMAC-signed) — not reachable from the browser',
+            },
+          ],
+          components: {
+            securitySchemes: {
+              BearerAuth: {
+                type: 'http',
+                scheme: 'bearer',
+                bearerFormat: 'JWT',
+              },
             },
           },
         },
-      },
-    }))
+      }),
+    )
     .use(errorHandler())
+    .use(requestContext())
     .use(requestLogger('user-provider-service'))
     .use(corsMiddleware(config.CORS_ORIGIN.split(',')))
     .get('/health', () => ({
@@ -84,15 +117,19 @@ export function createApp() {
       service: 'user-provider-service',
       timestamp: new Date().toISOString(),
     }))
-    .use(buildRoutes({
-      user: userController,
-      provider: providerController,
-      marketplace: marketplaceController,
-      admin: adminController,
-      progress: progressController,
-      internal: internalController,
-      onboarding: onboardingController,
-    }));
+    .use(
+      buildRoutes({
+        user: userController,
+        provider: providerController,
+        marketplace: marketplaceController,
+        admin: adminController,
+        progress: progressController,
+        internal: internalController,
+        onboarding: onboardingController,
+        profile: profileController,
+        profileService,
+      }),
+    );
 
-  return { app, publisher, userService };
+  return { app, publisher, userService, profileService };
 }

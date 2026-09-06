@@ -1,17 +1,17 @@
 import { EventConsumer } from '@longeny/events';
 import { createLogger } from '@longeny/utils';
-import { config, redisUrl } from './config/index.js';
 import { createApp } from './app.js';
+import { config, redisUrl } from './config/index.js';
 import { registerSubscribers } from './events/subscribers.js';
 
 const logger = createLogger('user-provider-service');
 
 async function bootstrap() {
-  const { app, publisher, userService } = createApp();
+  const { app, publisher, userService, profileService } = createApp();
 
   // ── Event consumer ──
   const consumer = new EventConsumer(redisUrl, 'user-provider-service');
-  registerSubscribers(consumer, null, userService);
+  registerSubscribers(consumer, profileService, userService);
   await consumer.start();
 
   // ── Start server ──

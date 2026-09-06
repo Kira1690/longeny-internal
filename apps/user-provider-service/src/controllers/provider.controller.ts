@@ -1,6 +1,6 @@
-import type { ProviderService } from '../services/provider.service.js';
 import type { EventPublisher } from '@longeny/events';
 import { EVENT_NAMES } from '@longeny/types';
+import type { ProviderService } from '../services/provider.service.js';
 
 export class ProviderController {
   constructor(
@@ -45,7 +45,10 @@ export class ProviderController {
   };
 
   setAvailability = async ({ body, store }: any) => {
-    const availability = await this.providerService.setAvailability(store.userId, body.rules || body);
+    const availability = await this.providerService.setAvailability(
+      store.userId,
+      body.rules || body,
+    );
     return { success: true, data: availability };
   };
 

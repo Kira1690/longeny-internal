@@ -1,25 +1,117 @@
-import { db } from '../db/index.js';
-import { sql, eq, and, ilike, gte, lte, or } from 'drizzle-orm';
+import { BadRequestError, NotFoundError } from '@longeny/errors';
+import { buildPaginationMeta, createLogger } from '@longeny/utils';
 import {
-  providers,
-  users,
-  provider_verification,
-  programs,
-  products,
-  moderation_queue,
+  type InferSelectModel,
+  type SQL,
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  ilike,
+  lte,
+  or,
+  sql,
+} from 'drizzle-orm';
+import type { PgColumn } from 'drizzle-orm/pg-core';
+import { db } from '../db/index.js';
+import {
   admin_actions,
-  platform_settings,
   analytics_snapshots,
   content_flags,
+  moderation_queue,
+  platform_settings,
+  products,
+  programs,
+  provider_verification,
+  providers,
+  users,
 } from '../db/schema.js';
-import { NotFoundError, BadRequestError } from '@longeny/errors';
-import { createLogger, buildPaginationMeta } from '@longeny/utils';
 
 const logger = createLogger('admin-service');
 
-export class AdminService {
-  constructor(_prismaUnused: unknown) {}
+/**
+ * Sortable columns, whitelisted per resource.
+ *
+ * The previous implementation built the ORDER BY by interpolating the caller's
+ * `sortBy` into `sql.raw()`. Nothing reached it — the query ordered by
+ * `created_at DESC` regardless — but it sat there as a SQL injection sink for
+ * whoever wired sorting up. Mapping an accepted name to a real Drizzle column
+ * reference means an unrecognised name can never reach the query text at all:
+ * it fails the lookup and answers 400 instead.
+ */
+const PROVIDER_SORT_COLUMNS: Record<string, PgColumn> = {
+  created_at: providers.created_at,
+  updated_at: providers.updated_at,
+  business_name: providers.business_name,
+  display_name: providers.display_name,
+  status: providers.status,
+  rating_avg: providers.rating_avg,
+  review_count: providers.review_count,
+  total_bookings: providers.total_bookings,
+};
 
+const USER_SORT_COLUMNS: Record<string, PgColumn> = {
+  created_at: users.created_at,
+  updated_at: users.updated_at,
+  email: users.email,
+  first_name: users.first_name,
+  last_name: users.last_name,
+  status: users.status,
+};
+
+const PROGRAM_SORT_COLUMNS: Record<string, PgColumn> = {
+  created_at: programs.created_at,
+  updated_at: programs.updated_at,
+  title: programs.title,
+  category: programs.category,
+  price: programs.price,
+  status: programs.status,
+  current_participants: programs.current_participants,
+};
+
+/**
+ * Resolve `sortBy`/`sortOrder` against a whitelist.
+ *
+ * `Object.hasOwn` rather than a plain lookup so inherited names (`constructor`,
+ * `toString`) cannot resolve to something that is not a column.
+ */
+function orderByClause(
+  columns: Record<string, PgColumn>,
+  sortBy: string | undefined,
+  sortOrder: string | undefined,
+): SQL {
+  const name = sortBy || 'created_at';
+  if (!Object.hasOwn(columns, name)) {
+    throw new BadRequestError(
+      `Cannot sort by '${name}'. Sortable columns: ${Object.keys(columns).join(', ')}`,
+    );
+  }
+  if (sortOrder && sortOrder !== 'asc' && sortOrder !== 'desc') {
+    throw new BadRequestError(`Invalid sortOrder '${sortOrder}'. Use 'asc' or 'desc'.`);
+  }
+  const column = columns[name] as PgColumn;
+  return sortOrder === 'asc' ? asc(column) : desc(column);
+}
+
+/**
+ * Strip PII from a `users` row before it leaves the service.
+ *
+ * Same contract as `sanitizeProfile()` in profile.service.ts: the ciphertext is
+ * useless to an admin UI, and `phone_hash` is a keyed lookup digest — the same
+ * number produces the same digest for every account, so handing it out turns it
+ * into a cross-account correlation key. Presence booleans are all the UI needs.
+ */
+function sanitizeUser(user: typeof users.$inferSelect) {
+  const { phone_encrypted, date_of_birth_encrypted, phone_hash, ...rest } = user;
+  return {
+    ...rest,
+    has_phone: Boolean(phone_encrypted),
+    has_date_of_birth: Boolean(date_of_birth_encrypted),
+  };
+}
+
+export class AdminService {
   // ── Provider management ──
 
   async listProviders(filters: {
@@ -28,13 +120,15 @@ export class AdminService {
     page?: number;
     limit?: number;
     sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
+    // Widened from 'asc' | 'desc': the value arrives from a query string, so the
+    // narrow type was a claim the caller could not keep. orderByClause() checks it.
+    sortOrder?: string;
   }) {
     const page = filters.page || 1;
     const limit = filters.limit || 20;
     const offset = (page - 1) * limit;
 
-    const conditions: any[] = [];
+    const conditions: Array<SQL | undefined> = [];
     if (filters.status) {
       conditions.push(sql`${providers.status}::text = ${filters.status}`);
     }
@@ -48,25 +142,11 @@ export class AdminService {
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
-    const sortCol = filters.sortBy || 'created_at';
-    const sortDir = filters.sortOrder || 'desc';
-    const orderExpr = sortDir === 'asc'
-      ? sql`${sql.raw(`"providers"."${sortCol}"`)}} ASC`
-      : sql`${sql.raw(`"providers"."${sortCol}"`)}} DESC`;
+    const orderBy = orderByClause(PROVIDER_SORT_COLUMNS, filters.sortBy, filters.sortOrder);
 
     const [providerRows, [{ count }]] = await Promise.all([
-      db
-        .select()
-        .from(providers)
-        .where(whereClause)
-        .orderBy(sql`${providers.created_at} DESC`)
-        .limit(limit)
-        .offset(offset),
-      db
-        .select({ count: sql<number>`COUNT(*)::int` })
-        .from(providers)
-        .where(whereClause),
+      db.select().from(providers).where(whereClause).orderBy(orderBy).limit(limit).offset(offset),
+      db.select({ count: sql<number>`COUNT(*)::int` }).from(providers).where(whereClause),
     ]);
 
     // Enrich with user info and latest verification
@@ -134,10 +214,14 @@ export class AdminService {
     return updated;
   }
 
-  async verifyProvider(providerId: string, adminId: string, data: {
-    verificationIds?: string[];
-    notes?: string;
-  }) {
+  async verifyProvider(
+    providerId: string,
+    adminId: string,
+    data: {
+      verificationIds?: string[];
+      notes?: string;
+    },
+  ) {
     const [provider] = await db
       .select()
       .from(providers)
@@ -199,13 +283,15 @@ export class AdminService {
     page?: number;
     limit?: number;
     sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
+    // Widened from 'asc' | 'desc': the value arrives from a query string, so the
+    // narrow type was a claim the caller could not keep. orderByClause() checks it.
+    sortOrder?: string;
   }) {
     const page = filters.page || 1;
     const limit = filters.limit || 20;
     const offset = (page - 1) * limit;
 
-    const conditions: any[] = [];
+    const conditions: Array<SQL | undefined> = [];
     if (filters.status) {
       conditions.push(sql`${users.status}::text = ${filters.status}`);
     }
@@ -220,6 +306,7 @@ export class AdminService {
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    const orderBy = orderByClause(USER_SORT_COLUMNS, filters.sortBy, filters.sortOrder);
 
     const [userRows, [{ count }]] = await Promise.all([
       db
@@ -237,20 +324,21 @@ export class AdminService {
         })
         .from(users)
         .where(whereClause)
-        .orderBy(sql`${users.created_at} DESC`)
+        .orderBy(orderBy)
         .limit(limit)
         .offset(offset),
-      db
-        .select({ count: sql<number>`COUNT(*)::int` })
-        .from(users)
-        .where(whereClause),
+      db.select({ count: sql<number>`COUNT(*)::int` }).from(users).where(whereClause),
     ]);
 
     // Enrich with provider info
     const enriched = await Promise.all(
       userRows.map(async (u) => {
         const [providerInfo] = await db
-          .select({ id: providers.id, status: providers.status, business_name: providers.business_name })
+          .select({
+            id: providers.id,
+            status: providers.status,
+            business_name: providers.business_name,
+          })
           .from(providers)
           .where(eq(providers.user_id, u.id))
           .limit(1);
@@ -265,25 +353,17 @@ export class AdminService {
   }
 
   async getUserDetail(userId: string) {
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, userId))
-      .limit(1);
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
 
     if (!user) {
       throw new NotFoundError('User', userId);
     }
 
-    return user;
+    return sanitizeUser(user);
   }
 
   async updateUserStatus(userId: string, adminId: string, status: string, reason?: string) {
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, userId))
-      .limit(1);
+    const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
 
     if (!user) {
       throw new NotFoundError('User', userId);
@@ -309,7 +389,8 @@ export class AdminService {
     });
 
     logger.info({ userId, adminId, status }, 'User status updated');
-    return updated;
+    // `.returning()` hands back the whole row, encrypted columns included.
+    return sanitizeUser(updated);
   }
 
   // ── Program management ──
@@ -321,13 +402,15 @@ export class AdminService {
     page?: number;
     limit?: number;
     sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
+    // Widened from 'asc' | 'desc': the value arrives from a query string, so the
+    // narrow type was a claim the caller could not keep. orderByClause() checks it.
+    sortOrder?: string;
   }) {
     const page = filters.page || 1;
     const limit = filters.limit || 20;
     const offset = (page - 1) * limit;
 
-    const conditions: any[] = [];
+    const conditions: Array<SQL | undefined> = [];
     if (filters.status) conditions.push(sql`${programs.status}::text = ${filters.status}`);
     if (filters.category) conditions.push(eq(programs.category, filters.category));
     if (filters.search) {
@@ -340,25 +423,21 @@ export class AdminService {
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    const orderBy = orderByClause(PROGRAM_SORT_COLUMNS, filters.sortBy, filters.sortOrder);
 
     const [programRows, [{ count }]] = await Promise.all([
-      db
-        .select()
-        .from(programs)
-        .where(whereClause)
-        .orderBy(sql`${programs.created_at} DESC`)
-        .limit(limit)
-        .offset(offset),
-      db
-        .select({ count: sql<number>`COUNT(*)::int` })
-        .from(programs)
-        .where(whereClause),
+      db.select().from(programs).where(whereClause).orderBy(orderBy).limit(limit).offset(offset),
+      db.select({ count: sql<number>`COUNT(*)::int` }).from(programs).where(whereClause),
     ]);
 
     const enriched = await Promise.all(
       programRows.map(async (p) => {
         const [provider] = await db
-          .select({ id: providers.id, business_name: providers.business_name, status: providers.status })
+          .select({
+            id: providers.id,
+            business_name: providers.business_name,
+            status: providers.status,
+          })
           .from(providers)
           .where(eq(providers.id, p.provider_id))
           .limit(1);
@@ -373,11 +452,7 @@ export class AdminService {
   }
 
   async updateProgramStatus(programId: string, adminId: string, status: string, reason?: string) {
-    const [program] = await db
-      .select()
-      .from(programs)
-      .where(eq(programs.id, programId))
-      .limit(1);
+    const [program] = await db.select().from(programs).where(eq(programs.id, programId)).limit(1);
 
     if (!program) {
       throw new NotFoundError('Program', programId);
@@ -432,10 +507,7 @@ export class AdminService {
         .orderBy(moderation_queue.priority, moderation_queue.created_at)
         .limit(limit)
         .offset(offset),
-      db
-        .select({ count: sql<number>`COUNT(*)::int` })
-        .from(moderation_queue)
-        .where(whereClause),
+      db.select({ count: sql<number>`COUNT(*)::int` }).from(moderation_queue).where(whereClause),
     ]);
 
     return {
@@ -444,11 +516,15 @@ export class AdminService {
     };
   }
 
-  async moderateItem(itemId: string, adminId: string, data: {
-    status: string;
-    reviewNotes?: string;
-    actionTaken?: string;
-  }) {
+  async moderateItem(
+    itemId: string,
+    adminId: string,
+    data: {
+      status: string;
+      reviewNotes?: string;
+      actionTaken?: string;
+    },
+  ) {
     const [item] = await db
       .select()
       .from(moderation_queue)
@@ -502,11 +578,20 @@ export class AdminService {
       [{ totalProducts }],
     ] = await Promise.all([
       db.select({ totalUsers: sql<number>`COUNT(*)::int` }).from(users),
-      db.select({ activeUsers: sql<number>`COUNT(*)::int` }).from(users).where(sql`${users.status}::text = 'active'`),
+      db
+        .select({ activeUsers: sql<number>`COUNT(*)::int` })
+        .from(users)
+        .where(sql`${users.status}::text = 'active'`),
       db.select({ totalProviders: sql<number>`COUNT(*)::int` }).from(providers),
-      db.select({ verifiedProviders: sql<number>`COUNT(*)::int` }).from(providers).where(sql`${providers.status}::text = 'verified'`),
+      db
+        .select({ verifiedProviders: sql<number>`COUNT(*)::int` })
+        .from(providers)
+        .where(sql`${providers.status}::text = 'verified'`),
       db.select({ totalPrograms: sql<number>`COUNT(*)::int` }).from(programs),
-      db.select({ activePrograms: sql<number>`COUNT(*)::int` }).from(programs).where(sql`${programs.status}::text = 'active'`),
+      db
+        .select({ activePrograms: sql<number>`COUNT(*)::int` })
+        .from(programs)
+        .where(sql`${programs.status}::text = 'active'`),
       db.select({ totalProducts: sql<number>`COUNT(*)::int` }).from(products),
     ]);
 
@@ -621,15 +706,33 @@ export class AdminService {
       [{ openFlags }],
     ] = await Promise.all([
       db.select({ totalUsers: sql<number>`COUNT(*)::int` }).from(users),
-      db.select({ activeUsers: sql<number>`COUNT(*)::int` }).from(users).where(sql`${users.status}::text = 'active'`),
-      db.select({ newUsersToday: sql<number>`COUNT(*)::int` }).from(users).where(gte(users.created_at, todayStart)),
+      db
+        .select({ activeUsers: sql<number>`COUNT(*)::int` })
+        .from(users)
+        .where(sql`${users.status}::text = 'active'`),
+      db
+        .select({ newUsersToday: sql<number>`COUNT(*)::int` })
+        .from(users)
+        .where(gte(users.created_at, todayStart)),
       db.select({ totalProviders: sql<number>`COUNT(*)::int` }).from(providers),
-      db.select({ pendingProviders: sql<number>`COUNT(*)::int` }).from(providers).where(sql`${providers.status}::text = 'pending'`),
-      db.select({ verifiedProviders: sql<number>`COUNT(*)::int` }).from(providers).where(sql`${providers.status}::text = 'verified'`),
+      db
+        .select({ pendingProviders: sql<number>`COUNT(*)::int` })
+        .from(providers)
+        .where(sql`${providers.status}::text = 'pending'`),
+      db
+        .select({ verifiedProviders: sql<number>`COUNT(*)::int` })
+        .from(providers)
+        .where(sql`${providers.status}::text = 'verified'`),
       db.select({ totalPrograms: sql<number>`COUNT(*)::int` }).from(programs),
       db.select({ totalProducts: sql<number>`COUNT(*)::int` }).from(products),
-      db.select({ pendingModeration: sql<number>`COUNT(*)::int` }).from(moderation_queue).where(sql`${moderation_queue.status}::text = 'pending'`),
-      db.select({ openFlags: sql<number>`COUNT(*)::int` }).from(content_flags).where(sql`${content_flags.status}::text = 'open'`),
+      db
+        .select({ pendingModeration: sql<number>`COUNT(*)::int` })
+        .from(moderation_queue)
+        .where(sql`${moderation_queue.status}::text = 'pending'`),
+      db
+        .select({ openFlags: sql<number>`COUNT(*)::int` })
+        .from(content_flags)
+        .where(sql`${content_flags.status}::text = 'open'`),
     ]);
 
     return {
@@ -810,7 +913,7 @@ export class AdminService {
         .where(eq(platform_settings.key, setting.key))
         .limit(1);
 
-      let result;
+      let result: InferSelectModel<typeof platform_settings> | undefined;
       if (existing) {
         [result] = await db
           .update(platform_settings)
@@ -845,13 +948,16 @@ export class AdminService {
 
   // ── Export report ──
 
-  async exportReport(adminId: string, data: {
-    reportType: string;
-    format: string;
-    startDate?: string;
-    endDate?: string;
-    filters?: Record<string, unknown>;
-  }) {
+  async exportReport(
+    adminId: string,
+    data: {
+      reportType: string;
+      format: string;
+      startDate?: string;
+      endDate?: string;
+      filters?: Record<string, unknown>;
+    },
+  ) {
     const startDate = data.startDate
       ? new Date(data.startDate)
       : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -927,10 +1033,7 @@ export class AdminService {
         .orderBy(sql`${content_flags.created_at} DESC`)
         .limit(limit)
         .offset(offset),
-      db
-        .select({ count: sql<number>`COUNT(*)::int` })
-        .from(content_flags)
-        .where(whereClause),
+      db.select({ count: sql<number>`COUNT(*)::int` }).from(content_flags).where(whereClause),
     ]);
 
     // Enrich with reporter info
@@ -951,10 +1054,14 @@ export class AdminService {
     };
   }
 
-  async resolveContentFlag(flagId: string, adminId: string, data: {
-    status: string;
-    resolutionNotes?: string;
-  }) {
+  async resolveContentFlag(
+    flagId: string,
+    adminId: string,
+    data: {
+      status: string;
+      resolutionNotes?: string;
+    },
+  ) {
     const [flag] = await db
       .select()
       .from(content_flags)
@@ -1008,7 +1115,8 @@ export class AdminService {
 
     const conditions: any[] = [];
     if (filters.adminId) conditions.push(eq(admin_actions.admin_id, filters.adminId));
-    if (filters.actionType) conditions.push(sql`${admin_actions.action_type}::text = ${filters.actionType}`);
+    if (filters.actionType)
+      conditions.push(sql`${admin_actions.action_type}::text = ${filters.actionType}`);
     if (filters.targetType) conditions.push(eq(admin_actions.target_type, filters.targetType));
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -1021,10 +1129,7 @@ export class AdminService {
         .orderBy(sql`${admin_actions.created_at} DESC`)
         .limit(limit)
         .offset(offset),
-      db
-        .select({ count: sql<number>`COUNT(*)::int` })
-        .from(admin_actions)
-        .where(whereClause),
+      db.select({ count: sql<number>`COUNT(*)::int` }).from(admin_actions).where(whereClause),
     ]);
 
     return {

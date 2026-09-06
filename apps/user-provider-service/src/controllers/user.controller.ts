@@ -1,6 +1,22 @@
-import type { UserService } from '../services/user.service.js';
 import type { EventPublisher } from '@longeny/events';
 import { EVENT_NAMES } from '@longeny/types';
+import type { UserService } from '../services/user.service.js';
+
+/**
+ * Request state the onboarding handlers read. `userId` is the account's auth_id
+ * (JWT sub); `activeProfileId` is the subject of care, resolved and re-verified
+ * by the profileContext middleware on every request.
+ */
+interface OnboardingStore {
+  userId: string;
+  activeProfileId: string;
+}
+
+/** The step payload is the service's own contract — never re-declared here. */
+interface OnboardingStepBody {
+  step: Parameters<UserService['saveOnboardingStep']>[2];
+  data: Parameters<UserService['saveOnboardingStep']>[3];
+}
 
 export class UserController {
   constructor(
@@ -15,13 +31,19 @@ export class UserController {
 
   updateProfile = async ({ body, store, set }: any) => {
     const user = await this.userService.updateProfile(store.userId, body);
-    await this.publisher.publish(EVENT_NAMES.USER_UPDATED, { authId: store.userId, changes: Object.keys(body) });
+    await this.publisher.publish(EVENT_NAMES.USER_UPDATED, {
+      authId: store.userId,
+      changes: Object.keys(body),
+    });
     return { success: true, data: user };
   };
 
   deleteAccount = async ({ store, set }: any) => {
     const result = await this.userService.softDelete(store.userId);
-    await this.publisher.publish(EVENT_NAMES.USER_DEACTIVATED, { authId: store.userId, userId: result.id });
+    await this.publisher.publish(EVENT_NAMES.USER_DEACTIVATED, {
+      authId: store.userId,
+      userId: result.id,
+    });
     return { success: true, data: result };
   };
 
@@ -50,13 +72,23 @@ export class UserController {
     return { success: true, data: preferences };
   };
 
-  saveOnboardingStep = async ({ body, store }: any) => {
-    const state = await this.userService.saveOnboardingStep(store.userId, body.step, body.data);
+  // store.activeProfileId is set by profileContext, which has already proved
+  // the account may act as that profile.
+  saveOnboardingStep = async ({
+    body,
+    store,
+  }: { body: OnboardingStepBody; store: OnboardingStore }) => {
+    const state = await this.userService.saveOnboardingStep(
+      store.userId,
+      store.activeProfileId,
+      body.step,
+      body.data,
+    );
     return { success: true, data: state };
   };
 
-  getOnboardingState = async ({ store }: any) => {
-    const state = await this.userService.getOnboardingState(store.userId);
+  getOnboardingState = async ({ store }: { store: OnboardingStore }) => {
+    const state = await this.userService.getOnboardingState(store.userId, store.activeProfileId);
     return { success: true, data: state };
   };
 
@@ -72,7 +104,10 @@ export class UserController {
 
   requestGdprErasure = async ({ store, set }: any) => {
     const request = await this.userService.requestGdprErasure(store.userId);
-    await this.publisher.publish(EVENT_NAMES.GDPR_ERASURE_REQUESTED, { authId: store.userId, requestId: request.id });
+    await this.publisher.publish(EVENT_NAMES.GDPR_ERASURE_REQUESTED, {
+      authId: store.userId,
+      requestId: request.id,
+    });
     set.status = 201;
     return { success: true, data: request };
   };
@@ -94,9 +129,13 @@ export class UserController {
     return { success: true, data: exportData };
   };
 
-  completeOnboarding = async ({ store }: any) => {
-    const state = await this.userService.completeOnboarding(store.userId);
-    await this.publisher.publish(EVENT_NAMES.USER_UPDATED, { authId: store.userId, changes: ['onboarding_completed'] });
+  completeOnboarding = async ({ store }: { store: OnboardingStore }) => {
+    const state = await this.userService.completeOnboarding(store.userId, store.activeProfileId);
+    await this.publisher.publish(EVENT_NAMES.USER_UPDATED, {
+      authId: store.userId,
+      profileId: store.activeProfileId,
+      changes: ['onboarding_completed'],
+    });
     return { success: true, data: state };
   };
 

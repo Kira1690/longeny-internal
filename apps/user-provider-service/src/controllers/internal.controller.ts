@@ -1,5 +1,5 @@
-import type { UserService } from '../services/user.service.js';
 import type { ProviderService } from '../services/provider.service.js';
+import type { UserService } from '../services/user.service.js';
 
 export class InternalController {
   constructor(
