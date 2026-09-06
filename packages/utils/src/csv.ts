@@ -6,9 +6,7 @@ export function toCSV(data: Record<string, unknown>[], headers?: string[]): stri
 
   const keys = headers || Object.keys(data[0]);
   const headerRow = keys.map(escapeCSV).join(',');
-  const rows = data.map(row =>
-    keys.map(key => escapeCSV(String(row[key] ?? ''))).join(',')
-  );
+  const rows = data.map((row) => keys.map((key) => escapeCSV(String(row[key] ?? ''))).join(','));
 
   return [headerRow, ...rows].join('\n');
 }

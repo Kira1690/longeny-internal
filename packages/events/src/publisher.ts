@@ -1,6 +1,6 @@
-import Redis from 'ioredis';
 import type { EventEnvelope } from '@longeny/types';
 import { createLogger } from '@longeny/utils';
+import Redis from 'ioredis';
 
 const CHANNEL = 'longeny:events';
 

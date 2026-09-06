@@ -20,3 +20,20 @@ export class AppError extends Error {
     Error.captureStackTrace(this, this.constructor);
   }
 }
+
+/**
+ * The error body every service returns, built in one place.
+ *
+ * `errorHandler` produces this shape when something throws. Middleware that runs
+ * in `beforeHandle` cannot throw — it has to *return* a body — and the gateway's
+ * top-level handler is outside the middleware stack entirely. Both were writing
+ * the envelope by hand, so the shape drifted between them: one carried `meta`,
+ * another did not, a third spelled the code differently.
+ */
+export function errorEnvelope(code: string, message: string, details?: Record<string, unknown>) {
+  return {
+    success: false as const,
+    error: { code, message, ...(details ? { details } : {}) },
+    meta: { timestamp: new Date().toISOString() },
+  };
+}

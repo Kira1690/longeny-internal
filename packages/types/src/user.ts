@@ -1,9 +1,4 @@
-import {
-  UserStatus,
-  Gender,
-  FitnessLevel,
-  HabitFrequency,
-} from './enums.js';
+import type { FitnessLevel, Gender, HabitFrequency, UserStatus } from './enums.js';
 
 export interface User {
   id: string;

@@ -11,7 +11,7 @@ export const corsMiddleware = (origins: string[]) =>
 
       if (origin && origins.includes(origin)) {
         set.headers['Access-Control-Allow-Origin'] = origin;
-        set.headers['Vary'] = 'Origin';
+        set.headers.Vary = 'Origin';
       }
 
       set.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, PATCH, DELETE, OPTIONS';

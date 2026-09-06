@@ -1,10 +1,10 @@
-import {
-  AiRequestType,
-  AiDocumentType,
-  AiDocumentStatus,
-  DocumentType,
-  DocumentStatus,
+import type {
   AccessPermission,
+  AiDocumentStatus,
+  AiDocumentType,
+  AiRequestType,
+  DocumentStatus,
+  DocumentType,
 } from './enums.js';
 
 export interface Embedding {

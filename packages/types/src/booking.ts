@@ -1,10 +1,10 @@
-import {
+import type {
   BookingStatus,
-  SessionType,
   CancelledBy,
-  ReminderType,
-  NotificationType,
   NotificationCategory,
+  NotificationType,
+  ReminderType,
+  SessionType,
 } from './enums.js';
 
 export interface Booking {

@@ -16,6 +16,7 @@ export {
   resetPasswordSchema,
   changePasswordSchema,
   consentSchema,
+  googleAuthSchema,
 } from './auth.js';
 
 // User & Provider schemas
@@ -36,10 +37,13 @@ export {
 
 // Booking schemas
 export {
+  calendarInviteSchema,
   createBookingSchema,
   cancelBookingSchema,
   rescheduleSchema,
+  updateBookingSchema,
   notificationPreferencesSchema,
+  registerPushTokenSchema,
 } from './booking.js';
 
 // Payment schemas
@@ -47,4 +51,36 @@ export {
   createCheckoutSchema,
   createSubscriptionSchema,
   requestRefundSchema,
+  createOrderSchema,
+  payOrderSchema,
+  createPaymentIntentSchema,
+  createSetupIntentSchema,
+  updateSubscriptionSchema,
+  cancelSubscriptionSchema,
 } from './payment.js';
+
+// RRO intake — one shape, shared by the endpoint and the classifier contract
+export { intakeSchema, submitIntakeSchema, isEmptyIntake } from './intake.js';
+export type { Intake, SubmitIntake } from './intake.js';
+
+// RRO AI contracts (plan item A6) — the boundary between backend and model
+export {
+  RRO_CONTRACT_VERSION,
+  RRO_GUARDRAILS,
+  RRO_MIN_CLASSIFIER_CONFIDENCE,
+  mayTransitionState,
+  rroClassifierInputSchema,
+  rroClassifierOutputSchema,
+  rroClassifierResponseSchema,
+  rroRefusalSchema,
+  rroSummaryInputSchema,
+  rroSummaryOutputSchema,
+  rroSummaryResponseSchema,
+} from './rro-ai.js';
+export type {
+  RroClassifierInput,
+  RroClassifierOutput,
+  RroRefusal,
+  RroSummaryInput,
+  RroSummaryOutput,
+} from './rro-ai.js';

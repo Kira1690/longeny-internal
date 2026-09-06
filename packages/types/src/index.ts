@@ -6,3 +6,4 @@ export * from './provider.js';
 export * from './booking.js';
 export * from './payment.js';
 export * from './ai.js';
+export * from './rro.js';

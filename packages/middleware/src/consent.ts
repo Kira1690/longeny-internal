@@ -1,8 +1,8 @@
-import Elysia from 'elysia';
-import Redis from 'ioredis';
 import { ConsentRequiredError } from '@longeny/errors';
 import type { ConsentType } from '@longeny/types';
-import { authStore } from './auth.js';
+import Elysia from 'elysia';
+import Redis from 'ioredis';
+import { requestCtx } from './request-context.js';
 
 const CONSENT_CACHE_TTL = 300; // 5 minutes in seconds
 
@@ -16,10 +16,10 @@ interface ConsentCheckResult {
  * with Redis caching (5 min TTL).
  */
 export const requireConsent = (...requiredTypes: ConsentType[]) =>
-  new Elysia({ name: `require-consent-${requiredTypes.join('-')}` })
-    .use(authStore())
-    .onBeforeHandle(async ({ store }) => {
-      const userId = store.userId;
+  new Elysia({ name: `require-consent-${requiredTypes.join('-')}` }).onBeforeHandle(
+    { as: 'scoped' },
+    async ({ request }) => {
+      const { userId } = requestCtx(request);
 
       if (!userId) {
         throw new ConsentRequiredError(requiredTypes);
@@ -54,9 +54,7 @@ export const requireConsent = (...requiredTypes: ConsentType[]) =>
           await redis.set(cacheKey, JSON.stringify(grantedConsents), 'EX', CONSENT_CACHE_TTL);
         }
 
-        const missingConsents = requiredTypes.filter(
-          (type) => !grantedConsents.includes(type),
-        );
+        const missingConsents = requiredTypes.filter((type) => !grantedConsents.includes(type));
 
         if (missingConsents.length > 0) {
           throw new ConsentRequiredError(missingConsents);
@@ -64,4 +62,5 @@ export const requireConsent = (...requiredTypes: ConsentType[]) =>
       } finally {
         await redis.quit();
       }
-    });
+    },
+  );

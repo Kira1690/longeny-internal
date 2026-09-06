@@ -1,10 +1,10 @@
-import {
+import type {
+  DayOfWeek,
+  PriceType,
+  ProductStatus,
+  ProgramStatus,
   ProviderStatus,
   VerificationStatus,
-  ProgramStatus,
-  ProductStatus,
-  PriceType,
-  DayOfWeek,
 } from './enums.js';
 
 export interface Provider {

@@ -1,12 +1,12 @@
-import {
-  PaymentGateway,
-  OrderType,
-  OrderStatus,
-  PaymentStatus,
-  SubscriptionStatus,
-  SubscriptionInterval,
-  RefundStatus,
+import type {
   InvoiceStatus,
+  OrderStatus,
+  OrderType,
+  PaymentGateway,
+  PaymentStatus,
+  RefundStatus,
+  SubscriptionInterval,
+  SubscriptionStatus,
 } from './enums.js';
 
 export interface GatewayCustomer {

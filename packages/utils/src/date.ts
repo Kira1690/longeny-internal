@@ -1,15 +1,15 @@
 import {
-  formatISO,
-  parseISO,
-  isValid,
-  addMinutes,
-  addHours,
   addDays,
-  differenceInMinutes,
+  addHours,
+  addMinutes,
   differenceInHours,
-  startOfDay,
+  differenceInMinutes,
   endOfDay,
   format,
+  formatISO,
+  isValid,
+  parseISO,
+  startOfDay,
 } from 'date-fns';
 
 /**
@@ -48,11 +48,7 @@ export function isValidISO(iso: string): boolean {
 /**
  * Add a duration to a date.
  */
-export function addDuration(
-  date: Date,
-  amount: number,
-  unit: 'minutes' | 'hours' | 'days',
-): Date {
+export function addDuration(date: Date, amount: number, unit: 'minutes' | 'hours' | 'days'): Date {
   switch (unit) {
     case 'minutes':
       return addMinutes(date, amount);
@@ -66,11 +62,7 @@ export function addDuration(
 /**
  * Calculate difference between two dates.
  */
-export function dateDifference(
-  start: Date,
-  end: Date,
-  unit: 'minutes' | 'hours',
-): number {
+export function dateDifference(start: Date, end: Date, unit: 'minutes' | 'hours'): number {
   switch (unit) {
     case 'minutes':
       return differenceInMinutes(end, start);

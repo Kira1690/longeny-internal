@@ -16,6 +16,6 @@ export {
   getCorrelationId,
   CORRELATION_ID_HEADER,
 } from './correlation-id.js';
-export { createServiceClient } from './http-client.js';
+export { createServiceClient, ServiceCallError } from './http-client.js';
 export type { ServiceClientOptions, RequestOptions } from './http-client.js';
 export { toCSV } from './csv.js';

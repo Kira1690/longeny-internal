@@ -27,6 +27,22 @@ export enum ConsentType {
   MARKETING_SMS = 'marketing_sms',
 }
 
+/**
+ * What a caregiver may do on a dependent's behalf.
+ *
+ * Distinct from `ConsentType`, which is what an *account holder* agreed to when
+ * they signed up. This list answers a different question: may I manage *this
+ * person's* care? Ask for each separately — agreeing to be contacted is not
+ * agreeing to be analysed.
+ */
+export const CAREGIVER_CONSENT_TYPES = [
+  'care_coordination',
+  'health_data',
+  'ai_analysis',
+  'notifications',
+] as const;
+export type CaregiverConsentType = (typeof CAREGIVER_CONSENT_TYPES)[number];
+
 // ── Provider ──
 export enum ProviderStatus {
   PENDING = 'pending',

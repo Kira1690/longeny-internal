@@ -36,6 +36,18 @@ export class ConflictError extends AppError {
   }
 }
 
+/**
+ * The request was understood and well-formed, but the domain refuses it — a
+ * state machine that does not allow the move, a rule that does not permit the
+ * combination. Distinct from 400, which means the request itself was malformed,
+ * and from 409, which means the resource changed underneath the caller.
+ */
+export class UnprocessableEntityError extends AppError {
+  constructor(message: string, code = 'UNPROCESSABLE_ENTITY', metadata?: Record<string, unknown>) {
+    super(message, 422, code, true, metadata);
+  }
+}
+
 export class TooManyRequestsError extends AppError {
   constructor(message = 'Too many requests', retryAfterSeconds?: number) {
     super(message, 429, 'RATE_LIMITED', true, { retryAfterSeconds });

@@ -1,5 +1,6 @@
-import Elysia from 'elysia';
 import { createLogger, generateCorrelationId } from '@longeny/utils';
+import Elysia from 'elysia';
+import { requestCtx } from './request-context.js';
 
 /**
  * Elysia plugin: log request method, path, status, duration.
@@ -9,19 +10,18 @@ export const requestLogger = (serviceName: string) => {
   const logger = createLogger(serviceName);
 
   return new Elysia({ name: `request-logger-${serviceName}` })
-    .state('correlationId', '')
-    .state('requestStartTime', 0)
-    .onRequest(({ request, store, set }) => {
-      const correlationId =
-        request.headers.get('X-Correlation-ID') || generateCorrelationId();
+    .onRequest(({ request, set }) => {
+      const state = requestCtx(request);
+      const correlationId = request.headers.get('X-Correlation-ID') || generateCorrelationId();
 
-      store.correlationId = correlationId;
-      store.requestStartTime = Date.now();
+      state.correlationId = correlationId;
+      state.requestStartTime = Date.now();
 
       set.headers['X-Correlation-ID'] = correlationId;
     })
-    .onAfterResponse(({ request, set, store }) => {
-      const duration = Date.now() - (store.requestStartTime || Date.now());
+    .onAfterResponse({ as: 'scoped' }, ({ request, set }) => {
+      const state = requestCtx(request);
+      const duration = Date.now() - (state.requestStartTime || Date.now());
       const url = new URL(request.url);
 
       logger.info({
@@ -29,7 +29,7 @@ export const requestLogger = (serviceName: string) => {
         path: url.pathname,
         status: set.status,
         duration,
-        correlationId: store.correlationId,
+        correlationId: state.correlationId,
         userAgent: request.headers.get('User-Agent'),
       });
     });
