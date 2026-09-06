@@ -1,6 +1,7 @@
 {
   "name": "longeny",
   "private": true,
+  "packageManager": "bun@1.2.18",
   "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "dev": "bunx turbo dev",
@@ -15,7 +16,8 @@
     "db:push": "bunx turbo db:push",
     "db:studio": "bunx turbo db:studio",
     "clean": "bunx turbo clean && rm -rf node_modules",
-    "typecheck": "bunx turbo typecheck"
+    "typecheck": "bunx turbo typecheck",
+    "test:e2e": "./scripts/run-e2e.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
