@@ -1,6 +1,6 @@
-import type { DocumentGenService } from '../services/document-gen.service.js';
 import { BadRequestError } from '@longeny/errors';
 import { buildPaginationMeta } from '@longeny/utils';
+import type { DocumentGenService } from '../services/document-gen.service.js';
 
 type AiDocumentType = 'prescription' | 'nutrition_plan' | 'training_plan';
 type AiDocumentStatus = 'draft' | 'pending_review' | 'approved' | 'rejected';
@@ -38,10 +38,12 @@ export class DocumentGenController {
     const status = query.status as AiDocumentStatus | undefined;
     const documentType = query.documentType as AiDocumentType | undefined;
 
-    const { documents, total } = await this.documentGenService.listDocuments(
-      store.userId,
-      { status, documentType, page, limit },
-    );
+    const { documents, total } = await this.documentGenService.listDocuments(store.userId, {
+      status,
+      documentType,
+      page,
+      limit,
+    });
 
     return {
       success: true,
@@ -116,16 +118,14 @@ export class DocumentGenController {
       throw new BadRequestError('patientContext object is required');
     }
 
-    const result = await this.documentGenService.generate(
-      {
-        userId: body.userId,
-        providerId: store.userId,
-        documentType,
-        title: body.title,
-        patientContext: body.patientContext,
-        providerNotes: body.providerNotes,
-      },
-    );
+    const result = await this.documentGenService.generate({
+      userId: body.userId,
+      providerId: store.userId,
+      documentType,
+      title: body.title,
+      patientContext: body.patientContext,
+      providerNotes: body.providerNotes,
+    });
 
     set.status = 201;
     return {

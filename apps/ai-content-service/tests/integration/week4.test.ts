@@ -19,7 +19,7 @@
 // Override AI_AGENT_URL BEFORE any module that reads config is imported.
 process.env.AI_AGENT_URL = 'http://localhost:8000';
 
-import { describe, it, expect, beforeAll } from 'bun:test';
+import { beforeAll, describe, expect, it } from 'bun:test';
 import jwt from 'jsonwebtoken';
 import { createApp } from '../../src/app.js';
 
@@ -28,8 +28,7 @@ import { createApp } from '../../src/app.js';
 // ---------------------------------------------------------------------------
 
 const PYTHON_URL = 'http://localhost:8000';
-const JWT_SECRET =
-  Bun.env.JWT_SECRET ?? Bun.env.JWT_ACCESS_SECRET ?? 'test-e2e-jwt-secret-longeny';
+const JWT_SECRET = Bun.env.JWT_SECRET ?? Bun.env.JWT_ACCESS_SECRET ?? 'test-e2e-jwt-secret-longeny';
 
 // Stable test provider ID reused across provider + scheduling + notification tests.
 const TEST_PROVIDER_ID = `test-node-prov-${Date.now()}`;
@@ -40,7 +39,7 @@ const TEST_USER_ID = 'test-user-w4-001';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeToken(role: string = 'user', sub: string = TEST_USER_ID): string {
+function makeToken(role = 'user', sub: string = TEST_USER_ID): string {
   return jwt.sign(
     {
       sub,
@@ -58,7 +57,11 @@ function authHeader(token: string): Record<string, string> {
   return { Authorization: `Bearer ${token}` };
 }
 
-function jsonBody(payload: unknown): { method: string; headers: Record<string, string>; body: string } {
+function jsonBody(payload: unknown): {
+  method: string;
+  headers: Record<string, string>;
+  body: string;
+} {
   return {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -74,8 +77,7 @@ beforeAll(async () => {
   const res = await fetch(`${PYTHON_URL}/openapi.json`).catch(() => null);
   if (!res || !res.ok) {
     throw new Error(
-      `Python agent not reachable at ${PYTHON_URL}. ` +
-        'Start it with: conda activate brave && uvicorn ai_engine.api.main:app --port 8000',
+      `Python agent not reachable at ${PYTHON_URL}. Start it with: conda activate brave && uvicorn ai_engine.api.main:app --port 8000`,
     );
   }
 });
@@ -355,7 +357,10 @@ describe('Provider profile CRUD — real Python calls', () => {
 
     console.log('\n[PROVIDER LIST FILTERED] status:', res.status);
     const body = (await res.json()) as any;
-    console.log('[PROVIDER LIST FILTERED] count:', Array.isArray(body.data) ? body.data.length : 'N/A');
+    console.log(
+      '[PROVIDER LIST FILTERED] count:',
+      Array.isArray(body.data) ? body.data.length : 'N/A',
+    );
 
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
@@ -364,9 +369,7 @@ describe('Provider profile CRUD — real Python calls', () => {
     if (body.data.length > 0) {
       for (const p of body.data) {
         expect(
-          (p.specialties as string[]).some((s) =>
-            s.toLowerCase().includes('cardiology'),
-          ),
+          (p.specialties as string[]).some((s) => s.toLowerCase().includes('cardiology')),
         ).toBe(true);
       }
     }
@@ -428,9 +431,7 @@ describe('Auth guard — /ai/matching', () => {
 
   it('GET /ai/matching/match/:matchId returns 401 without token', async () => {
     const app = createApp();
-    const res = await app.handle(
-      new Request('http://localhost/ai/matching/match/some-id'),
-    );
+    const res = await app.handle(new Request('http://localhost/ai/matching/match/some-id'));
     expect(res.status).toBe(401);
   });
 });
@@ -530,7 +531,9 @@ describe('Matching flow — real Python calls', () => {
 
       matchId = result.match_id;
     } else {
-      console.log('[MATCHING MATCH] non-200 — session not complete yet, skipping match_id assertion');
+      console.log(
+        '[MATCHING MATCH] non-200 — session not complete yet, skipping match_id assertion',
+      );
     }
   });
 

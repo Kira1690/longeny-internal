@@ -9,7 +9,7 @@
  *
  * Run: bun test tests/integration/rag.test.ts --env-file .env.test
  */
-import { describe, it, expect, beforeAll } from 'bun:test';
+import { beforeAll, describe, expect, it } from 'bun:test';
 import jwt from 'jsonwebtoken';
 import { createApp } from '../../src/app.js';
 
@@ -19,7 +19,7 @@ const JWT_SECRET = Bun.env.JWT_SECRET ?? Bun.env.JWT_ACCESS_SECRET ?? 'test-e2e-
 // Seed collection used in Python E2E test — we pre-seed it here too so RAG has data
 const TEST_COLLECTION = 'knowledge_base';
 
-function makeToken(role: string = 'user'): string {
+function makeToken(role = 'user'): string {
   return jwt.sign(
     {
       sub: 'test-user-e2e-002',
@@ -62,7 +62,7 @@ beforeAll(async () => {
   // Call Python to directly upsert test data (using test endpoint if available,
   // otherwise rely on data already indexed from kb.test.ts run)
   // We seed via a small inline HTTP call to our Python test helper
-  const { execSync } = await import('child_process') as any;
+  const { execSync } = (await import('node:child_process')) as any;
   try {
     execSync(
       `conda run -n brave python -c "
@@ -144,7 +144,7 @@ describe('POST /ai/patient/query — real Bedrock + ChromaDB + Nova Pro', () => 
     );
 
     console.log('\n[RAG QUERY] status:', res.status);
-    const body = await res.json() as any;
+    const body = (await res.json()) as any;
     console.log('[RAG QUERY] answer:', body.data?.answer);
     console.log('[RAG QUERY] citations:', JSON.stringify(body.data?.citations, null, 2));
     console.log('[RAG QUERY] emergency:', body.data?.emergency);
@@ -160,10 +160,10 @@ describe('POST /ai/patient/query — real Bedrock + ChromaDB + Nova Pro', () => 
     const answerLower = answer.toLowerCase();
     expect(
       answerLower.includes('paracetamol') ||
-      answerLower.includes('ibuprofen') ||
-      answerLower.includes('headache') ||
-      answerLower.includes('tension') ||
-      answerLower.includes('treatment'),
+        answerLower.includes('ibuprofen') ||
+        answerLower.includes('headache') ||
+        answerLower.includes('tension') ||
+        answerLower.includes('treatment'),
     ).toBe(true);
 
     expect(Array.isArray(citations)).toBe(true);
@@ -196,7 +196,7 @@ describe('POST /ai/patient/query — real Bedrock + ChromaDB + Nova Pro', () => 
     );
 
     console.log('\n[RAG EMERGENCY] status:', res.status);
-    const body = await res.json() as any;
+    const body = (await res.json()) as any;
     console.log('[RAG EMERGENCY] answer:', body.data?.answer);
     console.log('[RAG EMERGENCY] emergency:', body.data?.emergency);
 

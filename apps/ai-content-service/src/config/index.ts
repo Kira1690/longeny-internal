@@ -1,4 +1,4 @@
-import { loadConfig, aiContentConfigSchema, type AiContentConfig } from '@longeny/config';
+import { type AiContentConfig, aiContentConfigSchema, loadConfig } from '@longeny/config';
 
 export const config: AiContentConfig = loadConfig(aiContentConfigSchema);
 

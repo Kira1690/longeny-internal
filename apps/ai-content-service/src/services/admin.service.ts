@@ -1,17 +1,14 @@
-import { db } from '../db/index.js';
-import { sql, eq, and, gte, lte } from 'drizzle-orm';
-import { ai_requests, prompt_templates } from '../db/schema.js';
-import type { EmbeddingService, EmbeddingEntityType } from './embedding.service.js';
 import { NotFoundError } from '@longeny/errors';
 import { createLogger } from '@longeny/utils';
+import { and, eq, gte, lte, sql } from 'drizzle-orm';
+import { db } from '../db/index.js';
+import { ai_requests, prompt_templates } from '../db/schema.js';
+import type { EmbeddingEntityType, EmbeddingService } from './embedding.service.js';
 
 const logger = createLogger('ai-content:admin');
 
 export class AdminService {
-  constructor(
-    _prismaUnused: unknown,
-    private embeddingService: EmbeddingService,
-  ) {}
+  constructor(private embeddingService: EmbeddingService) {}
 
   // ── Embedding Generation ──
 
@@ -38,7 +35,10 @@ export class AdminService {
           logger.error({ entityType, entityId, error }, 'Failed to generate embedding for entity');
         }
       }
-      logger.info({ entityType, triggered, total: entityIds.length }, 'Embedding generation triggered');
+      logger.info(
+        { entityType, triggered, total: entityIds.length },
+        'Embedding generation triggered',
+      );
       return { triggered, entityType };
     }
 
@@ -49,7 +49,10 @@ export class AdminService {
     `);
 
     const count = Number((result as any)[0]?.count || 0);
-    logger.info({ entityType, existingCount: count, forceRegenerate }, 'Embedding generation status checked');
+    logger.info(
+      { entityType, existingCount: count, forceRegenerate },
+      'Embedding generation status checked',
+    );
 
     return { triggered: 0, entityType };
   }
@@ -61,9 +64,11 @@ export class AdminService {
     byEntityType: Record<string, number>;
     lastUpdated: string | null;
   }> {
-    const counts = await db.execute<
-      { entity_type: string; count: bigint; last_updated: Date | null }
-    >(sql`
+    const counts = await db.execute<{
+      entity_type: string;
+      count: bigint;
+      last_updated: Date | null;
+    }>(sql`
       SELECT entity_type, COUNT(*) as count, MAX(updated_at) as last_updated
       FROM "embeddings"
       GROUP BY entity_type
@@ -90,7 +95,10 @@ export class AdminService {
 
   // ── AI Usage Statistics ──
 
-  async getUsageStats(startDate?: string, endDate?: string): Promise<{
+  async getUsageStats(
+    startDate?: string,
+    endDate?: string,
+  ): Promise<{
     totalCalls: number;
     totalTokensIn: number;
     totalTokensOut: number;
@@ -123,12 +131,11 @@ export class AdminService {
       totalTokensOut += log.tokens_out;
 
       const modelKey = log.model_id;
-      if (!byModel[modelKey]) {
-        byModel[modelKey] = { calls: 0, tokensIn: 0, tokensOut: 0 };
-      }
-      byModel[modelKey]!.calls++;
-      byModel[modelKey]!.tokensIn += log.tokens_in;
-      byModel[modelKey]!.tokensOut += log.tokens_out;
+      byModel[modelKey] ??= { calls: 0, tokensIn: 0, tokensOut: 0 };
+      const modelTotals = byModel[modelKey];
+      modelTotals.calls++;
+      modelTotals.tokensIn += log.tokens_in;
+      modelTotals.tokensOut += log.tokens_out;
 
       const purposeKey = log.purpose || 'unknown';
       byPurpose[purposeKey] = (byPurpose[purposeKey] || 0) + 1;
@@ -178,7 +185,8 @@ export class AdminService {
     const updateData: Record<string, unknown> = { updated_at: new Date() };
     if (data.name !== undefined) updateData.name = data.name;
     if (data.systemPrompt !== undefined) updateData.system_prompt = data.systemPrompt;
-    if (data.userPromptTemplate !== undefined) updateData.user_prompt_template = data.userPromptTemplate;
+    if (data.userPromptTemplate !== undefined)
+      updateData.user_prompt_template = data.userPromptTemplate;
     if (data.maxTokens !== undefined) updateData.max_tokens = data.maxTokens;
     if (data.temperature !== undefined) updateData.temperature = data.temperature.toString();
     if (data.isActive !== undefined) updateData.status = data.isActive ? 'active' : 'deprecated';

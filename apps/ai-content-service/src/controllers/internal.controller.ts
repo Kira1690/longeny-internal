@@ -1,15 +1,15 @@
-import { db } from '../db/index.js';
-import { eq } from 'drizzle-orm';
-import {
-  recommendation_cache,
-  ai_requests,
-  generated_documents,
-  safety_logs,
-} from '../db/schema.js';
-import type { EmbeddingService, EmbeddingEntityType } from '../services/embedding.service.js';
-import type { DocumentService } from '../services/document.service.js';
 import { BadRequestError } from '@longeny/errors';
 import { createLogger } from '@longeny/utils';
+import { eq } from 'drizzle-orm';
+import { db } from '../db/index.js';
+import {
+  ai_requests,
+  generated_documents,
+  recommendation_cache,
+  safety_logs,
+} from '../db/schema.js';
+import type { DocumentService } from '../services/document.service.js';
+import type { EmbeddingEntityType, EmbeddingService } from '../services/embedding.service.js';
 
 const logger = createLogger('ai-content:internal');
 
@@ -57,54 +57,49 @@ export class InternalController {
     const { userId } = params;
 
     // Gather AI-related data
-    const [
-      recommendations,
-      aiRequestsData,
-      generatedDocs,
-      safetyLogsData,
-      documentData,
-    ] = await Promise.all([
-      db.select().from(recommendation_cache).where(eq(recommendation_cache.user_id, userId)),
-      db
-        .select({
-          id: ai_requests.id,
-          request_type: ai_requests.request_type,
-          model: ai_requests.model,
-          prompt_tokens: ai_requests.prompt_tokens,
-          completion_tokens: ai_requests.completion_tokens,
-          total_tokens: ai_requests.total_tokens,
-          estimated_cost: ai_requests.estimated_cost,
-          status: ai_requests.status,
-          cache_hit: ai_requests.cache_hit,
-          created_at: ai_requests.created_at,
-        })
-        .from(ai_requests)
-        .where(eq(ai_requests.user_id, userId)),
-      db
-        .select({
-          id: generated_documents.id,
-          document_type: generated_documents.document_type,
-          title: generated_documents.title,
-          status: generated_documents.status,
-          ai_model: generated_documents.ai_model,
-          created_at: generated_documents.created_at,
-          approved_at: generated_documents.approved_at,
-        })
-        .from(generated_documents)
-        .where(eq(generated_documents.user_id, userId)),
-      db
-        .select({
-          id: safety_logs.id,
-          output_flagged: safety_logs.output_flagged,
-          flag_category: safety_logs.flag_category,
-          input_filtered: safety_logs.input_filtered,
-          disclaimer_injected: safety_logs.disclaimer_injected,
-          created_at: safety_logs.created_at,
-        })
-        .from(safety_logs)
-        .where(eq(safety_logs.user_id, userId)),
-      this.documentService.getUserDataForDsar(userId),
-    ]);
+    const [recommendations, aiRequestsData, generatedDocs, safetyLogsData, documentData] =
+      await Promise.all([
+        db.select().from(recommendation_cache).where(eq(recommendation_cache.user_id, userId)),
+        db
+          .select({
+            id: ai_requests.id,
+            request_type: ai_requests.request_type,
+            model: ai_requests.model,
+            prompt_tokens: ai_requests.prompt_tokens,
+            completion_tokens: ai_requests.completion_tokens,
+            total_tokens: ai_requests.total_tokens,
+            estimated_cost: ai_requests.estimated_cost,
+            status: ai_requests.status,
+            cache_hit: ai_requests.cache_hit,
+            created_at: ai_requests.created_at,
+          })
+          .from(ai_requests)
+          .where(eq(ai_requests.user_id, userId)),
+        db
+          .select({
+            id: generated_documents.id,
+            document_type: generated_documents.document_type,
+            title: generated_documents.title,
+            status: generated_documents.status,
+            ai_model: generated_documents.ai_model,
+            created_at: generated_documents.created_at,
+            approved_at: generated_documents.approved_at,
+          })
+          .from(generated_documents)
+          .where(eq(generated_documents.user_id, userId)),
+        db
+          .select({
+            id: safety_logs.id,
+            output_flagged: safety_logs.output_flagged,
+            flag_category: safety_logs.flag_category,
+            input_filtered: safety_logs.input_filtered,
+            disclaimer_injected: safety_logs.disclaimer_injected,
+            created_at: safety_logs.created_at,
+          })
+          .from(safety_logs)
+          .where(eq(safety_logs.user_id, userId)),
+        this.documentService.getUserDataForDsar(userId),
+      ]);
 
     return {
       success: true,
@@ -140,9 +135,7 @@ export class InternalController {
     const recsDeleted = (recsResult as any).rowCount ?? 0;
 
     // 3. Delete safety logs for user
-    const safetyResult = await db
-      .delete(safety_logs)
-      .where(eq(safety_logs.user_id, userId));
+    const safetyResult = await db.delete(safety_logs).where(eq(safety_logs.user_id, userId));
     const safetyLogsDeleted = (safetyResult as any).rowCount ?? 0;
 
     // 4. Delete AI requests
@@ -152,9 +145,7 @@ export class InternalController {
       .set({ ai_request_id: null })
       .where(eq(generated_documents.user_id, userId));
 
-    const aiRequestsResult = await db
-      .delete(ai_requests)
-      .where(eq(ai_requests.user_id, userId));
+    const aiRequestsResult = await db.delete(ai_requests).where(eq(ai_requests.user_id, userId));
     const aiRequestsDeleted = (aiRequestsResult as any).rowCount ?? 0;
 
     // 5. Delete generated documents

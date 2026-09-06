@@ -10,14 +10,14 @@
  *
  * Run: bun test tests/integration/kb.test.ts --env-file .env.test
  */
-import { describe, it, expect, beforeAll } from 'bun:test';
+import { beforeAll, describe, expect, it } from 'bun:test';
 import jwt from 'jsonwebtoken';
 import { createApp } from '../../src/app.js';
 
 const PYTHON_URL = 'http://localhost:8080';
 const JWT_SECRET = Bun.env.JWT_SECRET ?? Bun.env.JWT_ACCESS_SECRET ?? 'test-e2e-jwt-secret-longeny';
 
-function makeToken(role: string = 'provider'): string {
+function makeToken(role = 'provider'): string {
   return jwt.sign(
     {
       sub: 'test-provider-e2e-001',
@@ -103,7 +103,7 @@ describe('POST /ai/kb/upload — real S3 + Python ingestion', () => {
     );
 
     console.log('\n[KB UPLOAD] status:', res.status);
-    const body = await res.json() as any;
+    const body = (await res.json()) as any;
     console.log('[KB UPLOAD] body:', JSON.stringify(body, null, 2));
 
     expect(res.status).toBe(200);
@@ -125,7 +125,7 @@ describe('POST /ai/kb/upload — real S3 + Python ingestion', () => {
           headers: { Authorization: `Bearer ${token2}` },
         }),
       );
-      const statusBody = await statusRes.json() as any;
+      const statusBody = (await statusRes.json()) as any;
       console.log(`[KB STATUS] job=${jobId} status=${statusBody.data?.status}`);
       finalStatus = statusBody.data?.status ?? 'unknown';
       if (finalStatus === 'completed' || finalStatus === 'failed') break;
@@ -150,7 +150,7 @@ describe('GET /ai/kb/status/:jobId — real Redis', () => {
       }),
     );
     console.log('\n[KB STATUS unknown] status:', res.status);
-    const body = await res.json() as any;
+    const body = (await res.json()) as any;
     console.log('[KB STATUS unknown] body:', JSON.stringify(body, null, 2));
     // Unknown job not in Redis → controller throws AppError(404, 'NOT_FOUND')
     expect(res.status).toBe(404);

@@ -1,11 +1,8 @@
-import {
-  BedrockRuntimeClient,
-  InvokeModelCommand,
-} from '@aws-sdk/client-bedrock-runtime';
+import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
+import { createLogger } from '@longeny/utils';
+import { config } from '../config/index.js';
 import { db } from '../db/index.js';
 import { ai_requests } from '../db/schema.js';
-import { config } from '../config/index.js';
-import { createLogger } from '@longeny/utils';
 
 const logger = createLogger('ai-content:bedrock');
 
@@ -66,8 +63,6 @@ export interface EmbeddingResult {
 }
 
 export class BedrockService {
-  constructor(_prismaUnused: unknown) {}
-
   /**
    * Invoke a Bedrock model (Llama 3.1) with system + user prompt.
    * Falls back to mock response if Bedrock is unavailable.
@@ -76,8 +71,8 @@ export class BedrockService {
     modelId: string,
     systemPrompt: string,
     userPrompt: string,
-    maxTokens: number = 2000,
-    temperature: number = 0.7,
+    maxTokens = 2000,
+    temperature = 0.7,
     userId?: string,
     requestType: 'recommendation' | 'health_analysis' | 'document_gen' = 'recommendation',
     correlationId?: string,
@@ -127,21 +122,40 @@ export class BedrockService {
           correlation_id: correlationId || null,
         });
 
-        return { text, promptTokens, completionTokens, totalTokens, estimatedCost: cost, isMock: false };
+        return {
+          text,
+          promptTokens,
+          completionTokens,
+          totalTokens,
+          estimatedCost: cost,
+          isMock: false,
+        };
       } catch (error) {
         logger.warn({ error }, 'Bedrock invocation failed, falling back to mock');
         bedrockAvailable = false;
 
         // Schedule re-check after 5 minutes
-        setTimeout(() => {
-          bedrockAvailable = true;
-          logger.info('Bedrock availability re-enabled for next check');
-        }, 5 * 60 * 1000);
+        setTimeout(
+          () => {
+            bedrockAvailable = true;
+            logger.info('Bedrock availability re-enabled for next check');
+          },
+          5 * 60 * 1000,
+        );
       }
     }
 
     // ── Mock fallback ──
-    return this.mockInvokeModel(modelId, systemPrompt, userPrompt, maxTokens, userId, requestType, correlationId, startTime);
+    return this.mockInvokeModel(
+      modelId,
+      systemPrompt,
+      userPrompt,
+      maxTokens,
+      userId,
+      requestType,
+      correlationId,
+      startTime,
+    );
   }
 
   /**
@@ -195,9 +209,12 @@ export class BedrockService {
         logger.warn({ error }, 'Bedrock embedding failed, falling back to mock');
         bedrockAvailable = false;
 
-        setTimeout(() => {
-          bedrockAvailable = true;
-        }, 5 * 60 * 1000);
+        setTimeout(
+          () => {
+            bedrockAvailable = true;
+          },
+          5 * 60 * 1000,
+        );
       }
     }
 
@@ -261,7 +278,7 @@ export class BedrockService {
       const seed = text + i.toString();
       for (let j = 0; j < seed.length; j++) {
         const char = seed.charCodeAt(j);
-        hash = ((hash << 5) - hash) + char;
+        hash = (hash << 5) - hash + char;
         hash = hash & hash; // Convert to 32bit integer
       }
       return (hash % 10000) / 10000; // Normalize to [-1, 1] range approx
@@ -300,14 +317,16 @@ export class BedrockService {
               rank: 1,
               entityId: 'mock-entity-1',
               score: 0.92,
-              explanation: 'Highly relevant based on your health profile and goals. This provider specializes in areas matching your needs.',
+              explanation:
+                'Highly relevant based on your health profile and goals. This provider specializes in areas matching your needs.',
               matchFactors: ['specialty_match', 'location', 'availability'],
             },
             {
               rank: 2,
               entityId: 'mock-entity-2',
               score: 0.85,
-              explanation: 'Strong match for your wellness objectives with excellent patient reviews.',
+              explanation:
+                'Strong match for your wellness objectives with excellent patient reviews.',
               matchFactors: ['specialty_match', 'reviews', 'experience'],
             },
             {
@@ -318,7 +337,8 @@ export class BedrockService {
               matchFactors: ['price', 'availability', 'specialty_match'],
             },
           ],
-          summary: 'Based on your profile, we found 3 strong matches. The top recommendation excels in your primary health focus areas.',
+          summary:
+            'Based on your profile, we found 3 strong matches. The top recommendation excels in your primary health focus areas.',
         });
 
       case 'document_gen':
@@ -327,15 +347,18 @@ export class BedrockService {
           sections: [
             {
               title: 'Overview',
-              content: 'This document has been generated based on the provided patient context and clinical parameters.',
+              content:
+                'This document has been generated based on the provided patient context and clinical parameters.',
             },
             {
               title: 'Recommendations',
-              content: 'Based on the available information, the following recommendations are provided for consideration by the supervising healthcare provider.',
+              content:
+                'Based on the available information, the following recommendations are provided for consideration by the supervising healthcare provider.',
             },
             {
               title: 'Notes',
-              content: 'This AI-generated content requires provider review and approval before sharing with the patient.',
+              content:
+                'This AI-generated content requires provider review and approval before sharing with the patient.',
             },
           ],
           recommendations: [
@@ -352,7 +375,8 @@ export class BedrockService {
       default:
         return JSON.stringify({
           _disclaimer: disclaimer,
-          response: 'Mock response for development. Connect AWS Bedrock for production AI capabilities.',
+          response:
+            'Mock response for development. Connect AWS Bedrock for production AI capabilities.',
         });
     }
   }

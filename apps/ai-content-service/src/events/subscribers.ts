@@ -1,13 +1,13 @@
-import { db } from '../db/index.js';
-import { eq } from 'drizzle-orm';
-import { processed_events, recommendation_cache } from '../db/schema.js';
 import { EventConsumer } from '@longeny/events';
 import { EVENT_NAMES, type EventEnvelope } from '@longeny/types';
-import { redisUrl } from '../config/index.js';
 import { createLogger } from '@longeny/utils';
+import { eq } from 'drizzle-orm';
+import { redisUrl } from '../config/index.js';
+import { db } from '../db/index.js';
+import { processed_events, recommendation_cache } from '../db/schema.js';
 import { BedrockService } from '../services/bedrock.service.js';
-import { EmbeddingService } from '../services/embedding.service.js';
 import { DocumentService } from '../services/document.service.js';
+import { EmbeddingService } from '../services/embedding.service.js';
 import { S3Service } from '../services/s3.service.js';
 
 const logger = createLogger('ai-content:subscriber');
@@ -40,10 +40,10 @@ interface GdprErasurePayload {
 export function startSubscribers(): EventConsumer {
   consumer = new EventConsumer(redisUrl, 'ai-content-service');
 
-  const bedrockService = new BedrockService(null);
-  const embeddingService = new EmbeddingService(null, bedrockService);
+  const bedrockService = new BedrockService();
+  const embeddingService = new EmbeddingService(bedrockService);
   const s3Service = new S3Service();
-  const documentService = new DocumentService(null, s3Service);
+  const documentService = new DocumentService(s3Service);
 
   // ── provider.verified → embed provider ──
   consumer.on<ProviderVerifiedPayload>(

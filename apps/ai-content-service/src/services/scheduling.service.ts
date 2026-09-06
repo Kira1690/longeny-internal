@@ -1,5 +1,5 @@
-import { config } from '../config/index.js';
 import { AppError } from '@longeny/errors';
+import { config } from '../config/index.js';
 
 const BASE = config.AI_AGENT_URL;
 

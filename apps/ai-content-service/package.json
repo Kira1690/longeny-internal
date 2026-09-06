@@ -31,7 +31,8 @@
     "@longeny/utils": "workspace:*",
     "@longeny/events": "workspace:*",
     "@longeny/middleware": "workspace:*",
-    "@longeny/validators": "workspace:*"
+    "@longeny/validators": "workspace:*",
+    "@longeny/openapi": "workspace:*"
   },
   "devDependencies": {
     "drizzle-kit": "^0.28.0",

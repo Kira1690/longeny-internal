@@ -1,5 +1,8 @@
 import { AppError } from '@longeny/errors';
-import { ProviderProfileService, type ProviderProfileInput } from '../services/provider-profile.service.js';
+import type {
+  ProviderProfileInput,
+  ProviderProfileService,
+} from '../services/provider-profile.service.js';
 
 export class ProviderController {
   constructor(private readonly profileSvc: ProviderProfileService) {}

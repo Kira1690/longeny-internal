@@ -1,8 +1,8 @@
+import { createLogger } from '@longeny/utils';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { sql, eq, and } from 'drizzle-orm';
 import { embeddings } from '../db/schema.js';
 import type { BedrockService } from './bedrock.service.js';
-import { createLogger } from '@longeny/utils';
 
 const logger = createLogger('ai-content:embedding');
 
@@ -16,6 +16,9 @@ export interface EmbeddingInput {
 }
 
 export interface SimilarityResult {
+  /** db.execute<T> requires a row shape it can index; the named fields below
+   *  are the ones the query actually selects. */
+  [column: string]: unknown;
   id: string;
   entity_type: EmbeddingEntityType;
   entity_id: string;
@@ -24,15 +27,15 @@ export interface SimilarityResult {
 }
 
 export class EmbeddingService {
-  constructor(
-    _prismaUnused: unknown,
-    private bedrockService: BedrockService,
-  ) {}
+  constructor(private bedrockService: BedrockService) {}
 
   /**
    * Generate embedding for an entity and upsert to DB.
    */
-  async generateAndStore(input: EmbeddingInput, userId?: string): Promise<{ id: string; isMock: boolean }> {
+  async generateAndStore(
+    input: EmbeddingInput,
+    userId?: string,
+  ): Promise<{ id: string; isMock: boolean }> {
     const { entityType, entityId, text, metadata } = input;
 
     const result = await this.bedrockService.generateEmbedding(text, userId);
@@ -72,7 +75,10 @@ export class EmbeddingService {
   /**
    * Bulk embed multiple entities.
    */
-  async bulkEmbed(inputs: EmbeddingInput[], userId?: string): Promise<Array<{ entityId: string; id: string; isMock: boolean }>> {
+  async bulkEmbed(
+    inputs: EmbeddingInput[],
+    userId?: string,
+  ): Promise<Array<{ entityId: string; id: string; isMock: boolean }>> {
     const results: Array<{ entityId: string; id: string; isMock: boolean }> = [];
 
     for (const input of inputs) {
@@ -94,7 +100,7 @@ export class EmbeddingService {
   async similaritySearch(
     queryVector: number[],
     entityType: EmbeddingEntityType,
-    limit: number = 10,
+    limit = 10,
   ): Promise<SimilarityResult[]> {
     const vectorStr = `[${queryVector.join(',')}]`;
 

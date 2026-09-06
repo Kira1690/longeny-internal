@@ -1,8 +1,8 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
+import { createLogger } from '@longeny/utils';
 import Redis from 'ioredis';
 import { config } from '../config/index.js';
-import { S3Service } from './s3.service.js';
-import { createLogger } from '@longeny/utils';
+import type { S3Service } from './s3.service.js';
 
 const logger = createLogger('ai-content:kb-upload');
 

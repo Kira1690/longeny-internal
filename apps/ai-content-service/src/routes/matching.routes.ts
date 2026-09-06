@@ -1,8 +1,8 @@
-import { Elysia, t } from 'elysia';
 import { requireAuth } from '@longeny/middleware';
+import { Elysia, t } from 'elysia';
 import type { MatchingController } from '../controllers/matching.controller.js';
 
-export function createMatchingRoutes(controller: MatchingController): Elysia {
+export function createMatchingRoutes(controller: MatchingController) {
   return new Elysia({ prefix: '/ai/matching', detail: { tags: ['matching'] } })
     .use(requireAuth())
     .post(
@@ -22,7 +22,8 @@ export function createMatchingRoutes(controller: MatchingController): Elysia {
     .get('/match/:matchId', ({ params }) => controller.getResult({ params }), {
       detail: {
         summary: 'Get match result',
-        description: 'Returns a previously computed match result including provider scores and breakdown.',
+        description:
+          'Returns a previously computed match result including provider scores and breakdown.',
       },
     });
 }

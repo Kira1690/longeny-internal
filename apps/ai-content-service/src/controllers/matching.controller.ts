@@ -1,5 +1,5 @@
 import { AppError } from '@longeny/errors';
-import { MatchingService } from '../services/matching.service.js';
+import type { MatchingService } from '../services/matching.service.js';
 
 export class MatchingController {
   constructor(private readonly matchingSvc: MatchingService) {}

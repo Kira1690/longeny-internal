@@ -13,7 +13,13 @@ const MAX_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
 export class KbController {
   constructor(private readonly kbSvc: KbUploadService) {}
 
-  async upload({ body, store }: { body: { file: File; title?: string; description?: string; collection_name?: string }; store: { userId: string } }) {
+  async upload({
+    body,
+    store,
+  }: {
+    body: { file: File; title?: string; description?: string; collection_name?: string };
+    store: { userId: string };
+  }) {
     const { file } = body;
 
     const mimeBase = file.type.split(';')[0].trim();

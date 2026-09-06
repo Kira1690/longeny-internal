@@ -1,5 +1,5 @@
-import { config } from '../config/index.js';
 import { AppError } from '@longeny/errors';
+import { config } from '../config/index.js';
 
 const BASE = config.AI_AGENT_URL;
 
@@ -40,19 +40,12 @@ export class NotificationService {
     return res.json() as Promise<ProviderNotification[]>;
   }
 
-  async updateStatus(
-    providerId: string,
-    notificationId: string,
-    status: string,
-  ): Promise<void> {
-    const res = await fetch(
-      `${BASE}/ai/notifications/${providerId}/${notificationId}/status`,
-      {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      },
-    );
+  async updateStatus(providerId: string, notificationId: string, status: string): Promise<void> {
+    const res = await fetch(`${BASE}/ai/notifications/${providerId}/${notificationId}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
     if (!res.ok) throw new AppError('Failed to update notification', 502, 'AGENT_ERROR');
   }
 }

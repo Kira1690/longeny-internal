@@ -1,8 +1,8 @@
-import { config } from './config/index.js';
-import { createApp } from './app.js';
-import { startSubscribers, stopSubscribers } from './events/subscribers.js';
-import { disconnectPublisher } from './events/publishers.js';
 import { createLogger } from '@longeny/utils';
+import { createApp } from './app.js';
+import { config } from './config/index.js';
+import { disconnectPublisher } from './events/publishers.js';
+import { startSubscribers, stopSubscribers } from './events/subscribers.js';
 
 const logger = createLogger('ai-content-service');
 

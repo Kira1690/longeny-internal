@@ -1,20 +1,26 @@
+import { BadRequestError, ForbiddenError, NotFoundError } from '@longeny/errors';
+import { createLogger } from '@longeny/utils';
+import { type InferSelectModel, and, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { sql, eq, and, ne, isNull, inArray } from 'drizzle-orm';
 import {
-  documents,
   document_access,
   document_access_log,
   document_tags,
   document_versions,
+  documents,
 } from '../db/schema.js';
 import type { S3Service } from './s3.service.js';
-import { createLogger } from '@longeny/utils';
-import { NotFoundError, ForbiddenError, BadRequestError } from '@longeny/errors';
 
 const logger = createLogger('ai-content:document');
 
 type DocOwnerType = 'user' | 'provider';
-type DocumentType = 'lab_report' | 'prescription' | 'imaging' | 'insurance' | 'certificate' | 'other';
+type DocumentType =
+  | 'lab_report'
+  | 'prescription'
+  | 'imaging'
+  | 'insurance'
+  | 'certificate'
+  | 'other';
 type DocStatus = 'processing' | 'active' | 'archived' | 'deleted';
 type AccessPermission = 'view' | 'download';
 
@@ -29,6 +35,14 @@ interface UploadInput {
   mimeType: string;
   tags?: string[];
   metadata?: Record<string, unknown>;
+  /**
+   * Subject of care the document is about. Resolved and ownership-checked
+   * before the handler runs. Absent only for a provider-owned document, which
+   * belongs to the practice rather than to a patient.
+   */
+  profileId?: string;
+  /** When the report was produced, which is not when it was uploaded. */
+  reportedAt?: Date;
 }
 
 interface ShareInput {
@@ -41,10 +55,7 @@ interface ShareInput {
 }
 
 export class DocumentService {
-  constructor(
-    _prismaUnused: unknown,
-    private s3Service: S3Service,
-  ) {}
+  constructor(private s3Service: S3Service) {}
 
   // ── Upload ──
 
@@ -58,20 +69,25 @@ export class DocumentService {
   }> {
     const s3Key = this.s3Service.buildDocumentKey(input.ownerId, input.fileName);
 
-    const [doc] = await db.insert(documents).values({
-      owner_id: input.ownerId,
-      owner_type: input.ownerType,
-      document_type: input.documentType,
-      title: input.title,
-      description: input.description || null,
-      file_key: s3Key,
-      file_name: input.fileName,
-      file_size: BigInt(input.fileSize),
-      mime_type: input.mimeType,
-      tags: JSON.stringify(input.tags || []),
-      metadata: input.metadata || {},
-      status: 'processing',
-    }).returning();
+    const [doc] = await db
+      .insert(documents)
+      .values({
+        owner_id: input.ownerId,
+        owner_type: input.ownerType,
+        document_type: input.documentType,
+        title: input.title,
+        description: input.description || null,
+        file_key: s3Key,
+        file_name: input.fileName,
+        file_size: BigInt(input.fileSize),
+        mime_type: input.mimeType,
+        tags: JSON.stringify(input.tags || []),
+        metadata: input.metadata || {},
+        profile_id: input.profileId ?? null,
+        reported_at: input.reportedAt ?? null,
+        status: 'processing',
+      })
+      .returning();
 
     const { uploadUrl, expiresIn } = await this.s3Service.generateUploadUrl(
       s3Key,
@@ -108,10 +124,7 @@ export class DocumentService {
       sortOrder: 'asc' | 'desc';
     },
   ) {
-    const conditions = [
-      eq(documents.owner_id, ownerId),
-      ne(documents.status, 'deleted'),
-    ];
+    const conditions = [eq(documents.owner_id, ownerId), ne(documents.status, 'deleted')];
 
     if (filters.documentType) {
       conditions.push(eq(documents.document_type, filters.documentType));
@@ -163,11 +176,7 @@ export class DocumentService {
    * Get document detail with access check.
    */
   async getDocument(id: string, requesterId: string) {
-    const [doc] = await db
-      .select()
-      .from(documents)
-      .where(eq(documents.id, id))
-      .limit(1);
+    const [doc] = await db.select().from(documents).where(eq(documents.id, id)).limit(1);
 
     if (!doc || doc.status === 'deleted') throw new NotFoundError('Document', id);
 
@@ -181,12 +190,7 @@ export class DocumentService {
         created_at: document_access.created_at,
       })
       .from(document_access)
-      .where(
-        and(
-          eq(document_access.document_id, id),
-          isNull(document_access.revoked_at),
-        ),
-      );
+      .where(and(eq(document_access.document_id, id), isNull(document_access.revoked_at)));
 
     // Check access: owner or granted access
     const isOwner = doc.owner_id === requesterId;
@@ -210,11 +214,7 @@ export class DocumentService {
    * Generate a presigned download URL.
    */
   async getDownloadUrl(id: string, requesterId: string) {
-    const [doc] = await db
-      .select()
-      .from(documents)
-      .where(eq(documents.id, id))
-      .limit(1);
+    const [doc] = await db.select().from(documents).where(eq(documents.id, id)).limit(1);
 
     if (!doc || doc.status === 'deleted') throw new NotFoundError('Document', id);
 
@@ -265,14 +265,11 @@ export class DocumentService {
       metadata?: Record<string, unknown>;
     },
   ) {
-    const [doc] = await db
-      .select()
-      .from(documents)
-      .where(eq(documents.id, id))
-      .limit(1);
+    const [doc] = await db.select().from(documents).where(eq(documents.id, id)).limit(1);
 
     if (!doc || doc.status === 'deleted') throw new NotFoundError('Document', id);
-    if (doc.owner_id !== ownerId) throw new ForbiddenError('Only the owner can update this document');
+    if (doc.owner_id !== ownerId)
+      throw new ForbiddenError('Only the owner can update this document');
 
     const updateData: Record<string, unknown> = { updated_at: new Date() };
     if (data.title !== undefined) updateData.title = data.title;
@@ -296,14 +293,11 @@ export class DocumentService {
    * Get access log for a document (owner only).
    */
   async getAccessLog(id: string, requesterId: string, page: number, limit: number) {
-    const [doc] = await db
-      .select()
-      .from(documents)
-      .where(eq(documents.id, id))
-      .limit(1);
+    const [doc] = await db.select().from(documents).where(eq(documents.id, id)).limit(1);
 
     if (!doc || doc.status === 'deleted') throw new NotFoundError('Document', id);
-    if (doc.owner_id !== requesterId) throw new ForbiddenError('Only the owner can view the access log');
+    if (doc.owner_id !== requesterId)
+      throw new ForbiddenError('Only the owner can view the access log');
 
     const [logs, [{ count }]] = await Promise.all([
       db
@@ -331,12 +325,7 @@ export class DocumentService {
     const grants = await db
       .select()
       .from(document_access)
-      .where(
-        and(
-          eq(document_access.granted_to_id, providerId),
-          isNull(document_access.revoked_at),
-        ),
-      )
+      .where(and(eq(document_access.granted_to_id, providerId), isNull(document_access.revoked_at)))
       .orderBy(sql`${document_access.created_at} DESC`)
       .limit(limit)
       .offset((page - 1) * limit);
@@ -345,33 +334,31 @@ export class DocumentService {
       .select({ count: sql<number>`COUNT(*)::int` })
       .from(document_access)
       .where(
-        and(
-          eq(document_access.granted_to_id, providerId),
-          isNull(document_access.revoked_at),
-        ),
+        and(eq(document_access.granted_to_id, providerId), isNull(document_access.revoked_at)),
       );
 
     // Fetch documents for each grant
     const docIds = grants.map((g) => g.document_id);
-    const docs = docIds.length > 0
-      ? await db
-          .select({
-            id: documents.id,
-            document_type: documents.document_type,
-            title: documents.title,
-            description: documents.description,
-            file_name: documents.file_name,
-            file_size: documents.file_size,
-            mime_type: documents.mime_type,
-            tags: documents.tags,
-            owner_id: documents.owner_id,
-            status: documents.status,
-            created_at: documents.created_at,
-            updated_at: documents.updated_at,
-          })
-          .from(documents)
-          .where(inArray(documents.id, docIds))
-      : [];
+    const docs =
+      docIds.length > 0
+        ? await db
+            .select({
+              id: documents.id,
+              document_type: documents.document_type,
+              title: documents.title,
+              description: documents.description,
+              file_name: documents.file_name,
+              file_size: documents.file_size,
+              mime_type: documents.mime_type,
+              tags: documents.tags,
+              owner_id: documents.owner_id,
+              status: documents.status,
+              created_at: documents.created_at,
+              updated_at: documents.updated_at,
+            })
+            .from(documents)
+            .where(inArray(documents.id, docIds))
+        : [];
 
     const docMap = new Map(docs.map((d) => [d.id, d]));
 
@@ -398,14 +385,11 @@ export class DocumentService {
    * Soft delete a document (owner only).
    */
   async softDelete(id: string, ownerId: string) {
-    const [doc] = await db
-      .select()
-      .from(documents)
-      .where(eq(documents.id, id))
-      .limit(1);
+    const [doc] = await db.select().from(documents).where(eq(documents.id, id)).limit(1);
 
     if (!doc) throw new NotFoundError('Document', id);
-    if (doc.owner_id !== ownerId) throw new ForbiddenError('Only the owner can delete this document');
+    if (doc.owner_id !== ownerId)
+      throw new ForbiddenError('Only the owner can delete this document');
     if (doc.status === 'deleted') throw new BadRequestError('Document is already deleted');
 
     await db
@@ -429,14 +413,11 @@ export class DocumentService {
    * Share document with a provider (consent-gated).
    */
   async shareDocument(id: string, ownerId: string, input: ShareInput) {
-    const [doc] = await db
-      .select()
-      .from(documents)
-      .where(eq(documents.id, id))
-      .limit(1);
+    const [doc] = await db.select().from(documents).where(eq(documents.id, id)).limit(1);
 
     if (!doc) throw new NotFoundError('Document', id);
-    if (doc.owner_id !== ownerId) throw new ForbiddenError('Only the owner can share this document');
+    if (doc.owner_id !== ownerId)
+      throw new ForbiddenError('Only the owner can share this document');
     if (doc.status !== 'active') throw new BadRequestError('Only active documents can be shared');
 
     // Select-then-upsert pattern for document_access
@@ -451,7 +432,7 @@ export class DocumentService {
       )
       .limit(1);
 
-    let grant;
+    let grant: InferSelectModel<typeof document_access> | undefined;
     if (existing) {
       [grant] = await db
         .update(document_access)
@@ -496,11 +477,7 @@ export class DocumentService {
    * Revoke a share grant.
    */
   async revokeAccess(documentId: string, grantId: string, ownerId: string) {
-    const [doc] = await db
-      .select()
-      .from(documents)
-      .where(eq(documents.id, documentId))
-      .limit(1);
+    const [doc] = await db.select().from(documents).where(eq(documents.id, documentId)).limit(1);
 
     if (!doc) throw new NotFoundError('Document', documentId);
     if (doc.owner_id !== ownerId) throw new ForbiddenError('Only the owner can revoke access');
@@ -536,12 +513,7 @@ export class DocumentService {
     const grants = await db
       .select()
       .from(document_access)
-      .where(
-        and(
-          eq(document_access.granted_to_id, providerId),
-          isNull(document_access.revoked_at),
-        ),
-      )
+      .where(and(eq(document_access.granted_to_id, providerId), isNull(document_access.revoked_at)))
       .orderBy(sql`${document_access.created_at} DESC`)
       .limit(limit)
       .offset((page - 1) * limit);
@@ -550,31 +522,29 @@ export class DocumentService {
       .select({ count: sql<number>`COUNT(*)::int` })
       .from(document_access)
       .where(
-        and(
-          eq(document_access.granted_to_id, providerId),
-          isNull(document_access.revoked_at),
-        ),
+        and(eq(document_access.granted_to_id, providerId), isNull(document_access.revoked_at)),
       );
 
     const docIds = grants.map((g) => g.document_id);
-    const docs = docIds.length > 0
-      ? await db
-          .select({
-            id: documents.id,
-            document_type: documents.document_type,
-            title: documents.title,
-            description: documents.description,
-            file_name: documents.file_name,
-            file_size: documents.file_size,
-            mime_type: documents.mime_type,
-            tags: documents.tags,
-            owner_id: documents.owner_id,
-            status: documents.status,
-            created_at: documents.created_at,
-          })
-          .from(documents)
-          .where(inArray(documents.id, docIds))
-      : [];
+    const docs =
+      docIds.length > 0
+        ? await db
+            .select({
+              id: documents.id,
+              document_type: documents.document_type,
+              title: documents.title,
+              description: documents.description,
+              file_name: documents.file_name,
+              file_size: documents.file_size,
+              mime_type: documents.mime_type,
+              tags: documents.tags,
+              owner_id: documents.owner_id,
+              status: documents.status,
+              created_at: documents.created_at,
+            })
+            .from(documents)
+            .where(inArray(documents.id, docIds))
+        : [];
 
     const docMap = new Map(docs.map((d) => [d.id, d]));
 
@@ -600,11 +570,7 @@ export class DocumentService {
    * Add tags to a document.
    */
   async addTags(id: string, ownerId: string, tags: string[]) {
-    const [doc] = await db
-      .select()
-      .from(documents)
-      .where(eq(documents.id, id))
-      .limit(1);
+    const [doc] = await db.select().from(documents).where(eq(documents.id, id)).limit(1);
 
     if (!doc) throw new NotFoundError('Document', id);
     if (doc.owner_id !== ownerId) throw new ForbiddenError('Only the owner can modify tags');
@@ -623,12 +589,7 @@ export class DocumentService {
       const [existingTag] = await db
         .select()
         .from(document_tags)
-        .where(
-          and(
-            eq(document_tags.name, tag),
-            eq(document_tags.category, 'user'),
-          ),
-        )
+        .where(and(eq(document_tags.name, tag), eq(document_tags.category, 'user')))
         .limit(1);
 
       if (existingTag) {
@@ -637,14 +598,17 @@ export class DocumentService {
           .set({ usage_count: existingTag.usage_count + 1 })
           .where(eq(document_tags.id, existingTag.id));
       } else {
-        await db.insert(document_tags).values({
-          name: tag,
-          category: 'user',
-          created_by: ownerId,
-          usage_count: 1,
-        }).catch(() => {
-          // Race condition on insert — ignore
-        });
+        await db
+          .insert(document_tags)
+          .values({
+            name: tag,
+            category: 'user',
+            created_by: ownerId,
+            usage_count: 1,
+          })
+          .catch(() => {
+            // Race condition on insert — ignore
+          });
       }
     }
 
@@ -656,11 +620,7 @@ export class DocumentService {
    * Remove a tag from a document.
    */
   async removeTag(id: string, ownerId: string, tag: string) {
-    const [doc] = await db
-      .select()
-      .from(documents)
-      .where(eq(documents.id, id))
-      .limit(1);
+    const [doc] = await db.select().from(documents).where(eq(documents.id, id)).limit(1);
 
     if (!doc) throw new NotFoundError('Document', id);
     if (doc.owner_id !== ownerId) throw new ForbiddenError('Only the owner can modify tags');
@@ -693,7 +653,7 @@ export class DocumentService {
   /**
    * Get tag cloud (most used tags).
    */
-  async getTagCloud(limit: number = 50) {
+  async getTagCloud(limit = 50) {
     const tags = await db
       .select({
         name: document_tags.name,
@@ -714,10 +674,7 @@ export class DocumentService {
    * Chronological document timeline for a user.
    */
   async getTimeline(ownerId: string, page: number, limit: number) {
-    const conditions = [
-      eq(documents.owner_id, ownerId),
-      ne(documents.status, 'deleted'),
-    ];
+    const conditions = [eq(documents.owner_id, ownerId), ne(documents.status, 'deleted')];
 
     const [rows, [{ count }]] = await Promise.all([
       db
@@ -753,6 +710,72 @@ export class DocumentService {
     return { timeline, total: count };
   }
 
+  /**
+   * A profile's reports, newest report-date first.
+   *
+   * Ordered by when the report was produced rather than when it was uploaded: a
+   * clinician reading a timeline wants the lab work in the order it happened,
+   * and a patient uploading three years of history in one afternoon would
+   * otherwise see it in upload order. Rows predating `reported_at` fall back to
+   * their upload date so the timeline stays continuous.
+   *
+   * Scope is the profile, not the account. The caller's right to read this
+   * profile is established before this runs — by ownership for a patient, or by
+   * an active booking for a provider.
+   */
+  async getProfileReports(profileId: string, page: number, limit: number) {
+    const conditions = [eq(documents.profile_id, profileId), ne(documents.status, 'deleted')];
+
+    const [rows, [{ count }]] = await Promise.all([
+      db
+        .select({
+          id: documents.id,
+          document_type: documents.document_type,
+          title: documents.title,
+          description: documents.description,
+          file_name: documents.file_name,
+          mime_type: documents.mime_type,
+          tags: documents.tags,
+          ai_generated: documents.ai_generated,
+          status: documents.status,
+          reported_at: documents.reported_at,
+          created_at: documents.created_at,
+        })
+        .from(documents)
+        .where(and(...conditions))
+        .orderBy(sql`COALESCE(${documents.reported_at}, ${documents.created_at}) DESC`)
+        .limit(limit)
+        .offset((page - 1) * limit),
+      db
+        .select({ count: sql<number>`COUNT(*)::int` })
+        .from(documents)
+        .where(and(...conditions)),
+    ]);
+
+    return { reports: rows, total: count };
+  }
+
+  /**
+   * Backfill `profile_id` for documents uploaded before the multi-profile model.
+   *
+   * `owner_id` on a patient document is the account's auth id, so the caller
+   * supplies the mapping it already resolved; nothing is guessed here.
+   */
+  async backfillProfileId(ownerId: string, profileId: string): Promise<number> {
+    const updated = await db
+      .update(documents)
+      .set({ profile_id: profileId })
+      .where(
+        and(
+          eq(documents.owner_id, ownerId),
+          eq(documents.owner_type, 'user'),
+          isNull(documents.profile_id),
+        ),
+      )
+      .returning({ id: documents.id });
+    return updated.length;
+  }
+
   // ── GDPR ──
 
   /**
@@ -775,10 +798,7 @@ export class DocumentService {
         })
         .from(documents)
         .where(eq(documents.owner_id, userId)),
-      db
-        .select()
-        .from(document_access)
-        .where(eq(document_access.granted_by, userId)),
+      db.select().from(document_access).where(eq(document_access.granted_by, userId)),
       db
         .select()
         .from(document_access_log)
@@ -797,7 +817,9 @@ export class DocumentService {
   /**
    * Delete all documents and S3 files for a user (GDPR erasure).
    */
-  async deleteAllForUser(userId: string): Promise<{ documentsDeleted: number; s3FilesDeleted: number }> {
+  async deleteAllForUser(
+    userId: string,
+  ): Promise<{ documentsDeleted: number; s3FilesDeleted: number }> {
     const userDocs = await db
       .select({
         id: documents.id,
@@ -813,7 +835,10 @@ export class DocumentService {
         await this.s3Service.deleteObject(doc.file_key);
         s3FilesDeleted++;
       } catch (error) {
-        logger.error({ fileKey: doc.file_key, error }, 'Failed to delete S3 file during GDPR erasure');
+        logger.error(
+          { fileKey: doc.file_key, error },
+          'Failed to delete S3 file during GDPR erasure',
+        );
       }
     }
 
@@ -825,7 +850,10 @@ export class DocumentService {
       await db.delete(documents).where(eq(documents.owner_id, userId));
     }
 
-    logger.info({ userId, documentsDeleted: userDocs.length, s3FilesDeleted }, 'User documents deleted (GDPR)');
+    logger.info(
+      { userId, documentsDeleted: userDocs.length, s3FilesDeleted },
+      'User documents deleted (GDPR)',
+    );
     return { documentsDeleted: userDocs.length, s3FilesDeleted };
   }
 }

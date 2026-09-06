@@ -8,14 +8,14 @@
  *
  * Run: bun test tests/integration/onboarding.test.ts --env-file .env.test
  */
-import { describe, it, expect, beforeAll } from 'bun:test';
+import { beforeAll, describe, expect, it } from 'bun:test';
 import jwt from 'jsonwebtoken';
 import { createApp } from '../../src/app.js';
 
 const PYTHON_URL = 'http://localhost:8080';
 const JWT_SECRET = Bun.env.JWT_SECRET ?? Bun.env.JWT_ACCESS_SECRET ?? 'test-e2e-jwt-secret-longeny';
 
-function makeToken(role: string = 'user'): string {
+function makeToken(role = 'user'): string {
   return jwt.sign(
     {
       sub: 'test-user-e2e-001',
@@ -33,7 +33,9 @@ function makeToken(role: string = 'user'): string {
 beforeAll(async () => {
   const res = await fetch(`${PYTHON_URL}/openapi.json`).catch(() => null);
   if (!res || !res.ok) {
-    throw new Error(`Python agent not reachable at ${PYTHON_URL}. Start it with: conda activate brave && uvicorn ai_engine.api.main:app --port 8000`);
+    throw new Error(
+      `Python agent not reachable at ${PYTHON_URL}. Start it with: conda activate brave && uvicorn ai_engine.api.main:app --port 8000`,
+    );
   }
 });
 
@@ -52,9 +54,7 @@ describe('Auth guard', () => {
 
   it('GET /ai/onboarding/session/:id returns 401 without token', async () => {
     const app = createApp();
-    const res = await app.handle(
-      new Request('http://localhost/ai/onboarding/session/nonexistent'),
-    );
+    const res = await app.handle(new Request('http://localhost/ai/onboarding/session/nonexistent'));
     expect(res.status).toBe(401);
   });
 });
@@ -76,7 +76,7 @@ describe('POST /ai/onboarding/start — real Python call', () => {
     );
 
     console.log('\n[ONBOARDING START] status:', res.status);
-    const body = await res.json() as any;
+    const body = (await res.json()) as any;
     console.log('[ONBOARDING START] body:', JSON.stringify(body, null, 2));
 
     expect(res.status).toBe(200);
@@ -100,7 +100,7 @@ describe('GET /ai/onboarding/session/:id — real Python call', () => {
         headers: { Authorization: `Bearer ${token}` },
       }),
     );
-    const startBody = await startRes.json() as any;
+    const startBody = (await startRes.json()) as any;
     const sessionId = startBody.data?.session_id;
     expect(typeof sessionId).toBe('string');
 
@@ -112,7 +112,7 @@ describe('GET /ai/onboarding/session/:id — real Python call', () => {
     );
 
     console.log('\n[ONBOARDING SESSION] status:', res.status);
-    const body = await res.json() as any;
+    const body = (await res.json()) as any;
     console.log('[ONBOARDING SESSION] body:', JSON.stringify(body, null, 2));
 
     // Session just created, not yet complete — Python returns 404 (not finalized)

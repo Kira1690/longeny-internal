@@ -1,8 +1,16 @@
+import { BadRequestError, NotFoundError } from '@longeny/errors';
+import { UserRole } from '@longeny/types';
+import { buildPaginationMeta, parsePaginationParams } from '@longeny/utils';
 import type { DocumentService } from '../services/document.service.js';
-import { BadRequestError } from '@longeny/errors';
-import { parsePaginationParams, buildPaginationMeta } from '@longeny/utils';
+import type { ProfileAccessService } from '../services/profile-access.service.js';
 
-type DocumentType = 'lab_report' | 'prescription' | 'imaging' | 'insurance' | 'certificate' | 'other';
+type DocumentType =
+  | 'lab_report'
+  | 'prescription'
+  | 'imaging'
+  | 'insurance'
+  | 'certificate'
+  | 'other';
 type DocOwnerType = 'user' | 'provider';
 type AccessPermission = 'view' | 'download';
 
@@ -18,7 +26,10 @@ const ALLOWED_MIME_TYPES = [
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 export class DocumentController {
-  constructor(private documentService: DocumentService) {}
+  constructor(
+    private documentService: DocumentService,
+    private profileAccess: ProfileAccessService,
+  ) {}
 
   /**
    * POST /documents/upload
@@ -26,16 +37,30 @@ export class DocumentController {
   upload = async ({ store, body, set }: any) => {
     if (!body.title) throw new BadRequestError('title is required');
     if (!body.fileName) throw new BadRequestError('fileName is required');
-    if (!body.fileSize || body.fileSize <= 0) throw new BadRequestError('fileSize must be positive');
-    if (body.fileSize > MAX_FILE_SIZE) throw new BadRequestError('File exceeds maximum size of 50MB');
+    if (!body.fileSize || body.fileSize <= 0)
+      throw new BadRequestError('fileSize must be positive');
+    if (body.fileSize > MAX_FILE_SIZE)
+      throw new BadRequestError('File exceeds maximum size of 50MB');
     if (!body.mimeType) throw new BadRequestError('mimeType is required');
     if (!ALLOWED_MIME_TYPES.includes(body.mimeType)) {
       throw new BadRequestError(`Unsupported MIME type. Allowed: ${ALLOWED_MIME_TYPES.join(', ')}`);
     }
 
+    const ownerType = (body.ownerType as DocOwnerType) || 'user';
+
+    // A patient document is about a subject of care. The header names one when
+    // the client is acting as a dependent; without it, the account owner's own
+    // profile is resolved here rather than in middleware, because a provider
+    // upload reaches this same route and has no profile to resolve.
+    let profileId: string | undefined;
+    if (ownerType === 'user') {
+      profileId =
+        store.activeProfileId || (await this.profileAccess.resolve(store.userId)).profileId;
+    }
+
     const result = await this.documentService.initiateUpload({
       ownerId: store.userId,
-      ownerType: (body.ownerType as DocOwnerType) || 'user',
+      ownerType,
       documentType: (body.documentType as DocumentType) || 'other',
       title: body.title,
       description: body.description,
@@ -44,6 +69,8 @@ export class DocumentController {
       mimeType: body.mimeType,
       tags: body.tags,
       metadata: body.metadata,
+      profileId,
+      reportedAt: body.reportedAt ? new Date(body.reportedAt) : undefined,
     });
 
     set.status = 201;
@@ -51,6 +78,41 @@ export class DocumentController {
       success: true,
       data: result,
       meta: { timestamp: new Date().toISOString() },
+    };
+  };
+
+  /**
+   * GET /profiles/:profileId/reports
+   *
+   * Two ways in, and only two: the account owns the profile, or a provider has
+   * an active booking with it. A provider with no engagement gets the same
+   * answer as a stranger — 404, which does not confirm the profile exists.
+   */
+  reportsForProfile = async ({ params, query, store }: any) => {
+    const isProvider =
+      store.userRole === UserRole.PROVIDER || (store.userRoles ?? []).includes(UserRole.PROVIDER);
+
+    if (isProvider) {
+      const allowed = await this.profileAccess.providerHasAccess(store.userId, params.profileId);
+      if (!allowed) throw new NotFoundError('Profile');
+    } else {
+      await this.profileAccess.assertOwns(store.userId, params.profileId);
+    }
+
+    const pagination = parsePaginationParams(query);
+    const { reports, total } = await this.documentService.getProfileReports(
+      params.profileId,
+      pagination.page,
+      pagination.limit,
+    );
+
+    return {
+      success: true,
+      data: reports,
+      meta: {
+        ...buildPaginationMeta(total, pagination.page, pagination.limit),
+        timestamp: new Date().toISOString(),
+      },
     };
   };
 
@@ -129,7 +191,12 @@ export class DocumentController {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 50));
 
-    const { logs, total } = await this.documentService.getAccessLog(params.id, store.userId, page, limit);
+    const { logs, total } = await this.documentService.getAccessLog(
+      params.id,
+      store.userId,
+      page,
+      limit,
+    );
 
     return {
       success: true,
@@ -221,7 +288,11 @@ export class DocumentController {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 20));
 
-    const { documents, total } = await this.documentService.getSharedWithMe(store.userId, page, limit);
+    const { documents, total } = await this.documentService.getSharedWithMe(
+      store.userId,
+      page,
+      limit,
+    );
 
     return {
       success: true,

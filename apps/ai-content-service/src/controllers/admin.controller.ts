@@ -1,6 +1,6 @@
-import type { EmbeddingService } from '../services/embedding.service.js';
+import { buildPaginationMeta, parsePaginationParams } from '@longeny/utils';
 import type { AdminService } from '../services/admin.service.js';
-import { parsePaginationParams, buildPaginationMeta } from '@longeny/utils';
+import type { EmbeddingService } from '../services/embedding.service.js';
 
 export class AdminController {
   constructor(

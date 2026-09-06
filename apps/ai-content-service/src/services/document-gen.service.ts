@@ -1,12 +1,12 @@
-import { db } from '../db/index.js';
-import { eq, and, sql } from 'drizzle-orm';
-import { generated_documents, prompt_templates, documents } from '../db/schema.js';
-import type { BedrockService } from './bedrock.service.js';
-import type { SafetyService } from './safety.service.js';
-import type { S3Service } from './s3.service.js';
-import { config } from '../config/index.js';
+import { BadRequestError, ForbiddenError, NotFoundError } from '@longeny/errors';
 import { createLogger, createServiceClient } from '@longeny/utils';
-import { NotFoundError, ForbiddenError, BadRequestError } from '@longeny/errors';
+import { and, eq, sql } from 'drizzle-orm';
+import { config } from '../config/index.js';
+import { db } from '../db/index.js';
+import { documents, generated_documents, prompt_templates } from '../db/schema.js';
+import type { BedrockService } from './bedrock.service.js';
+import type { S3Service } from './s3.service.js';
+import type { SafetyService } from './safety.service.js';
 
 const logger = createLogger('ai-content:document-gen');
 
@@ -71,7 +71,7 @@ interface GenerateDocumentInput {
   providerNotes?: string;
 }
 
-interface DocumentContent {
+export interface DocumentContent {
   sections: Array<{ title: string; content: string }>;
   recommendations: string[];
   disclaimers: string[];
@@ -79,7 +79,6 @@ interface DocumentContent {
 
 export class DocumentGenService {
   constructor(
-    _prismaUnused: unknown,
     private bedrockService: BedrockService,
     private safetyService: SafetyService,
     private s3Service: S3Service,
@@ -88,7 +87,10 @@ export class DocumentGenService {
   /**
    * Generate an AI document (prescription, nutrition plan, or training plan).
    */
-  async generate(input: GenerateDocumentInput, correlationId?: string): Promise<{
+  async generate(
+    input: GenerateDocumentInput,
+    correlationId?: string,
+  ): Promise<{
     id: string;
     content: DocumentContent;
     isMock: boolean;
@@ -140,16 +142,19 @@ export class DocumentGenService {
     const content = this.parseDocumentContent(processed);
 
     // 7. Create GeneratedDocument record
-    const [doc] = await db.insert(generated_documents).values({
-      user_id: userId,
-      provider_id: providerId,
-      document_type: documentType,
-      title,
-      content: content as unknown as Record<string, unknown>,
-      raw_ai_response: aiResult.text,
-      status: 'draft',
-      ai_model: aiResult.isMock ? `mock-${modelId}` : modelId,
-    }).returning();
+    const [doc] = await db
+      .insert(generated_documents)
+      .values({
+        user_id: userId,
+        provider_id: providerId,
+        document_type: documentType,
+        title,
+        content: content as unknown as Record<string, unknown>,
+        raw_ai_response: aiResult.text,
+        status: 'draft',
+        ai_model: aiResult.isMock ? `mock-${modelId}` : modelId,
+      })
+      .returning();
 
     logger.info(
       { docId: doc.id, documentType, providerId, isMock: aiResult.isMock },
@@ -164,7 +169,12 @@ export class DocumentGenService {
    */
   async listDocuments(
     providerId: string,
-    filters: { status?: AiDocumentStatus; documentType?: AiDocumentType; page: number; limit: number },
+    filters: {
+      status?: AiDocumentStatus;
+      documentType?: AiDocumentType;
+      page: number;
+      limit: number;
+    },
   ) {
     const conditions = [eq(generated_documents.provider_id, providerId)];
 
@@ -196,10 +206,7 @@ export class DocumentGenService {
         .orderBy(generated_documents.created_at)
         .limit(filters.limit)
         .offset((filters.page - 1) * filters.limit),
-      db
-        .select({ count: sql<number>`COUNT(*)::int` })
-        .from(generated_documents)
-        .where(whereClause),
+      db.select({ count: sql<number>`COUNT(*)::int` }).from(generated_documents).where(whereClause),
     ]);
 
     return { documents: rows, total: count };
@@ -224,11 +231,7 @@ export class DocumentGenService {
   /**
    * Provider approves a document (finalize).
    */
-  async finalizeDocument(
-    id: string,
-    providerId: string,
-    reviewNotes?: string,
-  ) {
+  async finalizeDocument(id: string, providerId: string, reviewNotes?: string) {
     const [doc] = await db
       .select()
       .from(generated_documents)
@@ -238,7 +241,9 @@ export class DocumentGenService {
     if (!doc) throw new NotFoundError('GeneratedDocument', id);
     if (doc.provider_id !== providerId) throw new ForbiddenError('Access denied to this document');
     if (doc.status !== 'draft' && doc.status !== 'pending_review') {
-      throw new BadRequestError('Document can only be finalized from draft or pending_review status');
+      throw new BadRequestError(
+        'Document can only be finalized from draft or pending_review status',
+      );
     }
 
     const [updated] = await db
@@ -261,10 +266,7 @@ export class DocumentGenService {
   /**
    * Share document with patient by creating a Document vault entry.
    */
-  async shareWithPatient(
-    id: string,
-    providerId: string,
-  ) {
+  async shareWithPatient(id: string, providerId: string) {
     const [doc] = await db
       .select()
       .from(generated_documents)
@@ -281,21 +283,24 @@ export class DocumentGenService {
     const s3Key = this.s3Service.buildGeneratedDocumentKey(providerId, doc.document_type, id);
 
     // Create a Document vault entry for the patient
-    const [vaultDoc] = await db.insert(documents).values({
-      owner_id: doc.user_id,
-      owner_type: 'user',
-      document_type: 'prescription',
-      title: doc.title,
-      description: `AI-generated ${doc.document_type.replace('_', ' ')} by provider`,
-      file_key: s3Key,
-      file_name: `${doc.title.replace(/\s+/g, '_')}.pdf`,
-      file_size: BigInt(0), // Will be updated when PDF is actually generated
-      mime_type: 'application/pdf',
-      tags: JSON.stringify([doc.document_type, 'ai-generated']),
-      ai_generated: true,
-      ai_document_id: id,
-      status: 'active',
-    }).returning();
+    const [vaultDoc] = await db
+      .insert(documents)
+      .values({
+        owner_id: doc.user_id,
+        owner_type: 'user',
+        document_type: 'prescription',
+        title: doc.title,
+        description: `AI-generated ${doc.document_type.replace('_', ' ')} by provider`,
+        file_key: s3Key,
+        file_name: `${doc.title.replace(/\s+/g, '_')}.pdf`,
+        file_size: BigInt(0), // Will be updated when PDF is actually generated
+        mime_type: 'application/pdf',
+        tags: JSON.stringify([doc.document_type, 'ai-generated']),
+        ai_generated: true,
+        ai_document_id: id,
+        status: 'active',
+      })
+      .returning();
 
     // Update generated document with S3 key
     await db
@@ -303,7 +308,10 @@ export class DocumentGenService {
       .set({ s3_file_key: s3Key, updated_at: new Date() })
       .where(eq(generated_documents.id, id));
 
-    logger.info({ docId: id, vaultDocId: vaultDoc.id, userId: doc.user_id }, 'Document shared with patient');
+    logger.info(
+      { docId: id, vaultDocId: vaultDoc.id, userId: doc.user_id },
+      'Document shared with patient',
+    );
     return { vaultDocumentId: vaultDoc.id, s3Key };
   }
 
@@ -329,16 +337,15 @@ export class DocumentGenService {
     return { downloadUrl, expiresIn, format: 'pdf' };
   }
 
-  private async getPromptTemplate(documentType: AiDocumentType): Promise<{ system: string; user: string }> {
+  private async getPromptTemplate(
+    documentType: AiDocumentType,
+  ): Promise<{ system: string; user: string }> {
     // Try to load from DB
     const [template] = await db
       .select()
       .from(prompt_templates)
       .where(
-        and(
-          eq(prompt_templates.category, documentType),
-          eq(prompt_templates.status, 'active'),
-        ),
+        and(eq(prompt_templates.category, documentType), eq(prompt_templates.status, 'active')),
       )
       .orderBy(prompt_templates.version)
       .limit(1);

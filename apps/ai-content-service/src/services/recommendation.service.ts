@@ -1,12 +1,12 @@
-import { db } from '../db/index.js';
-import { eq } from 'drizzle-orm';
-import { recommendation_cache } from '../db/schema.js';
-import Redis from 'ioredis';
-import type { BedrockService } from './bedrock.service.js';
-import type { EmbeddingService, EmbeddingEntityType } from './embedding.service.js';
-import type { SafetyService } from './safety.service.js';
-import { config, redisUrl } from '../config/index.js';
 import { createLogger, createServiceClient } from '@longeny/utils';
+import { eq } from 'drizzle-orm';
+import Redis from 'ioredis';
+import { config, redisUrl } from '../config/index.js';
+import { db } from '../db/index.js';
+import { recommendation_cache } from '../db/schema.js';
+import type { BedrockService } from './bedrock.service.js';
+import type { EmbeddingEntityType, EmbeddingService } from './embedding.service.js';
+import type { SafetyService } from './safety.service.js';
 
 const logger = createLogger('ai-content:recommendation');
 
@@ -24,7 +24,7 @@ interface UserHealthProfile {
   dateOfBirth?: string;
 }
 
-interface RecommendationItem {
+export interface RecommendationItem {
   entityType: string;
   entityId: string;
   score: number;
@@ -52,7 +52,6 @@ export class RecommendationService {
   private redis: Redis;
 
   constructor(
-    _prismaUnused: unknown,
     private bedrockService: BedrockService,
     private embeddingService: EmbeddingService,
     private safetyService: SafetyService,
@@ -66,7 +65,7 @@ export class RecommendationService {
   async getRecommendations(
     userId: string,
     type: RecommendationType,
-    limit: number = 10,
+    limit = 10,
     correlationId?: string,
   ): Promise<RecommendationResult> {
     // 1. Check Redis cache
@@ -85,15 +84,16 @@ export class RecommendationService {
     const queryText = this.buildQueryText(userProfile, type);
 
     // 4. Strip PII from query text
-    const { sanitized } = await this.safetyService.processInput(
-      queryText,
-      userId,
-      undefined,
-      { dateOfBirth: userProfile.dateOfBirth },
-    );
+    const { sanitized } = await this.safetyService.processInput(queryText, userId, undefined, {
+      dateOfBirth: userProfile.dateOfBirth,
+    });
 
     // 5. Generate query embedding
-    const embeddingResult = await this.bedrockService.generateEmbedding(sanitized, userId, correlationId);
+    const embeddingResult = await this.bedrockService.generateEmbedding(
+      sanitized,
+      userId,
+      correlationId,
+    );
 
     // 6. Similarity search
     const entityType = this.mapRecommendationTypeToEntityType(type);
@@ -113,7 +113,10 @@ Always respond in valid JSON format with the following structure:
 Never provide medical diagnoses. Focus on matching user preferences and goals to available options.`;
 
     const contextStr = similarResults
-      .map((r, i) => `${i + 1}. [${r.entity_id}] Similarity: ${Number(r.similarity).toFixed(3)} | ${JSON.stringify(r.metadata)}`)
+      .map(
+        (r, i) =>
+          `${i + 1}. [${r.entity_id}] Similarity: ${Number(r.similarity).toFixed(3)} | ${JSON.stringify(r.metadata)}`,
+      )
       .join('\n');
 
     const userPrompt = `User Profile (anonymized): ${sanitized}
@@ -163,9 +166,7 @@ Please re-rank and explain the top ${limit} recommendations for this user.`;
     const [existingCache] = await db
       .select()
       .from(recommendation_cache)
-      .where(
-        eq(recommendation_cache.user_id, userId),
-      )
+      .where(eq(recommendation_cache.user_id, userId))
       .limit(1);
 
     const cacheData = {
@@ -239,7 +240,10 @@ Please re-rank and explain the top ${limit} recommendations for this user.`;
     // Invalidate cache so next request regenerates
     await this.redis.del(`recommendations:${userId}:${cache.recommendation_type}`);
 
-    logger.info({ userId, recommendationId, rating: feedback.rating }, 'Recommendation feedback submitted');
+    logger.info(
+      { userId, recommendationId, rating: feedback.rating },
+      'Recommendation feedback submitted',
+    );
   }
 
   private async fetchUserProfile(userId: string): Promise<UserHealthProfile> {
@@ -274,16 +278,25 @@ Please re-rank and explain the top ${limit} recommendations for this user.`;
 
   private mapRecommendationTypeToEntityType(type: RecommendationType): EmbeddingEntityType {
     switch (type) {
-      case 'providers': return 'provider';
-      case 'programs': return 'program';
-      case 'products': return 'product';
-      default: return 'provider';
+      case 'providers':
+        return 'provider';
+      case 'programs':
+        return 'program';
+      case 'products':
+        return 'product';
+      default:
+        return 'provider';
     }
   }
 
   private parseRecommendations(
     llmResponse: string,
-    similarResults: Array<{ entity_id: string; entity_type: string; similarity: number; metadata: unknown }>,
+    similarResults: Array<{
+      entity_id: string;
+      entity_type: string;
+      similarity: number;
+      metadata: unknown;
+    }>,
     limit: number,
   ): { items: RecommendationItem[]; summary: string } {
     try {
@@ -291,17 +304,19 @@ Please re-rank and explain the top ${limit} recommendations for this user.`;
       const jsonMatch = llmResponse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
-        const recs = (parsed.recommendations || []).slice(0, limit).map((rec: Record<string, unknown>, index: number) => {
-          const similarMatch = similarResults.find((s) => s.entity_id === rec.entityId);
-          return {
-            entityType: similarMatch?.entity_type || 'unknown',
-            entityId: (rec.entityId as string) || similarResults[index]?.entity_id || 'unknown',
-            score: Number(rec.score) || Number(similarMatch?.similarity) || 0,
-            explanation: (rec.explanation as string) || 'Matched based on similarity search.',
-            matchFactors: (rec.matchFactors as string[]) || ['similarity'],
-            metadata: (similarMatch?.metadata as Record<string, unknown>) || {},
-          };
-        });
+        const recs = (parsed.recommendations || [])
+          .slice(0, limit)
+          .map((rec: Record<string, unknown>, index: number) => {
+            const similarMatch = similarResults.find((s) => s.entity_id === rec.entityId);
+            return {
+              entityType: similarMatch?.entity_type || 'unknown',
+              entityId: (rec.entityId as string) || similarResults[index]?.entity_id || 'unknown',
+              score: Number(rec.score) || Number(similarMatch?.similarity) || 0,
+              explanation: (rec.explanation as string) || 'Matched based on similarity search.',
+              matchFactors: (rec.matchFactors as string[]) || ['similarity'],
+              metadata: (similarMatch?.metadata as Record<string, unknown>) || {},
+            };
+          });
 
         return {
           items: recs,

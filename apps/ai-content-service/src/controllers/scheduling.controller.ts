@@ -1,5 +1,5 @@
 import { AppError } from '@longeny/errors';
-import { SchedulingService } from '../services/scheduling.service.js';
+import type { SchedulingService } from '../services/scheduling.service.js';
 
 export class SchedulingController {
   constructor(private readonly schedulingSvc: SchedulingService) {}

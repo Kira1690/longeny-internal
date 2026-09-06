@@ -1,7 +1,8 @@
-import { config } from '../config/index.js';
 import { AppError } from '@longeny/errors';
 import { createLogger } from '@longeny/utils';
+import { config } from '../config/index.js';
 import { publishPatientOnboardingCompleted } from '../events/publishers.js';
+import type { OnboardingOwnershipService } from './onboarding-ownership.service.js';
 
 const BASE = config.AI_AGENT_URL;
 const logger = createLogger('ai-content:matching');
@@ -28,6 +29,8 @@ export interface MatchResult {
 }
 
 export class MatchingService {
+  constructor(private readonly ownership: OnboardingOwnershipService) {}
+
   async match(sessionId: string, userId: string): Promise<MatchResult> {
     const res = await fetch(`${BASE}/ai/provider/match`, {
       method: 'POST',
@@ -46,17 +49,34 @@ export class MatchingService {
     return result;
   }
 
-  /** Fetch the finalize payload and emit patient.onboarding.completed for durable persistence. */
+  /**
+   * Fetch the finalize payload and emit patient.onboarding.completed for durable
+   * persistence.
+   *
+   * The event carries the profile the session was started for. Without it the
+   * subscriber wrote every completed onboarding onto the account owner's own
+   * profile, so a session filled in for a parent landed on the wrong person.
+   */
   private async persistOnboarding(sessionId: string, authId: string): Promise<void> {
     try {
       const res = await fetch(`${BASE}/ai/onboarding/finalize/${sessionId}`);
       if (!res.ok) {
-        logger.warn({ sessionId, status: res.status }, 'Could not fetch final payload for persistence');
+        logger.warn(
+          { sessionId, status: res.status },
+          'Could not fetch final payload for persistence',
+        );
         return;
       }
       const finalPayload = (await res.json()) as Record<string, unknown>;
       if (!finalPayload || typeof finalPayload !== 'object') return;
-      await publishPatientOnboardingCompleted({ authId, sessionId, finalPayload });
+      const profileId = await this.ownership.profileFor(sessionId);
+      await publishPatientOnboardingCompleted({
+        authId,
+        sessionId,
+        finalPayload,
+        ...(profileId ? { profileId } : {}),
+      });
+      await this.ownership.markComplete(sessionId);
     } catch (error) {
       logger.error({ error, sessionId }, 'Failed to publish onboarding-completed event');
     }

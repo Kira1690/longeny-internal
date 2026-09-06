@@ -1,10 +1,11 @@
-import { Elysia } from 'elysia';
 import { requireAuth, requireConsent } from '@longeny/middleware';
+import { ConsentType } from '@longeny/types';
+import { Elysia } from 'elysia';
 import type { RecommendationController } from '../controllers/recommendation.controller.js';
 
-export function createRecommendationRoutes(controller: RecommendationController): Elysia {
+export function createRecommendationRoutes(controller: RecommendationController) {
   const authRequired = requireAuth();
-  const consentRequired = requireConsent('ai_profiling');
+  const consentRequired = requireConsent(ConsentType.AI_PROFILING);
 
   return new Elysia({ prefix: '/ai/recommendations' })
     .use(authRequired)

@@ -1,12 +1,12 @@
 import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
   DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { config } from '../config/index.js';
 import { createLogger } from '@longeny/utils';
+import { config } from '../config/index.js';
 
 const logger = createLogger('ai-content:s3');
 
@@ -54,7 +54,7 @@ export class S3Service {
    */
   async generateDownloadUrl(
     key: string,
-    expiresIn: number = 3600, // 1 hour default
+    expiresIn = 3600, // 1 hour default
     bucket?: string,
   ): Promise<{ downloadUrl: string; expiresIn: number }> {
     const targetBucket = bucket || config.S3_DOCUMENTS_BUCKET;
@@ -82,7 +82,12 @@ export class S3Service {
   ): Promise<void> {
     const targetBucket = bucket || config.S3_UPLOADS_BUCKET;
     await s3Client.send(
-      new PutObjectCommand({ Bucket: targetBucket, Key: key, Body: body, ContentType: contentType }),
+      new PutObjectCommand({
+        Bucket: targetBucket,
+        Key: key,
+        Body: body,
+        ContentType: contentType,
+      }),
     );
     logger.debug({ key, bucket: targetBucket }, 'Uploaded object to S3');
   }

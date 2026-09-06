@@ -1,5 +1,5 @@
-import { config } from '../config/index.js';
 import { AppError } from '@longeny/errors';
+import { config } from '../config/index.js';
 
 const BASE = config.AI_AGENT_URL;
 
@@ -7,7 +7,7 @@ export class PostOnboardingService {
   async startSession(
     sessionId: string,
     onboardingSessionId: string,
-    userId: string = '',
+    userId = '',
   ): Promise<{ session_id: string; first_message: string }> {
     const res = await fetch(`${BASE}/ai/post-onboarding/session`, {
       method: 'POST',

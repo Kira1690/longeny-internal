@@ -1,4 +1,4 @@
-import { NotificationService } from '../services/notification.service.js';
+import type { NotificationService } from '../services/notification.service.js';
 
 export class NotificationController {
   constructor(private readonly notifySvc: NotificationService) {}

@@ -1,5 +1,8 @@
-import type { RecommendationService, RecommendationType } from '../services/recommendation.service.js';
 import { BadRequestError } from '@longeny/errors';
+import type {
+  RecommendationService,
+  RecommendationType,
+} from '../services/recommendation.service.js';
 
 export class RecommendationController {
   constructor(private recommendationService: RecommendationService) {}
@@ -26,10 +29,9 @@ export class RecommendationController {
     ]);
 
     // Merge and sort by score
-    const combined = [
-      ...providerResult.recommendations,
-      ...programResult.recommendations,
-    ].sort((a, b) => b.score - a.score).slice(0, limit);
+    const combined = [...providerResult.recommendations, ...programResult.recommendations]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
 
     return {
       success: true,

@@ -1,5 +1,5 @@
 import { AppError } from '@longeny/errors';
-import { PostOnboardingService } from '../services/post-onboarding.service.js';
+import type { PostOnboardingService } from '../services/post-onboarding.service.js';
 
 export class PostOnboardingController {
   constructor(private readonly svc: PostOnboardingService) {}
@@ -12,11 +12,7 @@ export class PostOnboardingController {
     store: { userId: string };
   }) {
     const sessionId = crypto.randomUUID();
-    const result = await this.svc.startSession(
-      sessionId,
-      body.onboarding_session_id,
-      store.userId,
-    );
+    const result = await this.svc.startSession(sessionId, body.onboarding_session_id, store.userId);
     return { success: true, data: result };
   }
 

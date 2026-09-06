@@ -1,9 +1,9 @@
-import { Elysia } from 'elysia';
 import { verifyHmac } from '@longeny/middleware';
+import { Elysia } from 'elysia';
 import { config } from '../config/index.js';
 import type { InternalController } from '../controllers/internal.controller.js';
 
-export function createInternalRoutes(controller: InternalController): Elysia {
+export function createInternalRoutes(controller: InternalController) {
   return new Elysia({ prefix: '/internal' })
     .use(verifyHmac(config.HMAC_SECRET))
     .post('/embeddings/generate', controller.generateEmbedding)

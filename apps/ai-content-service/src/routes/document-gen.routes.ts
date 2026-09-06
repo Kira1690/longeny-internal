@@ -1,10 +1,11 @@
-import { Elysia } from 'elysia';
 import { requireAuth, requireRole } from '@longeny/middleware';
+import { UserRole } from '@longeny/types';
+import { Elysia } from 'elysia';
 import type { DocumentGenController } from '../controllers/document-gen.controller.js';
 
-export function createDocumentGenRoutes(controller: DocumentGenController): Elysia {
+export function createDocumentGenRoutes(controller: DocumentGenController) {
   const authRequired = requireAuth();
-  const providerRequired = requireRole('provider');
+  const providerRequired = requireRole(UserRole.PROVIDER);
 
   return new Elysia({ prefix: '/ai/documents' })
     .use(authRequired)

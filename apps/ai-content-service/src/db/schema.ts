@@ -1,18 +1,19 @@
+import type { RroPillar, RroState } from '@longeny/types';
 import {
-  pgTable,
+  bigint,
+  boolean,
+  customType,
+  index,
+  integer,
+  json,
+  numeric,
   pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  unique,
   uuid,
   varchar,
-  text,
-  boolean,
-  integer,
-  bigint,
-  numeric,
-  timestamp,
-  json,
-  customType,
-  unique,
-  index,
 } from 'drizzle-orm/pg-core';
 
 // ─────────────────────────────────────────────────────────────
@@ -20,8 +21,9 @@ import {
 // ─────────────────────────────────────────────────────────────
 
 const vector = customType<{ data: number[]; driverData: string }>({
-  dataType(config?: { dimensions?: number }) {
-    return config?.dimensions ? `vector(${config.dimensions})` : 'vector';
+  dataType(config: unknown) {
+    const dimensions = (config as { dimensions?: number } | undefined)?.dimensions;
+    return dimensions ? `vector(${dimensions})` : 'vector';
   },
   toDriver(value: number[]): string {
     return `[${value.join(',')}]`;
@@ -101,12 +103,7 @@ export const documentTypeEnum = pgEnum('DocumentType', [
   'other',
 ]);
 
-export const docStatusEnum = pgEnum('DocStatus', [
-  'processing',
-  'active',
-  'archived',
-  'deleted',
-]);
+export const docStatusEnum = pgEnum('DocStatus', ['processing', 'active', 'archived', 'deleted']);
 
 export const accessPermissionEnum = pgEnum('AccessPermission', ['view', 'download']);
 
@@ -133,7 +130,9 @@ export const embeddings = pgTable(
     entity_id: uuid('entity_id').notNull(),
     embedding: vector('embedding', { dimensions: 1024 }).notNull(),
     metadata: json('metadata').default({}).notNull(),
-    model_version: varchar('model_version', { length: 50 }).default('amazon.titan-embed-text-v2').notNull(),
+    model_version: varchar('model_version', { length: 50 })
+      .default('amazon.titan-embed-text-v2')
+      .notNull(),
     created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -268,7 +267,16 @@ export const documents = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     owner_id: uuid('owner_id').notNull(),
     owner_type: docOwnerTypeEnum('owner_type').notNull(),
+    /**
+     * Subject of care this document belongs to. Nullable for rows written before
+     * the multi-profile model existed; those are backfilled to the owner's own
+     * `self` profile. A provider-owned document (owner_type: 'provider') has no
+     * profile — it belongs to the practice, not to a patient.
+     */
+    profile_id: uuid('profile_id'),
     document_type: documentTypeEnum('document_type').notNull(),
+    /** When the report was produced, which is not when it was uploaded. */
+    reported_at: timestamp('reported_at', { withTimezone: true }),
     title: varchar('title', { length: 300 }).notNull(),
     description: text('description'),
     file_key: varchar('file_key', { length: 500 }).notNull(),
@@ -291,6 +299,8 @@ export const documents = pgTable(
   (t) => ({
     idx_owner: index('documents_owner_idx').on(t.owner_id, t.owner_type),
     idx_status: index('documents_status_idx').on(t.status),
+    // The reports timeline reads one profile ordered by report date.
+    idx_profile: index('documents_profile_idx').on(t.profile_id, t.reported_at),
   }),
 );
 
@@ -385,3 +395,265 @@ export const processed_events = pgTable('processed_events', {
   event_type: varchar('event_type', { length: 100 }).notNull(),
   processed_at: timestamp('processed_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ─────────────────────────────────────────────────────────────
+// RRO Module — intake, AI classification, pre-consult summary, care plans
+//
+// This service holds the patient-facing clinical inputs and the model output
+// derived from them. Profiles live in longeny_core, a different database, so
+// every row here carries a profile_id that was resolved — and ownership-checked
+// — through user-provider's /internal/profiles/resolve before the row was
+// written. There is deliberately no foreign key: it would cross a database
+// boundary, and the check that matters happens before the insert, not after.
+// ─────────────────────────────────────────────────────────────
+
+export const rroStateEnum = pgEnum('rro_state_value', ['intake', 'reverse', 'restore', 'optimise']);
+export const rroPillarEnum = pgEnum('rro_pillar', [
+  'nutrition',
+  'movement',
+  'sleep',
+  'stress',
+  'environment',
+]);
+/** Which implementation produced a classification. See plan/rro/week-07-ai-core.md D-2. */
+export const aiProviderEnum = pgEnum('ai_provider', ['bedrock', 'rules']);
+export const carePlanStatusEnum = pgEnum('care_plan_status', [
+  'draft',
+  'pending_approval',
+  'approved',
+  'superseded',
+]);
+
+// ── Taxonomy drift guard ─────────────────────────────────────────────────────
+// Literals for the same reason as in user-provider: drizzle-kit loads this file
+// through a CJS require and a runtime import from @longeny/types breaks
+// migration generation. These assertions fail to compile if a database enum and
+// the shared taxonomy disagree, in either direction.
+type MustExtend<Sub extends Super, Super> = Sub;
+
+type _DbStatesInTaxonomy = MustExtend<(typeof rroStateEnum.enumValues)[number], RroState>;
+type _TaxonomyStatesInDb = MustExtend<RroState, (typeof rroStateEnum.enumValues)[number]>;
+
+type _DbPillarsInTaxonomy = MustExtend<(typeof rroPillarEnum.enumValues)[number], RroPillar>;
+type _TaxonomyPillarsInDb = MustExtend<RroPillar, (typeof rroPillarEnum.enumValues)[number]>;
+
+/**
+ * Intake is versioned, never updated in place.
+ *
+ * A stored classification has to stay explainable: it was derived from one
+ * specific set of answers, and overwriting those answers would leave a clinical
+ * decision with no visible input. A resubmission therefore writes version n+1
+ * and leaves n where it is.
+ */
+export const intake_submissions = pgTable(
+  'intake_submissions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    profile_id: uuid('profile_id').notNull(),
+    /** Account that submitted it — the JWT sub, kept for audit, never for scoping. */
+    submitted_by_auth_id: uuid('submitted_by_auth_id').notNull(),
+    version: integer('version').notNull(),
+    symptoms: json('symptoms').$type<string[]>().default([]).notNull(),
+    goals: json('goals').$type<string[]>().default([]).notNull(),
+    conditions: json('conditions').$type<string[]>().default([]).notNull(),
+    medications: json('medications').$type<string[]>().default([]).notNull(),
+    // Typed to the taxonomy, not string[], so a row read back feeds the AI
+    // contract without a cast. Only validated writes reach this column.
+    pillar_priorities: json('pillar_priorities').$type<RroPillar[]>().default([]).notNull(),
+    notes: text('notes'),
+    submitted_at: timestamp('submitted_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    unique_version: unique('intake_profile_version_unique').on(t.profile_id, t.version),
+    idx_profile: index('intake_profile_idx').on(t.profile_id, t.version),
+    idx_submitted: index('intake_submitted_idx').on(t.profile_id, t.submitted_at),
+  }),
+);
+
+/**
+ * One row per classification attempt, including the ones that changed nothing.
+ *
+ * `transitioned` records whether this classification actually moved the profile.
+ * A low-confidence result, or one whose target state the taxonomy forbids, is
+ * stored with `transitioned: false` and the reason — the attempt is evidence
+ * even when it was refused.
+ */
+export const rro_classifications = pgTable(
+  'rro_classifications',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    profile_id: uuid('profile_id').notNull(),
+    intake_id: uuid('intake_id'),
+    intake_version: integer('intake_version'),
+    provider: aiProviderEnum('provider').notNull(),
+    model_id: varchar('model_id', { length: 100 }),
+    contract_version: varchar('contract_version', { length: 10 }).notNull(),
+    prompt_version: varchar('prompt_version', { length: 20 }).notNull(),
+    state: rroStateEnum('state'),
+    confidence: numeric('confidence', { precision: 4, scale: 3 }),
+    pillar_priorities: json('pillar_priorities').$type<RroPillar[]>().default([]).notNull(),
+    rationale: text('rationale'),
+    missing_data: json('missing_data').$type<string[]>().default([]).notNull(),
+    /** Set when the model declined; mutually exclusive with `state`. */
+    refused_reason: varchar('refused_reason', { length: 40 }),
+    refused_detail: text('refused_detail'),
+    transitioned: boolean('transitioned').default(false).notNull(),
+    not_transitioned_reason: varchar('not_transitioned_reason', { length: 60 }),
+    latency_ms: integer('latency_ms'),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    idx_profile: index('rro_classification_profile_idx').on(t.profile_id, t.created_at),
+    idx_intake: index('rro_classification_intake_idx').on(t.intake_id),
+  }),
+);
+
+/**
+ * Pre-consult summary, stored so the Week 8 workspace can read it without
+ * paying for the model again. Tied to the intake version it was derived from:
+ * a summary whose input has since changed is stale, and the workspace has to be
+ * able to tell.
+ */
+export const rro_summaries = pgTable(
+  'rro_summaries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    profile_id: uuid('profile_id').notNull(),
+    intake_id: uuid('intake_id'),
+    intake_version: integer('intake_version'),
+    provider: aiProviderEnum('provider').notNull(),
+    model_id: varchar('model_id', { length: 100 }),
+    contract_version: varchar('contract_version', { length: 10 }).notNull(),
+    prompt_version: varchar('prompt_version', { length: 20 }).notNull(),
+    current_state: rroStateEnum('current_state'),
+    concerns: json('concerns').$type<string[]>().default([]).notNull(),
+    missing_data: json('missing_data').$type<string[]>().default([]).notNull(),
+    red_flags: json('red_flags').$type<unknown[]>().default([]).notNull(),
+    suggested_questions: json('suggested_questions').$type<string[]>().default([]).notNull(),
+    /** False means the model declined for lack of input. Never a clinical finding. */
+    sufficient_data: boolean('sufficient_data').default(false).notNull(),
+    refused_reason: varchar('refused_reason', { length: 40 }),
+    refused_detail: text('refused_detail'),
+    latency_ms: integer('latency_ms'),
+    generated_at: timestamp('generated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    idx_profile: index('rro_summary_profile_idx').on(t.profile_id, t.generated_at),
+  }),
+);
+
+/**
+ * D6 — care plans and their versions. Created this week per the plan sheet;
+ * the endpoints that write them are Week 9.
+ */
+export const care_plans = pgTable(
+  'care_plans',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    profile_id: uuid('profile_id').notNull(),
+    created_by: uuid('created_by').notNull(),
+    title: varchar('title', { length: 300 }).notNull(),
+    state_at_creation: rroStateEnum('state_at_creation'),
+    pillars: json('pillars').$type<string[]>().default([]).notNull(),
+    status: carePlanStatusEnum('status').default('draft').notNull(),
+    current_version: integer('current_version').default(1).notNull(),
+    approved_by: uuid('approved_by'),
+    approved_at: timestamp('approved_at', { withTimezone: true }),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    idx_profile: index('care_plan_profile_idx').on(t.profile_id, t.created_at),
+    idx_status: index('care_plan_status_idx').on(t.status),
+  }),
+);
+
+export const plan_versions = pgTable(
+  'plan_versions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    care_plan_id: uuid('care_plan_id').notNull(),
+    version_number: integer('version_number').notNull(),
+    content: json('content').$type<Record<string, unknown>>().default({}).notNull(),
+    change_summary: text('change_summary'),
+    created_by: uuid('created_by').notNull(),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    unique_version: unique('plan_version_unique').on(t.care_plan_id, t.version_number),
+    idx_plan: index('plan_version_plan_idx').on(t.care_plan_id),
+  }),
+);
+
+/**
+ * Health-data access trail for this service.
+ *
+ * user-provider has a table of the same shape. The two are deliberately not one
+ * table: an audit row must be durable at the moment of the access, and routing
+ * it through another service would mean losing rows whenever that service is
+ * down — silently, because an audit write may never fail the request it records.
+ * What is shared is the contract: both sinks are written from the same
+ * `AuditEntry` type in `@longeny/middleware`, so an access review reads the same
+ * columns in both databases.
+ *
+ * Append-only is enforced in the database (see db/enforce-append-only.sql).
+ */
+export const phi_access_log = pgTable(
+  'phi_access_log',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    actor_id: varchar('actor_id', { length: 64 }).notNull(),
+    actor_role: varchar('actor_role', { length: 50 }),
+    profile_id: uuid('profile_id'),
+    action: varchar('action', { length: 100 }).notNull(),
+    resource_type: varchar('resource_type', { length: 50 }),
+    resource_id: varchar('resource_id', { length: 64 }),
+    purpose: varchar('purpose', { length: 100 }).notNull(),
+    method: varchar('method', { length: 10 }).notNull(),
+    path: text('path').notNull(),
+    status_code: integer('status_code').notNull(),
+    success: boolean('success').notNull(),
+    duration_ms: integer('duration_ms').notNull(),
+    ip: varchar('ip', { length: 64 }),
+    user_agent: text('user_agent'),
+    correlation_id: varchar('correlation_id', { length: 100 }),
+    occurred_at: timestamp('occurred_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    idx_profile: index('ai_phi_access_log_profile_idx').on(t.profile_id, t.occurred_at),
+    idx_actor: index('ai_phi_access_log_actor_idx').on(t.actor_id, t.occurred_at),
+    // Denials are what an access review looks for first.
+    idx_denied: index('ai_phi_access_log_denied_idx').on(t.success, t.occurred_at),
+  }),
+);
+
+/**
+ * Who owns an AI onboarding session, and which profile it is about.
+ *
+ * The conversation itself lives in the Python onboarding agent, keyed by a
+ * session id it generates. Nothing here recorded who that session belonged to,
+ * so `GET /ai/onboarding/session/{id}` handed any authenticated caller any
+ * session — and a session transcript carries symptoms and conditions.
+ *
+ * This table is the ownership record: written when a session starts, checked on
+ * every read. It also carries the profile, so a session started for a parent
+ * profile persists to that parent rather than to the account owner.
+ */
+export const onboarding_sessions = pgTable(
+  'onboarding_sessions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** The agent's session id. Opaque to us, unique per conversation. */
+    session_id: varchar('session_id', { length: 128 }).notNull().unique(),
+    /** Account that started it — the JWT sub. */
+    auth_id: uuid('auth_id').notNull(),
+    /** Subject of care the session is about. */
+    profile_id: uuid('profile_id').notNull(),
+    completed_at: timestamp('completed_at', { withTimezone: true }),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    idx_auth: index('onboarding_session_auth_idx').on(t.auth_id, t.created_at),
+    idx_profile: index('onboarding_session_profile_idx').on(t.profile_id),
+  }),
+);

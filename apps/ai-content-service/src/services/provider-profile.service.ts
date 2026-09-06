@@ -1,5 +1,5 @@
-import { config } from '../config/index.js';
 import { AppError } from '@longeny/errors';
+import { config } from '../config/index.js';
 
 const BASE = config.AI_AGENT_URL;
 
@@ -15,8 +15,22 @@ export interface ProviderProfileInput {
   bio?: string;
 }
 
-export interface ProviderProfile extends ProviderProfileInput {
+/**
+ * What the profile API actually returns: absent values come back as null, not
+ * as missing keys. Declaring them optional made the type disagree with the
+ * documented response schema on every route that returns a profile.
+ */
+export interface ProviderProfile {
   provider_id: string;
+  specialties: string[];
+  conditions_treated: string[];
+  consultation_modes: string[];
+  languages: string[];
+  city: string | null;
+  hourly_rate_inr: number | null;
+  years_experience: number | null;
+  availability_rules: Record<string, unknown> | null;
+  bio: string | null;
   rating: number;
   total_consultations: number;
   is_active: boolean;
@@ -42,7 +56,9 @@ export class ProviderProfileService {
     return res.json() as Promise<ProviderProfile>;
   }
 
-  async list(filters?: { specialty?: string; city?: string; mode?: string }): Promise<ProviderProfile[]> {
+  async list(filters?: { specialty?: string; city?: string; mode?: string }): Promise<
+    ProviderProfile[]
+  > {
     const params = new URLSearchParams();
     if (filters?.specialty) params.set('specialty', filters.specialty);
     if (filters?.city) params.set('city', filters.city);
