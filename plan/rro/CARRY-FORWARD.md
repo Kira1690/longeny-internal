@@ -89,65 +89,38 @@ Sequencing, not hours, is what will cost a rebuild:
 
 ---
 
-## G. Next session starts here — Week 7 verification
+## G. Week 7 verification — done 2026-09-06
 
-The task on resuming: **test Week 7 end to end, then migrate it.** Concretely:
+Everything §G asked for, except the migration to the client repo, which was deliberately
+not done: this pass was internal-repo only, by instruction.
 
-### G1. Protect the work first
-`longeny-internal` has **265 uncommitted files** and a last commit of `0eafab0`
-(2026-08-16). Weeks 6, 7 and the V-W7-7 fixes exist only in the working tree. Committing
-is not a card — it is the definition of done on every card, and nothing has met it. Do this
-before editing anything.
-
-### G2. Finish V-W7-7
-Six defects were fixed on 2026-09-03/04; typecheck 15/15 and lint are clean. Still open:
-- **`consent_type` pg enum + migration.** The validator now takes `CAREGIVER_CONSENT_TYPES`,
-  but the column is still `varchar(100)`. Safe as it stands (the validator is the effective
-  gate) but the card is not done. The migration must map any off-list rows, not drop them.
-- The E2E suites have **not** been run against these changes.
-
-What changed, so the tests can be read against it:
-
-| Change | File |
+| | Result |
 |---|---|
-| `assertOwnership` rejects a non-uuid (400) and a non-active profile (404), with an opt-in `includeInactive` used only by `deactivateProfile` | `user-provider-service/src/services/profile.service.ts` |
-| `blankAsAbsent()` — optional fields treat `""` as absent | `user-provider-service/src/validators/index.ts` |
-| `consentType` is `z.enum(CAREGIVER_CONSENT_TYPES)` | same |
-| `CAREGIVER_CONSENT_TYPES` added | `packages/types/src/enums.ts` |
-| `documented(schema, example)` — second argument sets the OpenAPI example | `packages/openapi/src/index.ts` |
-| Executable examples on the four profile write routes | `user-provider-service/src/routes/profile.routes.ts` |
+| G1 Commit | 265 files in nine commits from `0eafab0`, plus two more for the fixes below. Working tree clean. |
+| G2 `consent_type` | Now the `caregiver_consent_type` pg enum. Migration `0004` maps off-taxonomy rows rather than dropping them and aborts loudly on anything it cannot map — two live rows held `caregiver_access` and would have failed the generated cast. Verified: the column itself refuses an off-list value. |
+| G3 Suites | **12/12 pass, 646 checks + 7 unit assertions, 0 failures**, on real Postgres, Redis and SMTP. Baseline was 606. |
+| G4 Regression tests | Six sections added (29–34), all green. |
+| G5 Migrate | **Not done — internal only this pass.** Still open under V-W7-7. |
 
-### G3. Run the suites
-`./scripts/run-e2e.sh` — real Postgres, Redis and SMTP, no mocks. Twelve suites:
+### What the run found that §G did not know about
 
-```
-auth-rbac · profiles-rro · profile-scoping · compliance
-intake-rro · ai-classify · reports-timeline
-booking-profile · bookings-ownership · calendar-oauth-state
-gateway-routing · payments-rbac
-```
+A seventh defect, and the reason it survived the first fix: **the internal HMAC routes never
+pass through `assertOwnership`**, and three of them checked only that the profile row
+existed. A deactivated profile stayed reachable through `notifyProfile`, `recordTransition`
+and `getRroStateForService`. The first of those actually delivered mail to a removed person
+— confirmed by reading mailpit, not by trusting the API's own answer.
 
-Baseline before these fixes was **606 checks, 0 failures**. Expect movement in
-`profiles-rro` and `compliance`, which touch consent and deactivation.
+All three now share `assertActiveProfileForService()`. See D7 and D8, and the new line in
+the per-card checklist in [00-engineering-standards.md](./00-engineering-standards.md).
 
-### G4. New regression tests the fixes require
-None of these existed; V-W7-7 is not done without them.
-- A deleted profile answers 404 on get, patch, rro-state, consent and notification-targets.
-- A message sent to a deleted profile is **not delivered** — this is the one that mattered.
-- A malformed uuid on any `{id}` route returns 400, never 500.
-- `email: ""` and `documentUrl: ""` are accepted as absent.
-- An unknown `consentType` is rejected.
-- Every generated Swagger example on the profiles surface executes as-is.
+### Still open
 
-### G5. Then migrate
-Week 7's 12 endpoints to `BraveLabs/` under the Week 7 cards, per the two-repo rule in the
-root `CLAUDE.md`. Scope-scan the diff first: no Claude reference, no internal-notes content,
-no plan/rro content, nothing outside the week's cards.
-
-### G6. Unresolved, needs the user
+- **Migrate Week 7's 12 endpoints to `BraveLabs/`** under the Week 7 cards. Scope-scan the
+  diff first: no Claude reference, no `internal-notes/` content, no `plan/rro/` content,
+  nothing outside the week's cards.
 - **Vishal is at 44h against a 35h cap.** V-W7-7 added 9h. The card proposes moving
-  V-W7-5 (D2, 6h) to Week 8 and taking 3h out of R6. Not decided.
-- A1 and A2 in section A need Vijay **before Week 8 starts**.
+  V-W7-5 (D2, 6h) to Week 8 and taking 3h out of R6. **Not decided.**
+- **A1 and A2 in section A need Vijay before Week 8 starts.**
 
 ---
 
