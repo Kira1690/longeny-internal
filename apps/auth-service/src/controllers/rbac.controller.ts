@@ -1,12 +1,12 @@
+import { createAuditLog } from '../services/audit.service.js';
 import {
-  listRoles,
+  assignUserRoles,
   createRole,
   getRolePermissions,
-  updateRolePermissions,
   getUserRoles,
-  assignUserRoles,
+  listRoles,
+  updateRolePermissions,
 } from '../services/rbac.service.js';
-import { createAuditLog } from '../services/audit.service.js';
 
 function getIp(request: Request): string {
   return (

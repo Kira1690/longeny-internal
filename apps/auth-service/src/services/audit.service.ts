@@ -1,7 +1,7 @@
 import { sha256 } from '@longeny/utils';
+import { desc, eq } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { audit_logs } from '../db/schema.js';
-import { eq, desc } from 'drizzle-orm';
 
 export function initAuditService(_unused: unknown): void {
   // no-op — Drizzle db is a module-level singleton
@@ -90,7 +90,7 @@ export async function queryAuditLogs(params: QueryAuditLogsParams) {
   // Build where conditions
   const conditions: any[] = [];
   if (eventType) conditions.push(eq(audit_logs.event_type, eventType));
-  if (credentialId) conditions.push(eq(audit_logs.credential_id!, credentialId));
+  if (credentialId) conditions.push(eq(audit_logs.credential_id, credentialId));
 
   const { and: drizzleAnd, gte, lte } = await import('drizzle-orm');
   if (startDate) conditions.push(gte(audit_logs.created_at, new Date(startDate)));
@@ -135,7 +135,7 @@ export async function anonymizeAuditLogs(credentialId: string): Promise<number> 
       user_agent: '[ANONYMIZED]',
       metadata: {},
     })
-    .where(eq(audit_logs.credential_id!, credentialId))
+    .where(eq(audit_logs.credential_id, credentialId))
     .returning({ id: audit_logs.id });
 
   return result.length;

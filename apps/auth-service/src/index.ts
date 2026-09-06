@@ -1,10 +1,10 @@
-import Redis from 'ioredis';
 import { createLogger } from '@longeny/utils';
+import Redis from 'ioredis';
+import app from './app.js';
 import { config, redisUrl } from './config/index.js';
-import { initTokenService } from './services/token.service.js';
 import { initPublisher } from './events/publishers.js';
 import { initSubscribers, startSubscribers } from './events/subscribers.js';
-import app from './app.js';
+import { initTokenService } from './services/token.service.js';
 
 const logger = createLogger('auth-service');
 

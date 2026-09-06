@@ -1,9 +1,30 @@
-import { register, login, verifyEmail, forgotPassword, resetPassword, changePassword } from '../services/auth.service.js';
-import { rotateRefreshToken, blacklistAccessToken, revokeAllSessions, revokeSession, getActiveSessions, verifyAccessToken, invalidateAllUserTokens } from '../services/token.service.js';
-import { googleAuth } from '../services/oauth.service.js';
-import { listConsents, grantConsent, revokeConsent } from '../services/consent.service.js';
+import {
+  publishConsentChanged,
+  publishConsentGranted,
+  publishConsentRevoked,
+  publishUserLogin,
+  publishUserRegistered,
+} from '../events/publishers.js';
 import { queryAuditLogs } from '../services/audit.service.js';
-import { publishUserRegistered, publishUserLogin, publishConsentGranted, publishConsentRevoked, publishConsentChanged } from '../events/publishers.js';
+import {
+  changePassword,
+  forgotPassword,
+  login,
+  register,
+  resetPassword,
+  verifyEmail,
+} from '../services/auth.service.js';
+import { grantConsent, listConsents, revokeConsent } from '../services/consent.service.js';
+import { googleAuth } from '../services/oauth.service.js';
+import {
+  blacklistAccessToken,
+  getActiveSessions,
+  invalidateAllUserTokens,
+  revokeAllSessions,
+  revokeSession,
+  rotateRefreshToken,
+  verifyAccessToken,
+} from '../services/token.service.js';
 
 function getIp(request: Request): string {
   return (
@@ -29,7 +50,13 @@ export async function handleRegister({ body, request, set, store }: any) {
 
   const result = await register(body.email, body.password, body.firstName, body.lastName, ip, ua);
 
-  await publishUserRegistered(result.credential.id, body.email, body.firstName, body.lastName, getCorrelationId(request));
+  await publishUserRegistered(
+    result.credential.id,
+    body.email,
+    body.firstName,
+    body.lastName,
+    getCorrelationId(request),
+  );
 
   set.status = 201;
   return {
@@ -121,9 +148,20 @@ export async function handleGoogleAuth({ body, request, set }: any) {
   const result = await googleAuth(body, ip, ua);
 
   if (result.isNewUser) {
-    await publishUserRegistered(result.credential.id, result.credential.email, '', '', getCorrelationId(request));
+    await publishUserRegistered(
+      result.credential.id,
+      result.credential.email,
+      '',
+      '',
+      getCorrelationId(request),
+    );
   } else {
-    await publishUserLogin(result.credential.id, result.credential.email, ip, getCorrelationId(request));
+    await publishUserLogin(
+      result.credential.id,
+      result.credential.email,
+      ip,
+      getCorrelationId(request),
+    );
   }
 
   set.status = result.isNewUser ? 201 : 200;
@@ -253,7 +291,13 @@ export async function handleGrantConsent({ body, request, store, set }: any) {
   const consent = await grantConsent(userId, body.consentType, body.version, ip, ua);
 
   await publishConsentGranted(userId, body.consentType, body.version, getCorrelationId(request));
-  await publishConsentChanged(userId, body.consentType, true, body.version, getCorrelationId(request));
+  await publishConsentChanged(
+    userId,
+    body.consentType,
+    true,
+    body.version,
+    getCorrelationId(request),
+  );
 
   set.status = 201;
   return {
@@ -284,8 +328,8 @@ export async function handleRevokeConsent({ params, request, store }: any) {
 // ── Admin Endpoints ──
 
 export async function handleGetAuditLog({ query }: any) {
-  const page = parseInt(query.page || '1', 10);
-  const limit = Math.min(parseInt(query.limit || '50', 10), 100);
+  const page = Number.parseInt(query.page || '1', 10);
+  const limit = Math.min(Number.parseInt(query.limit || '50', 10), 100);
   const eventType = query.event_type || undefined;
   const credentialId = query.credential_id || undefined;
   const startDate = query.start_date || undefined;

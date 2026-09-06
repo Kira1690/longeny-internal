@@ -1,4 +1,4 @@
-import { loadConfig, authConfigSchema, type AuthConfig } from '@longeny/config';
+import { type AuthConfig, authConfigSchema, loadConfig } from '@longeny/config';
 
 export const config: AuthConfig = loadConfig(authConfigSchema);
 

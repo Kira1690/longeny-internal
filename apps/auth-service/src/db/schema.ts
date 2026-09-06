@@ -1,13 +1,13 @@
 import {
-  pgTable,
-  uuid,
-  text,
-  varchar,
   boolean,
   integer,
-  timestamp,
   jsonb,
   pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  varchar,
 } from 'drizzle-orm/pg-core';
 
 // ─────────────────────────────────────────────────────────────

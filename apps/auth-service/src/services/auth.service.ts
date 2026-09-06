@@ -1,16 +1,36 @@
 import crypto from 'node:crypto';
 import {
-  ConflictError,
-  BadRequestError,
-  UnauthorizedError,
-  NotFoundError,
   AccountLockedError,
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+  UnauthorizedError,
 } from '@longeny/errors';
+import { and, eq, gt, isNull } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { credentials, roles, user_roles, role_permissions, permissions } from '../db/schema.js';
-import { eq, and, gt, isNull } from 'drizzle-orm';
-import { generateTokenPair, type TokenPair } from './token.service.js';
+import { credentials, permissions, role_permissions, roles, user_roles } from '../db/schema.js';
 import { createAuditLog } from './audit.service.js';
+import { resolveIdentity } from './identity.service.js';
+import {
+  type TokenPair,
+  generateTokenPair,
+  invalidateAllUserTokens,
+  revokeAllSessions,
+} from './token.service.js';
+
+type Credential = typeof credentials.$inferSelect;
+
+/** What the auth routes are allowed to echo back about a credential. Never the
+ *  password hash, the reset token or any other column on the row. */
+export interface CredentialView {
+  id: string;
+  email: string;
+  status: Credential['status'];
+  emailVerified: boolean;
+  firstName?: string;
+  lastName?: string;
+  role?: string;
+}
 
 const LOCKOUT_THRESHOLD = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
@@ -25,9 +45,13 @@ export async function register(
   lastName: string,
   ipAddress: string,
   userAgent?: string,
-): Promise<{ credential: any; tokens: TokenPair }> {
+): Promise<{ credential: CredentialView; tokens: TokenPair }> {
   // Check if email already exists
-  const [existing] = await db.select().from(credentials).where(eq(credentials.email, email)).limit(1);
+  const [existing] = await db
+    .select()
+    .from(credentials)
+    .where(eq(credentials.email, email))
+    .limit(1);
   if (existing) {
     throw new ConflictError('An account with this email already exists');
   }
@@ -40,21 +64,27 @@ export async function register(
   const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
   // Create credential
-  const [credential] = await db.insert(credentials).values({
-    email,
-    password_hash: passwordHash,
-    email_verification_token: emailVerificationToken,
-    email_verification_expires: emailVerificationExpires,
-  }).returning();
+  const [credential] = await db
+    .insert(credentials)
+    .values({
+      email,
+      password_hash: passwordHash,
+      email_verification_token: emailVerificationToken,
+      email_verification_expires: emailVerificationExpires,
+    })
+    .returning();
 
   // Find or create the 'user' role and assign it
   let [userRole] = await db.select().from(roles).where(eq(roles.name, 'user')).limit(1);
   if (!userRole) {
-    [userRole] = await db.insert(roles).values({
-      name: 'user',
-      description: 'Default user role',
-      is_system: true,
-    }).returning();
+    [userRole] = await db
+      .insert(roles)
+      .values({
+        name: 'user',
+        description: 'Default user role',
+        is_system: true,
+      })
+      .returning();
   }
 
   await db.insert(user_roles).values({
@@ -62,21 +92,13 @@ export async function register(
     role_id: userRole.id,
   });
 
-  // Get permissions for the role
-  const rolePerms = await db
-    .select({ name: permissions.name })
-    .from(role_permissions)
-    .innerJoin(permissions, eq(role_permissions.permission_id, permissions.id))
-    .where(eq(role_permissions.role_id, userRole.id));
-
-  const permsArray = rolePerms.map((rp) => rp.name);
+  const identity = await resolveIdentity(credential.id);
 
   // Generate JWT pair
   const tokens = await generateTokenPair(
     credential.id,
     credential.email,
-    'user',
-    permsArray,
+    identity,
     ipAddress,
     userAgent,
   );
@@ -116,8 +138,12 @@ export async function login(
   password: string,
   ipAddress: string,
   userAgent?: string,
-): Promise<{ credential: any; tokens: TokenPair }> {
-  const [credential] = await db.select().from(credentials).where(eq(credentials.email, email)).limit(1);
+): Promise<{ credential: CredentialView; tokens: TokenPair }> {
+  const [credential] = await db
+    .select()
+    .from(credentials)
+    .where(eq(credentials.email, email))
+    .limit(1);
 
   if (!credential) {
     throw new UnauthorizedError('Invalid email or password');
@@ -153,7 +179,10 @@ export async function login(
   if (!isValid) {
     // Increment failed attempts
     const failedAttempts = credential.failed_login_attempts + 1;
-    const updateData: any = { failed_login_attempts: failedAttempts, updated_at: new Date() };
+    const updateData: Partial<typeof credentials.$inferInsert> = {
+      failed_login_attempts: failedAttempts,
+      updated_at: new Date(),
+    };
 
     if (failedAttempts >= LOCKOUT_THRESHOLD) {
       updateData.locked_until = new Date(Date.now() + LOCKOUT_DURATION_MS);
@@ -178,40 +207,25 @@ export async function login(
   }
 
   // Reset failed login attempts on successful login
-  await db.update(credentials).set({
-    failed_login_attempts: 0,
-    locked_until: null,
-    last_login_at: new Date(),
-    status: credential.status === 'locked' ? 'active' : credential.status,
-    updated_at: new Date(),
-  }).where(eq(credentials.id, credential.id));
+  await db
+    .update(credentials)
+    .set({
+      failed_login_attempts: 0,
+      locked_until: null,
+      last_login_at: new Date(),
+      status: credential.status === 'locked' ? 'active' : credential.status,
+      updated_at: new Date(),
+    })
+    .where(eq(credentials.id, credential.id));
 
-  // Get role and permissions
-  const [userRoleRow] = await db
-    .select({ roleName: roles.name, roleId: roles.id })
-    .from(user_roles)
-    .innerJoin(roles, eq(user_roles.role_id, roles.id))
-    .where(eq(user_roles.credential_id, credential.id))
-    .limit(1);
-
-  const roleName = userRoleRow?.roleName ?? 'user';
-
-  let permsArray: string[] = [];
-  if (userRoleRow) {
-    const rolePerms = await db
-      .select({ name: permissions.name })
-      .from(role_permissions)
-      .innerJoin(permissions, eq(role_permissions.permission_id, permissions.id))
-      .where(eq(role_permissions.role_id, userRoleRow.roleId));
-    permsArray = rolePerms.map((rp) => rp.name);
-  }
+  const identity = await resolveIdentity(credential.id);
+  const roleName = identity.primaryRole;
 
   // Generate JWT pair
   const tokens = await generateTokenPair(
     credential.id,
     credential.email,
-    roleName,
-    permsArray,
+    identity,
     ipAddress,
     userAgent,
   );
@@ -250,7 +264,7 @@ export async function verifyEmail(token: string): Promise<void> {
     .where(
       and(
         eq(credentials.email_verification_token, token),
-        gt(credentials.email_verification_expires!, new Date()),
+        gt(credentials.email_verification_expires, new Date()),
       ),
     )
     .limit(1);
@@ -259,13 +273,16 @@ export async function verifyEmail(token: string): Promise<void> {
     throw new BadRequestError('Invalid or expired verification token', 'INVALID_TOKEN');
   }
 
-  await db.update(credentials).set({
-    email_verified: true,
-    email_verification_token: null,
-    email_verification_expires: null,
-    status: 'active',
-    updated_at: new Date(),
-  }).where(eq(credentials.id, credential.id));
+  await db
+    .update(credentials)
+    .set({
+      email_verified: true,
+      email_verification_token: null,
+      email_verification_expires: null,
+      status: 'active',
+      updated_at: new Date(),
+    })
+    .where(eq(credentials.id, credential.id));
 
   await createAuditLog({
     credentialId: credential.id,
@@ -280,8 +297,15 @@ export async function verifyEmail(token: string): Promise<void> {
 /**
  * Generate a password reset token and store it on the credential.
  */
-export async function forgotPassword(email: string, ipAddress: string): Promise<{ resetToken: string }> {
-  const [credential] = await db.select().from(credentials).where(eq(credentials.email, email)).limit(1);
+export async function forgotPassword(
+  email: string,
+  ipAddress: string,
+): Promise<{ resetToken: string }> {
+  const [credential] = await db
+    .select()
+    .from(credentials)
+    .where(eq(credentials.email, email))
+    .limit(1);
 
   // Always return success to prevent email enumeration
   if (!credential) {
@@ -291,11 +315,14 @@ export async function forgotPassword(email: string, ipAddress: string): Promise<
   const resetToken = crypto.randomBytes(64).toString('hex');
   const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-  await db.update(credentials).set({
-    password_reset_token: resetToken,
-    password_reset_expires: resetExpires,
-    updated_at: new Date(),
-  }).where(eq(credentials.id, credential.id));
+  await db
+    .update(credentials)
+    .set({
+      password_reset_token: resetToken,
+      password_reset_expires: resetExpires,
+      updated_at: new Date(),
+    })
+    .where(eq(credentials.id, credential.id));
 
   await createAuditLog({
     credentialId: credential.id,
@@ -313,14 +340,18 @@ export async function forgotPassword(email: string, ipAddress: string): Promise<
 /**
  * Reset password using a reset token.
  */
-export async function resetPassword(token: string, newPassword: string, ipAddress: string): Promise<void> {
+export async function resetPassword(
+  token: string,
+  newPassword: string,
+  ipAddress: string,
+): Promise<void> {
   const [credential] = await db
     .select()
     .from(credentials)
     .where(
       and(
         eq(credentials.password_reset_token, token),
-        gt(credentials.password_reset_expires!, new Date()),
+        gt(credentials.password_reset_expires, new Date()),
       ),
     )
     .limit(1);
@@ -331,13 +362,23 @@ export async function resetPassword(token: string, newPassword: string, ipAddres
 
   const passwordHash = await Bun.password.hash(newPassword, { algorithm: 'bcrypt', cost: 12 });
 
-  await db.update(credentials).set({
-    password_hash: passwordHash,
-    password_reset_token: null,
-    password_reset_expires: null,
-    last_password_change: new Date(),
-    updated_at: new Date(),
-  }).where(eq(credentials.id, credential.id));
+  await db
+    .update(credentials)
+    .set({
+      password_hash: passwordHash,
+      password_reset_token: null,
+      password_reset_expires: null,
+      last_password_change: new Date(),
+      updated_at: new Date(),
+    })
+    .where(eq(credentials.id, credential.id));
+
+  // A password reset is the recovery path from a compromise, so every session
+  // and access token minted before it dies with it — the same invalidation
+  // logout-all performs. Without this a stolen refresh token outlived the
+  // reset by the full refresh lifetime.
+  await revokeAllSessions(credential.id);
+  await invalidateAllUserTokens(credential.id);
 
   await createAuditLog({
     credentialId: credential.id,
@@ -360,7 +401,11 @@ export async function changePassword(
   ipAddress: string,
   userAgent?: string,
 ): Promise<void> {
-  const [credential] = await db.select().from(credentials).where(eq(credentials.id, credentialId)).limit(1);
+  const [credential] = await db
+    .select()
+    .from(credentials)
+    .where(eq(credentials.id, credentialId))
+    .limit(1);
 
   if (!credential || !credential.password_hash) {
     throw new NotFoundError('Credential');
@@ -373,11 +418,19 @@ export async function changePassword(
 
   const passwordHash = await Bun.password.hash(newPassword, { algorithm: 'bcrypt', cost: 12 });
 
-  await db.update(credentials).set({
-    password_hash: passwordHash,
-    last_password_change: new Date(),
-    updated_at: new Date(),
-  }).where(eq(credentials.id, credentialId));
+  await db
+    .update(credentials)
+    .set({
+      password_hash: passwordHash,
+      last_password_change: new Date(),
+      updated_at: new Date(),
+    })
+    .where(eq(credentials.id, credentialId));
+
+  // Same reasoning as resetPassword: changing a password is how a user responds
+  // to a suspected compromise, so outstanding sessions and access tokens go too.
+  await revokeAllSessions(credentialId);
+  await invalidateAllUserTokens(credentialId);
 
   await createAuditLog({
     credentialId,

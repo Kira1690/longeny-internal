@@ -1,7 +1,7 @@
-import { NotFoundError, BadRequestError } from '@longeny/errors';
+import { BadRequestError, NotFoundError } from '@longeny/errors';
+import { and, desc, eq, gt, isNull, or } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { consents } from '../db/schema.js';
-import { eq, and, isNull, gt, or, desc } from 'drizzle-orm';
 import { createAuditLog } from './audit.service.js';
 
 type ConsentType =
@@ -52,15 +52,18 @@ export async function grantConsent(
     throw new BadRequestError(`Invalid consent type: ${consentType}`, 'INVALID_CONSENT_TYPE');
   }
 
-  const [consent] = await db.insert(consents).values({
-    credential_id: credentialId,
-    consent_type: consentType as ConsentType,
-    version,
-    granted: true,
-    ip_address: ipAddress,
-    user_agent: userAgent,
-    granted_at: new Date(),
-  }).returning();
+  const [consent] = await db
+    .insert(consents)
+    .values({
+      credential_id: credentialId,
+      consent_type: consentType as ConsentType,
+      version,
+      granted: true,
+      ip_address: ipAddress,
+      user_agent: userAgent,
+      granted_at: new Date(),
+    })
+    .returning();
 
   await createAuditLog({
     credentialId,

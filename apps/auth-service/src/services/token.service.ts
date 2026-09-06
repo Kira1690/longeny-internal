@@ -1,12 +1,13 @@
-import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
-import Redis from 'ioredis';
-import { sha256 } from '@longeny/utils';
 import { InvalidTokenError, UnauthorizedError } from '@longeny/errors';
+import { sha256 } from '@longeny/utils';
+import { and, eq } from 'drizzle-orm';
+import type Redis from 'ioredis';
+import jwt from 'jsonwebtoken';
 import { config } from '../config/index.js';
 import { db } from '../db/index.js';
-import { sessions, credentials, roles, user_roles, role_permissions, permissions } from '../db/schema.js';
-import { eq, and } from 'drizzle-orm';
+import { credentials, sessions } from '../db/schema.js';
+import { type ResolvedIdentity, resolveIdentity } from './identity.service.js';
 
 let redis: Redis;
 
@@ -17,7 +18,10 @@ export function initTokenService(_prismaUnused: unknown, redisClient: Redis): vo
 export interface AccessTokenPayload {
   sub: string;
   email: string;
+  /** Highest-privilege role. Kept for consumers that read a single role. */
   role: string;
+  /** Every role the credential holds. Authoritative for role checks. */
+  roles: string[];
   permissions: string[];
   jti: string;
 }
@@ -34,13 +38,18 @@ export interface TokenPair {
 function parseDuration(duration: string): number {
   const match = duration.match(/^(\d+)([smhd])$/);
   if (!match) return 900; // default 15m
-  const value = parseInt(match[1], 10);
+  const value = Number.parseInt(match[1], 10);
   switch (match[2]) {
-    case 's': return value;
-    case 'm': return value * 60;
-    case 'h': return value * 3600;
-    case 'd': return value * 86400;
-    default: return 900;
+    case 's':
+      return value;
+    case 'm':
+      return value * 60;
+    case 'h':
+      return value * 3600;
+    case 'd':
+      return value * 86400;
+    default:
+      return 900;
   }
 }
 
@@ -51,8 +60,7 @@ function parseDuration(duration: string): number {
 export async function generateTokenPair(
   credentialId: string,
   email: string,
-  role: string,
-  permissionsArray: string[],
+  identity: ResolvedIdentity,
   ipAddress: string,
   userAgent?: string,
 ): Promise<TokenPair> {
@@ -64,8 +72,9 @@ export async function generateTokenPair(
     {
       sub: credentialId,
       email,
-      role,
-      permissions: permissionsArray,
+      role: identity.primaryRole,
+      roles: identity.roles,
+      permissions: identity.permissions,
       jti,
     },
     config.JWT_ACCESS_SECRET,
@@ -145,32 +154,9 @@ export async function rotateRefreshToken(
     .where(eq(credentials.id, session.credential_id))
     .limit(1);
 
-  const [userRoleRow] = await db
-    .select({ roleName: roles.name, roleId: roles.id })
-    .from(user_roles)
-    .innerJoin(roles, eq(user_roles.role_id, roles.id))
-    .where(eq(user_roles.credential_id, session.credential_id))
-    .limit(1);
+  const identity = await resolveIdentity(session.credential_id);
 
-  const roleName = userRoleRow?.roleName ?? 'user';
-  let permsArray: string[] = [];
-  if (userRoleRow) {
-    const rolePerms = await db
-      .select({ name: permissions.name })
-      .from(role_permissions)
-      .innerJoin(permissions, eq(role_permissions.permission_id, permissions.id))
-      .where(eq(role_permissions.role_id, userRoleRow.roleId));
-    permsArray = rolePerms.map((rp) => rp.name);
-  }
-
-  return generateTokenPair(
-    session.credential_id,
-    credential.email,
-    roleName,
-    permsArray,
-    ipAddress,
-    userAgent,
-  );
+  return generateTokenPair(session.credential_id, credential.email, identity, ipAddress, userAgent);
 }
 
 /**
@@ -193,14 +179,18 @@ export async function blacklistAccessToken(accessToken: string): Promise<void> {
 /**
  * Check if a token JTI is blacklisted OR was issued before a logout-all.
  */
-export async function isTokenBlacklisted(jti: string, userId?: string, issuedAt?: number): Promise<boolean> {
+export async function isTokenBlacklisted(
+  jti: string,
+  userId?: string,
+  issuedAt?: number,
+): Promise<boolean> {
   const jtiBlacklisted = await redis.get(`blacklist:${jti}`);
   if (jtiBlacklisted !== null) return true;
 
   // Check per-user invalidation timestamp (set by logout-all)
   if (userId && issuedAt !== undefined) {
     const invalidateBefore = await redis.get(`user_invalidated_before:${userId}`);
-    if (invalidateBefore !== null && issuedAt < parseInt(invalidateBefore, 10)) {
+    if (invalidateBefore !== null && issuedAt < Number.parseInt(invalidateBefore, 10)) {
       return true;
     }
   }
@@ -259,8 +249,13 @@ export async function getActiveSessions(credentialId: string) {
 /**
  * Verify and decode an access token, checking blacklist.
  */
-export async function verifyAccessToken(token: string): Promise<AccessTokenPayload & { iat: number; exp: number }> {
-  const decoded = jwt.verify(token, config.JWT_ACCESS_SECRET) as AccessTokenPayload & { iat: number; exp: number };
+export async function verifyAccessToken(
+  token: string,
+): Promise<AccessTokenPayload & { iat: number; exp: number }> {
+  const decoded = jwt.verify(token, config.JWT_ACCESS_SECRET) as AccessTokenPayload & {
+    iat: number;
+    exp: number;
+  };
 
   // Check if token is blacklisted
   if (decoded.jti) {

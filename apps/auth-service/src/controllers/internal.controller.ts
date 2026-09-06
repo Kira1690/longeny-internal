@@ -1,9 +1,18 @@
-import { verifyAccessToken } from '../services/token.service.js';
-import { getActiveConsents } from '../services/consent.service.js';
-import { anonymizeAuditLogs } from '../services/audit.service.js';
+import { errorEnvelope } from '@longeny/errors';
+import { desc, eq } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { credentials, sessions, oauth_accounts, consents, audit_logs, user_roles, roles } from '../db/schema.js';
-import { eq, desc } from 'drizzle-orm';
+import {
+  audit_logs,
+  consents,
+  credentials,
+  oauth_accounts,
+  roles,
+  sessions,
+  user_roles,
+} from '../db/schema.js';
+import { anonymizeAuditLogs } from '../services/audit.service.js';
+import { getActiveConsents } from '../services/consent.service.js';
+import { verifyAccessToken } from '../services/token.service.js';
 
 export function initInternalController(_unused: unknown): void {
   // no-op — Drizzle db is a module-level singleton
@@ -16,10 +25,7 @@ export async function handleInternalVerify({ request, set }: any) {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) {
     set.status = 401;
-    return {
-      success: false,
-      error: { code: 'UNAUTHORIZED', message: 'Missing Authorization header' },
-    };
+    return errorEnvelope('UNAUTHORIZED', 'Missing Authorization header');
   }
 
   const token = authHeader.slice(7);
@@ -39,10 +45,7 @@ export async function handleInternalVerify({ request, set }: any) {
     };
   } catch {
     set.status = 401;
-    return {
-      success: false,
-      error: { code: 'INVALID_TOKEN', message: 'Token verification failed' },
-    };
+    return errorEnvelope('INVALID_TOKEN', 'Token verification failed');
   }
 }
 
@@ -129,7 +132,7 @@ export async function handleGdprExport({ params }: any) {
       created_at: audit_logs.created_at,
     })
     .from(audit_logs)
-    .where(eq(audit_logs.credential_id!, credentialId))
+    .where(eq(audit_logs.credential_id, credentialId))
     .orderBy(desc(audit_logs.created_at))
     .limit(100);
 
@@ -179,10 +182,22 @@ export async function handleGdprDelete({ params }: any) {
     };
   }
 
-  const deletedSessions = await db.delete(sessions).where(eq(sessions.credential_id, credentialId)).returning();
-  const deletedOauth = await db.delete(oauth_accounts).where(eq(oauth_accounts.credential_id, credentialId)).returning();
-  const deletedConsents = await db.delete(consents).where(eq(consents.credential_id, credentialId)).returning();
-  const deletedRoles = await db.delete(user_roles).where(eq(user_roles.credential_id, credentialId)).returning();
+  const deletedSessions = await db
+    .delete(sessions)
+    .where(eq(sessions.credential_id, credentialId))
+    .returning();
+  const deletedOauth = await db
+    .delete(oauth_accounts)
+    .where(eq(oauth_accounts.credential_id, credentialId))
+    .returning();
+  const deletedConsents = await db
+    .delete(consents)
+    .where(eq(consents.credential_id, credentialId))
+    .returning();
+  const deletedRoles = await db
+    .delete(user_roles)
+    .where(eq(user_roles.credential_id, credentialId))
+    .returning();
 
   const auditLogsAnonymized = await anonymizeAuditLogs(credentialId);
 

@@ -2,10 +2,17 @@ import { EventConsumer } from '@longeny/events';
 import { EVENT_NAMES, type EventEnvelope } from '@longeny/types';
 import { createLogger } from '@longeny/utils';
 import { eq } from 'drizzle-orm';
-import { db } from '../db/index.js';
-import { sessions, oauth_accounts, consents, user_roles, credentials, processed_events } from '../db/schema.js';
-import { anonymizeAuditLogs } from '../services/audit.service.js';
 import { redisUrl } from '../config/index.js';
+import { db } from '../db/index.js';
+import {
+  consents,
+  credentials,
+  oauth_accounts,
+  processed_events,
+  sessions,
+  user_roles,
+} from '../db/schema.js';
+import { anonymizeAuditLogs } from '../services/audit.service.js';
 
 const logger = createLogger('auth-service:subscribers');
 
@@ -20,7 +27,10 @@ export function initSubscribers(_: unknown): EventConsumer {
     async (event: EventEnvelope<{ credentialId: string; userId: string }>) => {
       const { credentialId } = event.payload;
 
-      logger.info({ credentialId, correlationId: event.correlationId }, 'Processing GDPR erasure request');
+      logger.info(
+        { credentialId, correlationId: event.correlationId },
+        'Processing GDPR erasure request',
+      );
 
       // Check idempotency
       const [existing] = await db
@@ -61,7 +71,10 @@ export function initSubscribers(_: unknown): EventConsumer {
 
         logger.info({ credentialId, correlationId: event.correlationId }, 'GDPR erasure completed');
       } catch (error) {
-        logger.error({ credentialId, error, correlationId: event.correlationId }, 'GDPR erasure failed');
+        logger.error(
+          { credentialId, error, correlationId: event.correlationId },
+          'GDPR erasure failed',
+        );
         throw error;
       }
     },
