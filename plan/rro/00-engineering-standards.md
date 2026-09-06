@@ -79,6 +79,13 @@ Four axes: **Security**, **Code Quality**, **SSOT**, **RBAC**.
   raw row.
 - Never return `phone_hash` or any lookup hash. It is a correlation key.
 - All `/internal/*` routes are HMAC-signed, raw-body-signed, and have a 401 test.
+- **An `/internal/*` route has no account to check ownership against, so it never passes
+  through `assertOwnership` — and must call `assertActiveProfileForService()` itself.**
+  Three of them once looked the profile up by hand and checked only that the row existed.
+  A deactivated profile stayed reachable through every one of them, including the route
+  that emails a human being: the account removed the person, and the scheduler wrote to
+  them anyway. HMAC proves *which service* is calling; it says nothing about whether the
+  subject is still someone we may act on.
 - Errors never leak internals: no stack traces, no SQL, no row counts that confirm
   existence.
 - No secret, key or connection string in either repo. `internal-notes/` and `pemKey/` only.
@@ -145,6 +152,8 @@ Four axes: **Security**, **Code Quality**, **SSOT**, **RBAC**.
 Copy into every Trello card:
 
 - [ ] `requireAuth` + role/permission guard + service-layer ownership check
+- [ ] If the route is `/internal/*`: `assertActiveProfileForService()`, not a hand-written
+      existence check — plus a test that a deactivated profile 404s on it
 - [ ] Negative tests: wrong role → 403, wrong owner → 404, no token → 401
 - [ ] Request body validated by a schema from `packages/validators`
 - [ ] Response sanitised — no encrypted columns, no hashes, no internal ids

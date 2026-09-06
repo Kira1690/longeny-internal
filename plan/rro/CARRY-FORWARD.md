@@ -28,8 +28,8 @@ separately will produce two models that disagree.
 
 | # | What | State | Next step |
 |---|---|---|---|
-| B1 | **Six API defects** — soft-deleted profiles still readable/editable/consentable/**contactable** (a real email was delivered to a deleted person); 500 on malformed uuid; optional `""` rejected; four broken Swagger examples; `consent_type` unenforced | Fixed in `longeny-internal`. typecheck 15/15, lint clean | Run the E2E suite · add the `consent_type` pg enum + migration (validator is done, column is still `varchar(100)`) · migrate to `BraveLabs/` under card **V-W7-7** |
-| B2 | **Week 7 backend** — 12 endpoints, 7 tables, 606 E2E checks | Complete, **committed nowhere** until Week 7's cards close | Migrate under the Week 7 cards |
+| B1 | **Seven API defects** — soft-deleted profiles still readable/editable/consentable/**contactable**; 500 on malformed uuid; optional `""` rejected; four broken Swagger examples; `consent_type` unenforced; **and the three internal HMAC routes that never had the status check at all** (see D7) | Fixed and committed in `longeny-internal`. typecheck 15/15, lint clean, `profiles-rro` 86/86 | Migrate to `BraveLabs/` under card **V-W7-7** |
+| B2 | **Week 7 backend** — 12 endpoints, 7 tables | Complete and committed (2026-09-06, nine commits from `0eafab0`) | Migrate under the Week 7 cards |
 
 ---
 
@@ -64,6 +64,16 @@ separately will produce two models that disagree.
    enforced by a pg enum, *what did this account holder agree to?*).
 6. **AWS is project-scoped**: `source internal-notes/aws/env.sh`. The machine's global
    `~/.aws` default is a **different account** and is not ours.
+7. **The internal HMAC routes do not pass through `assertOwnership`.** There is no account
+   to check them against, so each one re-stated the profile lookup by hand — and three of
+   the four checked only that the row *existed*, never that it was active. A deactivated
+   profile therefore stayed reachable through `notifyProfile` (a real email went to a
+   removed person), `recordTransition` and `getRroStateForService`. They now share one
+   `assertActiveProfileForService` helper. **Any new internal route must call it**; the
+   ownership guard will not cover you there.
+8. **A mock would have hidden it.** The delivery check asks mailpit, not the API response.
+   A fake transport reports "not delivered" whether or not the message left the building —
+   which is why `prep/testing/README.md` requires real Postgres, Redis and SMTP.
 
 ---
 
