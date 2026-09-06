@@ -1,4 +1,11 @@
-import { corsMiddleware, errorHandler, rateLimit, requestLogger } from '@longeny/middleware';
+import { errorEnvelope } from '@longeny/errors';
+import {
+  corsMiddleware,
+  errorHandler,
+  rateLimit,
+  requestContext,
+  requestLogger,
+} from '@longeny/middleware';
 import Elysia from 'elysia';
 import { getConfig } from './config/index.js';
 import { createRoutes } from './routes/index.js';
@@ -15,6 +22,7 @@ export function createApp(): any {
     // ── 1. Error handler (outermost — catches errors from all middleware) ──
     .use(errorHandler())
     // ── 2. Request logger (generates / propagates correlation ID) ──
+    .use(requestContext())
     .use(requestLogger('gateway'))
     // ── 3. CORS ──
     .use(corsMiddleware(origins))
@@ -41,16 +49,10 @@ export function createApp(): any {
     // ── Catch-all 404 ──
     .all('*', ({ request, set }) => {
       set.status = 404;
-      return {
-        success: false,
-        error: {
-          code: 'NOT_FOUND',
-          message: `Route ${request.method} ${new URL(request.url).pathname} not found`,
-        },
-        meta: {
-          timestamp: new Date().toISOString(),
-        },
-      };
+      return errorEnvelope(
+        'NOT_FOUND',
+        `Route ${request.method} ${new URL(request.url).pathname} not found`,
+      );
     });
 
   return app;

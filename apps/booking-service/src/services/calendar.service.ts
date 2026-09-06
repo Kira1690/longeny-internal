@@ -1,12 +1,16 @@
-import { db } from '../db/index.js';
-import { eq } from 'drizzle-orm';
-import { calendar_sync } from '../db/schema.js';
-import { google } from 'googleapis';
-import { NotFoundError, BadRequestError, InternalError } from '@longeny/errors';
-import { createLogger, encrypt, decrypt } from '@longeny/utils';
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { BookingConfig } from '@longeny/config';
+import { BadRequestError, InternalError, NotFoundError } from '@longeny/errors';
+import { createLogger, decrypt, encrypt } from '@longeny/utils';
+import { type InferSelectModel, eq } from 'drizzle-orm';
+import { type calendar_v3, google } from 'googleapis';
+import { db } from '../db/index.js';
+import { calendar_sync } from '../db/schema.js';
 
 const logger = createLogger('booking-service:calendar');
+
+/** How long a minted OAuth `state` stays usable. */
+const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 
 interface CalendarEvent {
   summary: string;
@@ -39,12 +43,57 @@ export class CalendarService {
     return this.oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: scopes,
-      state: providerId,
+      state: this.createState(providerId),
       prompt: 'consent',
     });
   }
 
-  async handleCallback(code: string, providerId: string) {
+  /**
+   * `state` used to travel as the bare provider id, and the callback wrote the
+   * caller's Google tokens to whichever provider id came back. Any provider
+   * could therefore hand back a victim's id and take over the victim's calendar
+   * link — and with it the availability every booking is checked against.
+   *
+   * It is now an opaque value signed with the service secret and bound to the
+   * provider that started the flow. The signature is what survives the redirect
+   * through Google; the caller check below is the second lock, for the case
+   * where a signed state leaks (browser history, referrer) and is replayed by
+   * someone else.
+   */
+  private createState(providerId: string): string {
+    const payload = `${providerId}.${randomBytes(16).toString('hex')}.${Date.now() + OAUTH_STATE_TTL_MS}`;
+    return `${Buffer.from(payload).toString('base64url')}.${this.signState(payload)}`;
+  }
+
+  /** The provider the state was minted for, or null if it is not ours or expired. */
+  private verifyState(state: string): string | null {
+    const [encoded, signature] = state.split('.');
+    if (!encoded || !signature) return null;
+
+    const payload = Buffer.from(encoded, 'base64url').toString('utf8');
+    const expected = this.signState(payload);
+    if (signature.length !== expected.length) return null;
+    if (!timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
+
+    const [providerId, , expiresAt] = payload.split('.');
+    if (!providerId || !expiresAt || Number(expiresAt) < Date.now()) return null;
+
+    return providerId;
+  }
+
+  private signState(payload: string): string {
+    return createHmac('sha256', this.config.HMAC_SECRET).update(payload).digest('hex');
+  }
+
+  async handleCallback(code: string, state: string, callerProviderId: string) {
+    const providerId = this.verifyState(state);
+
+    // One message for tampered, expired and someone else's state alike: the
+    // caller must not be able to tell a forged provider id from a real one.
+    if (!providerId || providerId !== callerProviderId) {
+      throw new BadRequestError('Invalid or expired OAuth state');
+    }
+
     try {
       const { tokens } = await this.oauth2Client.getToken(code);
 
@@ -74,7 +123,7 @@ export class CalendarService {
         .where(eq(calendar_sync.provider_id, providerId))
         .limit(1);
 
-      let result;
+      let result: InferSelectModel<typeof calendar_sync> | undefined;
       if (existing) {
         [result] = await db
           .update(calendar_sync)
@@ -125,7 +174,10 @@ export class CalendarService {
 
     if (calendarSyncRow.google_access_token_encrypted) {
       try {
-        const accessToken = decrypt(calendarSyncRow.google_access_token_encrypted, this.config.ENCRYPTION_KEY);
+        const accessToken = decrypt(
+          calendarSyncRow.google_access_token_encrypted,
+          this.config.ENCRYPTION_KEY,
+        );
         await this.oauth2Client.revokeToken(accessToken);
       } catch (error) {
         logger.warn({ providerId, error }, 'Failed to revoke calendar token');
@@ -203,7 +255,11 @@ export class CalendarService {
     }
   }
 
-  async updateCalendarEvent(providerId: string, eventId: string, event: CalendarEvent): Promise<boolean> {
+  async updateCalendarEvent(
+    providerId: string,
+    eventId: string,
+    event: CalendarEvent,
+  ): Promise<boolean> {
     const authedClient = await this.getAuthedClient(providerId);
     if (!authedClient) return false;
 
@@ -274,7 +330,7 @@ export class CalendarService {
     try {
       const calendar = google.calendar({ version: 'v3', auth: authedClient });
 
-      const params: Record<string, unknown> = {
+      const params: calendar_v3.Params$Resource$Events$List = {
         calendarId: calendarSyncRow.google_calendar_id || 'primary',
         singleEvents: true,
         timeMin: new Date().toISOString(),
@@ -286,7 +342,10 @@ export class CalendarService {
         params.timeMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
       }
 
-      const response = await calendar.events.list(params as Parameters<typeof calendar.events.list>[0]);
+      // Typed params, not a cast: an untyped object matched the callback
+      // overload, whose return is void — every response.data read below was
+      // reading a property that does not exist at runtime on that overload.
+      const response = await calendar.events.list(params);
 
       if (response.data.nextSyncToken) {
         await db
@@ -327,8 +386,14 @@ export class CalendarService {
     }
 
     try {
-      const accessToken = decrypt(calendarSyncRow.google_access_token_encrypted, this.config.ENCRYPTION_KEY);
-      const refreshToken = decrypt(calendarSyncRow.google_refresh_token_encrypted, this.config.ENCRYPTION_KEY);
+      const accessToken = decrypt(
+        calendarSyncRow.google_access_token_encrypted,
+        this.config.ENCRYPTION_KEY,
+      );
+      const refreshToken = decrypt(
+        calendarSyncRow.google_refresh_token_encrypted,
+        this.config.ENCRYPTION_KEY,
+      );
 
       const client = new google.auth.OAuth2(
         this.config.GOOGLE_CALENDAR_CLIENT_ID,

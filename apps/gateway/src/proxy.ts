@@ -64,6 +64,12 @@ export async function proxyRequest(ctx: ProxyContext, targetBaseUrl: string): Pr
     headers.set('X-User-ID', userId);
     headers.set('X-User-Email', (store.userEmail as string) || '');
     headers.set('X-User-Role', (store.userRole as string) || '');
+  } else {
+    // An unauthenticated request must never carry identity headers a caller
+    // set by hand — downstream services would otherwise see a forged actor.
+    headers.delete('X-User-ID');
+    headers.delete('X-User-Email');
+    headers.delete('X-User-Role');
   }
 
   // Read body for HMAC signing (only for methods that carry a body)
@@ -81,7 +87,15 @@ export async function proxyRequest(ctx: ProxyContext, targetBaseUrl: string): Pr
   }
 
   // Sign request with HMAC for downstream service-to-service auth
-  const hmacHeaders = signRequest('gateway', config.HMAC_SECRET, method, strippedPath, body || '');
+  // Signed over exactly what is forwarded — path and query. The query decides
+  // what a downstream route returns, so it belongs inside the signature.
+  const hmacHeaders = signRequest(
+    'gateway',
+    config.HMAC_SECRET,
+    method,
+    `${strippedPath}${url.search}`,
+    body || '',
+  );
   for (const [key, value] of Object.entries(hmacHeaders)) {
     headers.set(key, value);
   }

@@ -1,73 +1,145 @@
 import {
-  pgTable,
-  uuid,
-  text,
-  varchar,
   boolean,
+  date,
+  decimal,
+  index,
   integer,
-  timestamp,
   jsonb,
   pgEnum,
-  decimal,
-  date,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  varchar,
 } from 'drizzle-orm/pg-core';
 
 // ─────────────────────────────────────────────────────────────
 // Enums — Booking
 // ─────────────────────────────────────────────────────────────
 
-export const sessionTypeEnum = pgEnum('session_type', ['consultation', 'followup', 'assessment', 'program_session', 'custom']);
-export const bookingStatusEnum = pgEnum('booking_status', ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'no_show']);
+export const sessionTypeEnum = pgEnum('session_type', [
+  'consultation',
+  'followup',
+  'assessment',
+  'program_session',
+  'custom',
+]);
+export const bookingStatusEnum = pgEnum('booking_status', [
+  'pending',
+  'confirmed',
+  'in_progress',
+  'completed',
+  'cancelled',
+  'no_show',
+]);
 export const cancelledByEnum = pgEnum('cancelled_by', ['user', 'provider', 'system']);
 export const reminderTypeEnum = pgEnum('reminder_type', ['24h', '1h', '15min']);
-export const reminderStatusEnum = pgEnum('reminder_status', ['pending', 'sent', 'failed', 'cancelled']);
-export const calendarSyncStatusEnum = pgEnum('calendar_sync_status', ['active', 'disconnected', 'error', 'syncing']);
-export const recurringBookingStatusEnum = pgEnum('recurring_booking_status', ['active', 'paused', 'cancelled', 'completed']);
-export const waitlistStatusEnum = pgEnum('waitlist_status', ['waiting', 'notified', 'booked', 'expired']);
+export const reminderStatusEnum = pgEnum('reminder_status', [
+  'pending',
+  'sent',
+  'failed',
+  'cancelled',
+]);
+export const calendarSyncStatusEnum = pgEnum('calendar_sync_status', [
+  'active',
+  'disconnected',
+  'error',
+  'syncing',
+]);
+export const recurringBookingStatusEnum = pgEnum('recurring_booking_status', [
+  'active',
+  'paused',
+  'cancelled',
+  'completed',
+]);
+export const waitlistStatusEnum = pgEnum('waitlist_status', [
+  'waiting',
+  'notified',
+  'booked',
+  'expired',
+]);
 
 // ─────────────────────────────────────────────────────────────
 // Enums — Notification
 // ─────────────────────────────────────────────────────────────
 
 export const notificationTypeEnum = pgEnum('notification_type', ['email', 'sms', 'push', 'in_app']);
-export const notificationCategoryEnum = pgEnum('notification_category', ['booking', 'payment', 'system', 'marketing', 'reminder', 'document', 'provider', 'progress']);
-export const notificationStatusEnum = pgEnum('notification_status', ['pending', 'queued', 'sent', 'delivered', 'failed', 'read']);
+export const notificationCategoryEnum = pgEnum('notification_category', [
+  'booking',
+  'payment',
+  'system',
+  'marketing',
+  'reminder',
+  'document',
+  'provider',
+  'progress',
+]);
+export const notificationStatusEnum = pgEnum('notification_status', [
+  'pending',
+  'queued',
+  'sent',
+  'delivered',
+  'failed',
+  'read',
+]);
 export const templateStatusEnum = pgEnum('template_status', ['active', 'draft', 'deprecated']);
 export const pushPlatformEnum = pgEnum('push_platform', ['ios', 'android', 'web']);
-export const scheduledNotificationStatusEnum = pgEnum('scheduled_notification_status', ['pending', 'sent', 'cancelled', 'failed']);
+export const scheduledNotificationStatusEnum = pgEnum('scheduled_notification_status', [
+  'pending',
+  'sent',
+  'cancelled',
+  'failed',
+]);
 
 // ─────────────────────────────────────────────────────────────
 // Tables — Booking
 // ─────────────────────────────────────────────────────────────
 
-export const bookings = pgTable('bookings', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  user_id: uuid('user_id').notNull(),
-  provider_id: uuid('provider_id').notNull(),
-  program_id: uuid('program_id'),
-  session_type: sessionTypeEnum('session_type').default('consultation').notNull(),
-  status: bookingStatusEnum('status').default('pending').notNull(),
-  title: varchar('title', { length: 200 }),
-  start_time: timestamp('start_time', { withTimezone: true }).notNull(),
-  end_time: timestamp('end_time', { withTimezone: true }).notNull(),
-  duration_minutes: integer('duration_minutes').notNull(),
-  timezone: varchar('timezone', { length: 50 }).notNull(),
-  notes: text('notes'),
-  provider_notes: text('provider_notes'),
-  meeting_link: text('meeting_link'),
-  is_virtual: boolean('is_virtual').default(true).notNull(),
-  location_address: text('location_address'),
-  price: decimal('price', { precision: 10, scale: 2 }).notNull(),
-  currency: varchar('currency', { length: 3 }).default('USD').notNull(),
-  order_id: uuid('order_id'),
-  cancellation_reason: text('cancellation_reason'),
-  cancelled_by: cancelledByEnum('cancelled_by'),
-  cancelled_at: timestamp('cancelled_at', { withTimezone: true }),
-  completed_at: timestamp('completed_at', { withTimezone: true }),
-  google_event_id: varchar('google_event_id', { length: 255 }),
-  created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
+export const bookings = pgTable(
+  'bookings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    /** Account that booked and pays — the JWT sub. */
+    user_id: uuid('user_id').notNull(),
+    /**
+     * Subject of care the session is for. A parent profile has no login, so the
+     * booking is made by the account owner and attended by someone else; payment
+     * stays with the account either way. Null on bookings made before the
+     * multi-profile model, which were always for the account owner.
+     */
+    profile_id: uuid('profile_id'),
+    provider_id: uuid('provider_id').notNull(),
+    program_id: uuid('program_id'),
+    session_type: sessionTypeEnum('session_type').default('consultation').notNull(),
+    status: bookingStatusEnum('status').default('pending').notNull(),
+    title: varchar('title', { length: 200 }),
+    start_time: timestamp('start_time', { withTimezone: true }).notNull(),
+    end_time: timestamp('end_time', { withTimezone: true }).notNull(),
+    duration_minutes: integer('duration_minutes').notNull(),
+    timezone: varchar('timezone', { length: 50 }).notNull(),
+    notes: text('notes'),
+    provider_notes: text('provider_notes'),
+    meeting_link: text('meeting_link'),
+    is_virtual: boolean('is_virtual').default(true).notNull(),
+    location_address: text('location_address'),
+    price: decimal('price', { precision: 10, scale: 2 }).notNull(),
+    currency: varchar('currency', { length: 3 }).default('USD').notNull(),
+    order_id: uuid('order_id'),
+    cancellation_reason: text('cancellation_reason'),
+    cancelled_by: cancelledByEnum('cancelled_by'),
+    cancelled_at: timestamp('cancelled_at', { withTimezone: true }),
+    completed_at: timestamp('completed_at', { withTimezone: true }),
+    google_event_id: varchar('google_event_id', { length: 255 }),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    // A patient lists bookings per profile, and provider access to a profile's
+    // records is derived from an active booking — both read these.
+    idx_profile: index('bookings_profile_idx').on(t.profile_id, t.start_time),
+    idx_provider_profile: index('bookings_provider_profile_idx').on(t.provider_id, t.profile_id),
+  }),
+);
 
 export const booking_reminders = pgTable('booking_reminders', {
   id: uuid('id').primaryKey().defaultRandom(),

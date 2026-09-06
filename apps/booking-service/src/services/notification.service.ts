@@ -1,15 +1,15 @@
+import type { BookingConfig } from '@longeny/config';
+import { NotFoundError } from '@longeny/errors';
+import { createLogger } from '@longeny/utils';
+import { type InferSelectModel, and, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { sql, eq, and, isNull, lt, inArray } from 'drizzle-orm';
 import {
-  notifications,
-  notification_templates,
   notification_preferences,
+  notification_templates,
+  notifications,
   push_tokens,
   scheduled_notifications,
 } from '../db/schema.js';
-import { NotFoundError } from '@longeny/errors';
-import { createLogger } from '@longeny/utils';
-import type { BookingConfig } from '@longeny/config';
 
 const logger = createLogger('booking-service:notification');
 
@@ -19,7 +19,15 @@ interface SendNotificationInput {
   userId: string;
   bookingId?: string;
   type: 'email' | 'sms' | 'push' | 'in_app';
-  category: 'booking' | 'payment' | 'system' | 'marketing' | 'reminder' | 'document' | 'provider' | 'progress';
+  category:
+    | 'booking'
+    | 'payment'
+    | 'system'
+    | 'marketing'
+    | 'reminder'
+    | 'document'
+    | 'provider'
+    | 'progress';
   title: string;
   body: string;
   bodyHtml?: string;
@@ -39,8 +47,36 @@ export class NotificationService {
     const isAllowed = this.checkPreferences(preferences, input.category, input.type);
 
     if (!isAllowed) {
-      logger.debug({ userId: input.userId, type: input.type, category: input.category }, 'Notification blocked by user preferences');
-      const [notification] = await db.insert(notifications).values({
+      logger.debug(
+        { userId: input.userId, type: input.type, category: input.category },
+        'Notification blocked by user preferences',
+      );
+      const [notification] = await db
+        .insert(notifications)
+        .values({
+          user_id: input.userId,
+          booking_id: input.bookingId || null,
+          type: input.type,
+          category: input.category,
+          title: input.title,
+          body: input.body,
+          body_html: input.bodyHtml || null,
+          data: input.data || null,
+          template_id: input.templateId || null,
+          status: 'read',
+          priority: input.priority || 5,
+        })
+        .returning();
+      return notification;
+    }
+
+    if (this.isQuietHours(preferences)) {
+      logger.debug({ userId: input.userId }, 'Notification deferred due to quiet hours');
+    }
+
+    const [notification] = await db
+      .insert(notifications)
+      .values({
         user_id: input.userId,
         booking_id: input.bookingId || null,
         type: input.type,
@@ -50,29 +86,10 @@ export class NotificationService {
         body_html: input.bodyHtml || null,
         data: input.data || null,
         template_id: input.templateId || null,
-        status: 'read',
+        status: 'pending',
         priority: input.priority || 5,
-      }).returning();
-      return notification;
-    }
-
-    if (this.isQuietHours(preferences)) {
-      logger.debug({ userId: input.userId }, 'Notification deferred due to quiet hours');
-    }
-
-    const [notification] = await db.insert(notifications).values({
-      user_id: input.userId,
-      booking_id: input.bookingId || null,
-      type: input.type,
-      category: input.category,
-      title: input.title,
-      body: input.body,
-      body_html: input.bodyHtml || null,
-      data: input.data || null,
-      template_id: input.templateId || null,
-      status: 'pending',
-      priority: input.priority || 5,
-    }).returning();
+      })
+      .returning();
 
     try {
       await this.dispatch(notification);
@@ -82,7 +99,10 @@ export class NotificationService {
         .set({ status: 'sent', sent_at: new Date() })
         .where(eq(notifications.id, notification.id));
 
-      logger.info({ notificationId: notification.id, userId: input.userId, type: input.type }, 'Notification sent');
+      logger.info(
+        { notificationId: notification.id, userId: input.userId, type: input.type },
+        'Notification sent',
+      );
     } catch (error) {
       await db
         .update(notifications)
@@ -99,20 +119,23 @@ export class NotificationService {
   }
 
   async createInAppNotification(input: Omit<SendNotificationInput, 'type'>) {
-    const [notification] = await db.insert(notifications).values({
-      user_id: input.userId,
-      booking_id: input.bookingId || null,
-      type: 'in_app',
-      category: input.category,
-      title: input.title,
-      body: input.body,
-      body_html: input.bodyHtml || null,
-      data: input.data || null,
-      template_id: input.templateId || null,
-      status: 'delivered',
-      priority: input.priority || 5,
-      delivered_at: new Date(),
-    }).returning();
+    const [notification] = await db
+      .insert(notifications)
+      .values({
+        user_id: input.userId,
+        booking_id: input.bookingId || null,
+        type: 'in_app',
+        category: input.category,
+        title: input.title,
+        body: input.body,
+        body_html: input.bodyHtml || null,
+        data: input.data || null,
+        template_id: input.templateId || null,
+        status: 'delivered',
+        priority: input.priority || 5,
+        delivered_at: new Date(),
+      })
+      .returning();
 
     return notification;
   }
@@ -126,7 +149,10 @@ export class NotificationService {
         .orderBy(sql`${notifications.created_at} DESC`)
         .limit(options.limit)
         .offset((options.page - 1) * options.limit),
-      db.select({ count: sql<number>`COUNT(*)::int` }).from(notifications).where(eq(notifications.user_id, userId)),
+      db
+        .select({ count: sql<number>`COUNT(*)::int` })
+        .from(notifications)
+        .where(eq(notifications.user_id, userId)),
     ]);
 
     return { notifications: rows, total: count };
@@ -202,31 +228,38 @@ export class NotificationService {
     if (existing) {
       const [updated] = await db
         .update(notification_preferences)
-        .set({ ...data as any, updated_at: new Date() })
+        .set({ ...(data as any), updated_at: new Date() })
         .where(eq(notification_preferences.user_id, userId))
         .returning();
       return updated;
-    } else {
-      const [created] = await db
-        .insert(notification_preferences)
-        .values({ user_id: userId, ...data as any })
-        .returning();
-      return created;
     }
+    const [created] = await db
+      .insert(notification_preferences)
+      .values({ user_id: userId, ...(data as any) })
+      .returning();
+    return created;
   }
 
-  async registerPushToken(userId: string, input: { token: string; platform: string; deviceId: string }) {
+  async registerPushToken(
+    userId: string,
+    input: { token: string; platform: string; deviceId: string },
+  ) {
     const [existing] = await db
       .select()
       .from(push_tokens)
       .where(and(eq(push_tokens.user_id, userId), eq(push_tokens.device_id, input.deviceId)))
       .limit(1);
 
-    let result;
+    let result: InferSelectModel<typeof push_tokens> | undefined;
     if (existing) {
       [result] = await db
         .update(push_tokens)
-        .set({ token: input.token, platform: input.platform as any, is_active: true, updated_at: new Date() })
+        .set({
+          token: input.token,
+          platform: input.platform as any,
+          is_active: true,
+          updated_at: new Date(),
+        })
         .where(eq(push_tokens.id, existing.id))
         .returning();
     } else {
@@ -257,7 +290,15 @@ export class NotificationService {
 
   async broadcastNotification(input: {
     type: 'email' | 'sms' | 'push' | 'in_app';
-    category: 'booking' | 'payment' | 'system' | 'marketing' | 'reminder' | 'document' | 'provider' | 'progress';
+    category:
+      | 'booking'
+      | 'payment'
+      | 'system'
+      | 'marketing'
+      | 'reminder'
+      | 'document'
+      | 'provider'
+      | 'progress';
     title: string;
     body: string;
     bodyHtml?: string;
@@ -317,16 +358,19 @@ export class NotificationService {
     return { templates, total: count };
   }
 
-  async updateTemplate(templateId: string, data: {
-    name?: string;
-    subject?: string;
-    body?: string;
-    bodyHtml?: string;
-    category?: string;
-    type?: string;
-    variables?: Record<string, unknown>;
-    isActive?: boolean;
-  }) {
+  async updateTemplate(
+    templateId: string,
+    data: {
+      name?: string;
+      subject?: string;
+      body?: string;
+      bodyHtml?: string;
+      category?: string;
+      type?: string;
+      variables?: Record<string, unknown>;
+      isActive?: boolean;
+    },
+  ) {
     const [template] = await db
       .select()
       .from(notification_templates)
@@ -359,12 +403,7 @@ export class NotificationService {
     const failed = await db
       .select()
       .from(notifications)
-      .where(
-        and(
-          eq(notifications.status, 'failed'),
-          lt(notifications.retry_count, MAX_RETRIES),
-        ),
-      )
+      .where(and(eq(notifications.status, 'failed'), lt(notifications.retry_count, MAX_RETRIES)))
       .orderBy(notifications.created_at)
       .limit(50);
 
@@ -473,7 +512,11 @@ export class NotificationService {
 
   private async dispatchEmail(notification: any): Promise<void> {
     logger.info(
-      { notificationId: notification.id, userId: notification.user_id, smtpHost: this.config.SMTP_HOST },
+      {
+        notificationId: notification.id,
+        userId: notification.user_id,
+        smtpHost: this.config.SMTP_HOST,
+      },
       'Email dispatch stub: would send email',
     );
   }

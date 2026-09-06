@@ -1,35 +1,19 @@
-import { z } from 'zod';
 import { BadRequestError } from '@longeny/errors';
-import * as paymentService from '../services/payment.service.js';
+import {
+  createCheckoutSchema,
+  createOrderSchema,
+  createPaymentIntentSchema,
+  createSetupIntentSchema,
+  payOrderSchema,
+  requestRefundSchema,
+} from '@longeny/validators';
 import * as invoiceService from '../services/invoice.service.js';
+import * as paymentService from '../services/payment.service.js';
 import * as refundService from '../services/refund.service.js';
-
-const checkoutSchema = z.object({
-  providerId: z.string().uuid(),
-  bookingId: z.string().uuid().optional(),
-  orderType: z.enum(['session', 'program', 'product', 'subscription']),
-  currency: z.string().length(3).default('USD'),
-  items: z.array(
-    z.object({
-      entityType: z.enum(['session', 'program', 'product']),
-      entityId: z.string().uuid(),
-      description: z.string().min(1).max(500),
-      quantity: z.number().int().positive(),
-      unitPrice: z.number().positive(),
-    }),
-  ).min(1),
-  platformFeePercent: z.number().min(0).max(100).optional(),
-  taxRate: z.number().min(0).max(100).optional(),
-  successUrl: z.string().url(),
-  cancelUrl: z.string().url(),
-  gateway: z.enum(['stripe', 'razorpay']).default('stripe'),
-  notes: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
-});
 
 export async function checkout({ body, store, set }: any) {
   const userId = store.userId as string;
-  const parsed = checkoutSchema.safeParse(body);
+  const parsed = createCheckoutSchema.safeParse(body);
 
   if (!parsed.success) {
     throw new BadRequestError('Invalid checkout data', 'VALIDATION_ERROR', {
@@ -60,26 +44,6 @@ export async function checkout({ body, store, set }: any) {
   };
 }
 
-const createOrderSchema = z.object({
-  providerId: z.string().uuid(),
-  bookingId: z.string().uuid().optional(),
-  orderType: z.enum(['session', 'program', 'product', 'subscription']),
-  currency: z.string().length(3).default('USD'),
-  items: z.array(
-    z.object({
-      entityType: z.enum(['session', 'program', 'product']),
-      entityId: z.string().uuid(),
-      description: z.string().min(1).max(500),
-      quantity: z.number().int().positive(),
-      unitPrice: z.number().positive(),
-    }),
-  ).min(1),
-  platformFeePercent: z.number().min(0).max(100).optional(),
-  taxRate: z.number().min(0).max(100).optional(),
-  notes: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
-});
-
 export async function createOrder({ body, store, set }: any) {
   const userId = store.userId as string;
   const parsed = createOrderSchema.safeParse(body);
@@ -90,17 +54,16 @@ export async function createOrder({ body, store, set }: any) {
     });
   }
 
-  const order = await paymentService.createOrder({ userId, ...parsed.data });
+  const order = await paymentService.createOrder({
+    userId,
+    // The account pays; the profile receives. Scope stays with the account.
+    profileId: store.activeProfileId || undefined,
+    ...parsed.data,
+  });
 
   set.status = 201;
   return { success: true, data: order };
 }
-
-const payOrderSchema = z.object({
-  gateway: z.enum(['stripe', 'razorpay']).default('stripe'),
-  successUrl: z.string().url(),
-  cancelUrl: z.string().url(),
-});
 
 export async function payOrder({ body, store, params }: any) {
   const userId = store.userId as string;
@@ -124,16 +87,9 @@ export async function payOrder({ body, store, params }: any) {
   return { success: true, data: result };
 }
 
-const createIntentSchema = z.object({
-  amount: z.number().positive(),
-  currency: z.string().length(3).default('USD'),
-  gateway: z.enum(['stripe', 'razorpay']).default('stripe'),
-  metadata: z.record(z.string()).optional(),
-});
-
 export async function createPaymentIntent({ body, store, set }: any) {
   const userId = store.userId as string;
-  const parsed = createIntentSchema.safeParse(body);
+  const parsed = createPaymentIntentSchema.safeParse(body);
 
   if (!parsed.success) {
     throw new BadRequestError('Invalid payment intent data', 'VALIDATION_ERROR', {
@@ -153,13 +109,9 @@ export async function createPaymentIntent({ body, store, set }: any) {
   return { success: true, data: result };
 }
 
-const setupIntentSchema = z.object({
-  gateway: z.enum(['stripe', 'razorpay']).default('stripe'),
-});
-
 export async function createSetupIntent({ body, store, set }: any) {
   const userId = store.userId as string;
-  const parsed = setupIntentSchema.safeParse(body ?? {});
+  const parsed = createSetupIntentSchema.safeParse(body ?? {});
 
   if (!parsed.success) {
     throw new BadRequestError('Invalid setup intent data', 'VALIDATION_ERROR', {
@@ -186,8 +138,8 @@ export async function listOrders({ store, query }: any) {
 
   const result = await paymentService.listOrders(userId, {
     status: query.status,
-    page: query.page ? parseInt(query.page) : undefined,
-    limit: query.limit ? parseInt(query.limit) : undefined,
+    page: query.page ? Number.parseInt(query.page) : undefined,
+    limit: query.limit ? Number.parseInt(query.limit) : undefined,
     sortBy: query.sortBy,
     sortOrder: query.sortOrder as 'asc' | 'desc' | undefined,
   });
@@ -249,8 +201,8 @@ export async function listRefunds({ store, query }: any) {
 
   const result = await refundService.listRefunds(userId, {
     status: query.status,
-    page: query.page ? parseInt(query.page) : undefined,
-    limit: query.limit ? parseInt(query.limit) : undefined,
+    page: query.page ? Number.parseInt(query.page) : undefined,
+    limit: query.limit ? Number.parseInt(query.limit) : undefined,
   });
 
   return {
@@ -260,15 +212,9 @@ export async function listRefunds({ store, query }: any) {
   };
 }
 
-const refundRequestSchema = z.object({
-  orderId: z.string().uuid(),
-  reason: z.string().min(1).max(1000),
-  amount: z.number().positive().optional(),
-});
-
 export async function requestRefund({ body, store, set }: any) {
   const userId = store.userId as string;
-  const parsed = refundRequestSchema.safeParse(body);
+  const parsed = requestRefundSchema.safeParse(body);
 
   if (!parsed.success) {
     throw new BadRequestError('Invalid refund request', 'VALIDATION_ERROR', {
@@ -292,8 +238,8 @@ export async function listInvoices({ store, query }: any) {
 
   const result = await invoiceService.listInvoices(userId, {
     status: query.status,
-    page: query.page ? parseInt(query.page) : undefined,
-    limit: query.limit ? parseInt(query.limit) : undefined,
+    page: query.page ? Number.parseInt(query.page) : undefined,
+    limit: query.limit ? Number.parseInt(query.limit) : undefined,
   });
 
   return {

@@ -1,7 +1,15 @@
-import { db } from '../db/index.js';
-import { eq, and, inArray, lt, gte } from 'drizzle-orm';
-import { orders, order_items, payments, refunds, invoices, gateway_customers, subscriptions } from '../db/schema.js';
 import { createLogger } from '@longeny/utils';
+import { and, eq, gte, inArray, lt } from 'drizzle-orm';
+import { db } from '../db/index.js';
+import {
+  gateway_customers,
+  invoices,
+  order_items,
+  orders,
+  payments,
+  refunds,
+  subscriptions,
+} from '../db/schema.js';
 import * as stripeService from '../services/stripe.service.js';
 
 const logger = createLogger('payment-service:internal');
@@ -13,18 +21,34 @@ const logger = createLogger('payment-service:internal');
 export async function getUserPaymentData({ params }: any) {
   const userId = params.userId;
 
-  const userOrders = await db.select().from(orders).where(eq(orders.user_id, userId)).orderBy(orders.created_at);
+  const userOrders = await db
+    .select()
+    .from(orders)
+    .where(eq(orders.user_id, userId))
+    .orderBy(orders.created_at);
   const orderIds = userOrders.map((o) => o.id);
 
-  const [orderItemsList, paymentsList, refundsList, subscriptionList, gatewayCustomerList, invoiceList] =
-    await Promise.all([
-      orderIds.length ? db.select().from(order_items).where(inArray(order_items.order_id, orderIds)) : [],
-      orderIds.length ? db.select().from(payments).where(inArray(payments.order_id, orderIds)) : [],
-      orderIds.length ? db.select().from(refunds).where(inArray(refunds.order_id, orderIds)) : [],
-      db.select().from(subscriptions).where(eq(subscriptions.user_id, userId)).orderBy(subscriptions.created_at),
-      db.select().from(gateway_customers).where(eq(gateway_customers.user_id, userId)),
-      db.select().from(invoices).where(eq(invoices.user_id, userId)).orderBy(invoices.created_at),
-    ]);
+  const [
+    orderItemsList,
+    paymentsList,
+    refundsList,
+    subscriptionList,
+    gatewayCustomerList,
+    invoiceList,
+  ] = await Promise.all([
+    orderIds.length
+      ? db.select().from(order_items).where(inArray(order_items.order_id, orderIds))
+      : [],
+    orderIds.length ? db.select().from(payments).where(inArray(payments.order_id, orderIds)) : [],
+    orderIds.length ? db.select().from(refunds).where(inArray(refunds.order_id, orderIds)) : [],
+    db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.user_id, userId))
+      .orderBy(subscriptions.created_at),
+    db.select().from(gateway_customers).where(eq(gateway_customers.user_id, userId)),
+    db.select().from(invoices).where(eq(invoices.user_id, userId)).orderBy(invoices.created_at),
+  ]);
 
   return {
     success: true,
@@ -133,11 +157,14 @@ export async function anonymizeUserPaymentData({ params }: any) {
   }
 
   // Anonymize recent orders (within 7 years) - remove PII notes/metadata
-  await db.update(orders).set({
-    notes: null,
-    metadata: null,
-    updated_at: new Date(),
-  }).where(and(eq(orders.user_id, userId), gte(orders.created_at, sevenYearsAgo)));
+  await db
+    .update(orders)
+    .set({
+      notes: null,
+      metadata: null,
+      updated_at: new Date(),
+    })
+    .where(and(eq(orders.user_id, userId), gte(orders.created_at, sevenYearsAgo)));
 
   // Delete Stripe customers
   const gatewayCustomerList = await db
@@ -151,7 +178,10 @@ export async function anonymizeUserPaymentData({ params }: any) {
         await stripeService.deleteCustomer(gc.gateway_customer_id);
       }
     } catch (error) {
-      logger.error({ error, customerId: gc.gateway_customer_id }, 'Failed to delete gateway customer');
+      logger.error(
+        { error, customerId: gc.gateway_customer_id },
+        'Failed to delete gateway customer',
+      );
     }
   }
 
@@ -161,10 +191,12 @@ export async function anonymizeUserPaymentData({ params }: any) {
   const activeSubscriptions = await db
     .select()
     .from(subscriptions)
-    .where(and(
-      eq(subscriptions.user_id, userId),
-      inArray(subscriptions.status, ['active', 'trialing', 'past_due']),
-    ));
+    .where(
+      and(
+        eq(subscriptions.user_id, userId),
+        inArray(subscriptions.status, ['active', 'trialing', 'past_due']),
+      ),
+    );
 
   for (const sub of activeSubscriptions) {
     if (sub.gateway_subscription_id) {
@@ -176,12 +208,15 @@ export async function anonymizeUserPaymentData({ params }: any) {
     }
   }
 
-  await db.update(subscriptions).set({
-    status: 'cancelled',
-    cancelled_at: new Date(),
-    cancellation_reason: 'GDPR data erasure',
-    updated_at: new Date(),
-  }).where(eq(subscriptions.user_id, userId));
+  await db
+    .update(subscriptions)
+    .set({
+      status: 'cancelled',
+      cancelled_at: new Date(),
+      cancellation_reason: 'GDPR data erasure',
+      updated_at: new Date(),
+    })
+    .where(eq(subscriptions.user_id, userId));
 
   logger.info({ userId, oldOrdersDeleted: oldOrders.length }, 'GDPR anonymization completed');
 
@@ -189,7 +224,8 @@ export async function anonymizeUserPaymentData({ params }: any) {
     success: true,
     data: {
       userId,
-      message: 'Payment data anonymized. Financial records within 7-year retention period preserved per legal requirements.',
+      message:
+        'Payment data anonymized. Financial records within 7-year retention period preserved per legal requirements.',
       oldOrdersDeleted: oldOrders.length,
       subscriptionsCancelled: activeSubscriptions.length,
       gatewayCustomersDeleted: gatewayCustomerList.length,

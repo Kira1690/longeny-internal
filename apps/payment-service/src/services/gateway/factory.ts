@@ -1,10 +1,8 @@
-import { loadConfig, paymentConfigSchema } from '@longeny/config';
 import { BadRequestError } from '@longeny/errors';
+import { config } from '../../config/index.js';
 import type { PaymentGateway } from './index.js';
-import { StripeGateway } from './stripe.gateway.js';
 import { RazorpayGateway } from './razorpay.gateway.js';
-
-const config = loadConfig(paymentConfigSchema);
+import { StripeGateway } from './stripe.gateway.js';
 
 let stripeGateway: StripeGateway | null = null;
 let razorpayGateway: RazorpayGateway | null = null;
@@ -19,10 +17,7 @@ export function createPaymentGateway(gateway: 'stripe' | 'razorpay'): PaymentGat
 
     case 'razorpay':
       if (!razorpayGateway) {
-        razorpayGateway = new RazorpayGateway(
-          config.RAZORPAY_KEY_ID,
-          config.RAZORPAY_KEY_SECRET,
-        );
+        razorpayGateway = new RazorpayGateway(config.RAZORPAY_KEY_ID, config.RAZORPAY_KEY_SECRET);
       }
       return razorpayGateway;
 
@@ -47,10 +42,7 @@ export function getStripeGateway(): StripeGateway {
  */
 export function getRazorpayGateway(): RazorpayGateway {
   if (!razorpayGateway) {
-    razorpayGateway = new RazorpayGateway(
-      config.RAZORPAY_KEY_ID,
-      config.RAZORPAY_KEY_SECRET,
-    );
+    razorpayGateway = new RazorpayGateway(config.RAZORPAY_KEY_ID, config.RAZORPAY_KEY_SECRET);
   }
   return razorpayGateway;
 }

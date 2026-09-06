@@ -1,8 +1,24 @@
+import { BadRequestError } from '@longeny/errors';
+import { buildPaginationMeta, parsePaginationParams } from '@longeny/utils';
 import type { BookingService } from '../services/booking.service.js';
-import { parsePaginationParams, buildPaginationMeta } from '@longeny/utils';
 
 export class BookingController {
   constructor(private bookingService: BookingService) {}
+
+  /**
+   * GET /internal/bookings/access — HMAC.
+   *
+   * Answers one question for another service: does this provider have an active
+   * engagement with this profile? The caller holds the records; this service
+   * holds the bookings that justify reading them.
+   */
+  providerAccess = async ({ query }: any) => {
+    const data = await this.bookingService.providerHasProfileAccess(
+      query.providerId,
+      query.profileId,
+    );
+    return { success: true, data };
+  };
 
   // GET /bookings/providers/:id/slots
   getAvailableSlots = async ({ query, params }: any) => {
@@ -10,18 +26,15 @@ export class BookingController {
     const date = query.date;
     const timezone = query.timezone || 'UTC';
 
+    // Thrown, not returned. These used to answer HTTP 200 with a `success: false`
+    // body, so a client checking the status code saw a successful call with no
+    // slots in it.
     if (!date) {
-      return {
-        success: false,
-        error: { code: 'BAD_REQUEST', message: 'date query parameter is required' },
-      };
+      throw new BadRequestError('date query parameter is required');
     }
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      return {
-        success: false,
-        error: { code: 'BAD_REQUEST', message: 'date must be in YYYY-MM-DD format' },
-      };
+      throw new BadRequestError('date must be in YYYY-MM-DD format');
     }
 
     const slots = await this.bookingService.getAvailableSlots(providerId, date, timezone);
@@ -37,6 +50,8 @@ export class BookingController {
   createBooking = async ({ body, store, set }: any) => {
     const booking = await this.bookingService.createBooking({
       userId: store.userId,
+      // The account books; the profile attends. Payment stays on the account.
+      profileId: store.activeProfileId || undefined,
       providerId: body.providerId,
       programId: body.programId,
       sessionType: body.sessionType,
@@ -62,6 +77,8 @@ export class BookingController {
     const { bookings, total } = await this.bookingService.listUserBookings(store.userId, {
       status: query.status,
       timeframe: query.timeframe,
+      // Narrows within the account's own bookings; it cannot widen them.
+      profileId: query.profileId,
       page,
       limit,
     });
@@ -120,10 +137,13 @@ export class BookingController {
   listProviderUpcomingBookings = async ({ store, query }: any) => {
     const { page, limit } = parsePaginationParams(query);
 
-    const { bookings, total } = await this.bookingService.listProviderUpcomingBookings(store.userId, {
-      page,
-      limit,
-    });
+    const { bookings, total } = await this.bookingService.listProviderUpcomingBookings(
+      store.userId,
+      {
+        page,
+        limit,
+      },
+    );
 
     return {
       success: true,

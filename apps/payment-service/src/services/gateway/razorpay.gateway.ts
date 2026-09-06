@@ -1,12 +1,12 @@
-import Razorpay from 'razorpay';
-import { createHmac } from 'crypto';
-import { createLogger } from '@longeny/utils';
+import { createHmac } from 'node:crypto';
 import { InternalError } from '@longeny/errors';
+import { createLogger } from '@longeny/utils';
+import Razorpay from 'razorpay';
 import type {
-  PaymentGateway,
   CheckoutParams,
-  SubscriptionParams,
+  PaymentGateway,
   PaymentIntentParams,
+  SubscriptionParams,
 } from './index.js';
 
 const logger = createLogger('payment-service:razorpay-gateway');
@@ -113,7 +113,10 @@ export class RazorpayGateway implements PaymentGateway {
     }
   }
 
-  async updateSubscription(subscriptionId: string, params: { priceId?: string; quantity?: number }) {
+  async updateSubscription(
+    subscriptionId: string,
+    params: { priceId?: string; quantity?: number },
+  ) {
     try {
       const updateParams: Record<string, any> = {};
 
@@ -168,13 +171,13 @@ export class RazorpayGateway implements PaymentGateway {
   }
 
   verifyWebhookSignature(body: string, signature: string, secret: string): boolean {
-    const expectedSignature = createHmac('sha256', secret)
-      .update(body)
-      .digest('hex');
+    const expectedSignature = createHmac('sha256', secret).update(body).digest('hex');
     return expectedSignature === signature;
   }
 
-  async createPaymentIntent(params: PaymentIntentParams): Promise<{ intentId: string; clientSecret: string }> {
+  async createPaymentIntent(
+    params: PaymentIntentParams,
+  ): Promise<{ intentId: string; clientSecret: string }> {
     try {
       // Razorpay uses orders as the equivalent of payment intents
       const order = await this.razorpay.orders.create({
@@ -226,8 +229,8 @@ export class RazorpayGateway implements PaymentGateway {
           ? {
               brand: token.card.network || token.card.issuer || 'unknown',
               last4: token.card.last4 || '****',
-              exp_month: parseInt(token.card.expiry_month || '0', 10),
-              exp_year: parseInt(token.card.expiry_year || '0', 10),
+              exp_month: Number.parseInt(token.card.expiry_month || '0', 10),
+              exp_year: Number.parseInt(token.card.expiry_year || '0', 10),
             }
           : null,
       }));

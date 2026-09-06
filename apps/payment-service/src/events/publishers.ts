@@ -1,8 +1,7 @@
 import { EventPublisher } from '@longeny/events';
 import { EVENT_NAMES } from '@longeny/types';
-import { loadConfig, paymentConfigSchema } from '@longeny/config';
+import { config } from '../config/index.js';
 
-const config = loadConfig(paymentConfigSchema);
 const redisUrl = config.REDIS_PASSWORD
   ? `redis://:${config.REDIS_PASSWORD}@${config.REDIS_HOST}:${config.REDIS_PORT}`
   : `redis://${config.REDIS_HOST}:${config.REDIS_PORT}`;

@@ -1,8 +1,8 @@
-import { db } from '../db/index.js';
-import { sql, eq, and, lte } from 'drizzle-orm';
-import { booking_reminders, bookings } from '../db/schema.js';
-import { createLogger } from '@longeny/utils';
 import type { EventPublisher } from '@longeny/events';
+import { createLogger } from '@longeny/utils';
+import { and, eq, lte, sql } from 'drizzle-orm';
+import { db } from '../db/index.js';
+import { booking_reminders, bookings } from '../db/schema.js';
 import { publishBookingReminderDue } from '../events/publishers.js';
 import type { NotificationService } from './notification.service.js';
 
@@ -96,7 +96,9 @@ export class ReminderService {
             bookingId: reminder.booking_id,
             category: 'reminder',
             title: 'Booking Reminder',
-            body: reminder.message || `Your session is coming up at ${booking.start_time.toISOString()}`,
+            body:
+              reminder.message ||
+              `Your session is coming up at ${booking.start_time.toISOString()}`,
             data: {
               bookingId: reminder.booking_id,
               reminderType: reminder.reminder_type,
@@ -111,7 +113,9 @@ export class ReminderService {
               type: 'email',
               category: 'reminder',
               title: 'Booking Reminder',
-              body: reminder.message || `Your session is coming up at ${booking.start_time.toISOString()}`,
+              body:
+                reminder.message ||
+                `Your session is coming up at ${booking.start_time.toISOString()}`,
             });
           }
 
@@ -131,7 +135,10 @@ export class ReminderService {
 
           processed++;
         } catch (error) {
-          logger.error({ reminderId: reminder.id, bookingId: reminder.booking_id, error }, 'Failed to process reminder');
+          logger.error(
+            { reminderId: reminder.id, bookingId: reminder.booking_id, error },
+            'Failed to process reminder',
+          );
 
           await db
             .update(booking_reminders)
@@ -184,6 +191,8 @@ export class ReminderService {
     await db
       .update(booking_reminders)
       .set({ status: 'cancelled' })
-      .where(and(eq(booking_reminders.booking_id, bookingId), eq(booking_reminders.status, 'pending')));
+      .where(
+        and(eq(booking_reminders.booking_id, bookingId), eq(booking_reminders.status, 'pending')),
+      );
   }
 }

@@ -48,7 +48,10 @@ export interface PaymentGateway {
     status: string;
   }>;
 
-  updateSubscription(subscriptionId: string, params: { priceId?: string; quantity?: number }): Promise<{
+  updateSubscription(
+    subscriptionId: string,
+    params: { priceId?: string; quantity?: number },
+  ): Promise<{
     subscriptionId: string;
     status: string;
   }>;
@@ -59,20 +62,24 @@ export interface PaymentGateway {
 
   verifyWebhookSignature(body: string, signature: string, secret: string): boolean;
 
-  createPaymentIntent(params: PaymentIntentParams): Promise<{ intentId: string; clientSecret: string }>;
+  createPaymentIntent(
+    params: PaymentIntentParams,
+  ): Promise<{ intentId: string; clientSecret: string }>;
 
   createSetupIntent(customerId: string): Promise<{ intentId: string; clientSecret: string }>;
 
-  listPaymentMethods(customerId: string): Promise<Array<{
-    id: string;
-    type: string;
-    card: {
-      brand: string;
-      last4: string;
-      exp_month: number;
-      exp_year: number;
-    } | null;
-  }>>;
+  listPaymentMethods(customerId: string): Promise<
+    Array<{
+      id: string;
+      type: string;
+      card: {
+        brand: string;
+        last4: string;
+        exp_month: number;
+        exp_year: number;
+      } | null;
+    }>
+  >;
 
   detachPaymentMethod(paymentMethodId: string): Promise<void>;
 }

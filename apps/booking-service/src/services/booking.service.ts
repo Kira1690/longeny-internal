@@ -1,19 +1,24 @@
-import { db } from '../db/index.js';
-import { sql, eq, and, or, lt, gt, gte, lte, inArray, ne } from 'drizzle-orm';
-import { bookings, booking_reminders, calendar_sync } from '../db/schema.js';
-import type Redis from 'ioredis';
-import { NotFoundError, ConflictError, BadRequestError, ForbiddenError } from '@longeny/errors';
-import { createLogger, createServiceClient, fromISO } from '@longeny/utils';
 import type { BookingConfig } from '@longeny/config';
-import { publishBookingCreated, publishBookingConfirmed, publishBookingCancelled, publishBookingCompleted } from '../events/publishers.js';
+import { BadRequestError, ConflictError, NotFoundError } from '@longeny/errors';
 import type { EventPublisher } from '@longeny/events';
+import { createLogger, createServiceClient, fromISO } from '@longeny/utils';
+import { and, eq, gt, gte, inArray, lt, lte, ne, or, sql } from 'drizzle-orm';
+import type Redis from 'ioredis';
+import { db } from '../db/index.js';
+import { booking_reminders, bookings, calendar_sync } from '../db/schema.js';
+import {
+  publishBookingCancelled,
+  publishBookingCompleted,
+  publishBookingConfirmed,
+  publishBookingCreated,
+} from '../events/publishers.js';
 
 const logger = createLogger('booking-service:booking');
 
 const BOOKING_BUFFER_MINUTES = 10;
 const LOCK_TTL_SECONDS = 5;
 
-interface SlotInfo {
+export interface SlotInfo {
   startTime: string;
   endTime: string;
   durationMinutes: number;
@@ -37,6 +42,12 @@ interface AvailabilityOverride {
 
 interface CreateBookingInput {
   userId: string;
+  /**
+   * Subject of care the session is for. Resolved and ownership-checked before
+   * the handler runs. A booking for a parent profile is made and paid for by
+   * the account owner and attended by the parent.
+   */
+  profileId?: string;
   providerId: string;
   programId?: string;
   sessionType: 'consultation' | 'followup' | 'assessment' | 'program_session' | 'custom';
@@ -59,9 +70,10 @@ export class BookingService {
   async getAvailableSlots(providerId: string, date: string, timezone: string): Promise<SlotInfo[]> {
     const targetDate = fromISO(`${date}T00:00:00Z`);
     const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const dayOfWeek = dayNames[targetDate.getUTCDay()];
+    // getUTCDay() is 0-6, so the lookup always hits; ?? keeps the type honest.
+    const dayOfWeek = dayNames[targetDate.getUTCDay()] ?? 'sunday';
 
-    const rules = await this.fetchProviderAvailabilityRules(providerId, dayOfWeek!);
+    const rules = await this.fetchProviderAvailabilityRules(providerId, dayOfWeek);
     if (rules.length === 0) return [];
 
     const overrides = await this.fetchProviderOverrides(providerId, date);
@@ -89,18 +101,22 @@ export class BookingService {
       if (!rule.is_available) continue;
 
       const slotDuration = rule.slot_duration_minutes || 60;
-      const [startH, startM] = rule.start_time.split(':').map(Number);
-      const [endH, endM] = rule.end_time.split(':').map(Number);
+      const [startH = 0, startM = 0] = rule.start_time.split(':').map(Number);
+      const [endH = 0, endM = 0] = rule.end_time.split(':').map(Number);
 
-      const ruleStartMinutes = startH! * 60 + startM!;
-      const ruleEndMinutes = endH! * 60 + endM!;
+      const ruleStartMinutes = startH * 60 + startM;
+      const ruleEndMinutes = endH * 60 + endM;
 
       let cursor = ruleStartMinutes;
       while (cursor + slotDuration <= ruleEndMinutes) {
-        const slotStartH = Math.floor(cursor / 60).toString().padStart(2, '0');
+        const slotStartH = Math.floor(cursor / 60)
+          .toString()
+          .padStart(2, '0');
         const slotStartM = (cursor % 60).toString().padStart(2, '0');
         const slotEndCursor = cursor + slotDuration;
-        const slotEndH = Math.floor(slotEndCursor / 60).toString().padStart(2, '0');
+        const slotEndH = Math.floor(slotEndCursor / 60)
+          .toString()
+          .padStart(2, '0');
         const slotEndM = (slotEndCursor % 60).toString().padStart(2, '0');
 
         allSlots.push({
@@ -158,7 +174,9 @@ export class BookingService {
     const acquired = await this.redis.set(lockKey, lockValue, 'EX', LOCK_TTL_SECONDS, 'NX');
 
     if (!acquired) {
-      throw new ConflictError('Another booking is being processed for this time slot. Please retry.');
+      throw new ConflictError(
+        'Another booking is being processed for this time slot. Please retry.',
+      );
     }
 
     try {
@@ -190,6 +208,7 @@ export class BookingService {
         .insert(bookings)
         .values({
           user_id: userId,
+          profile_id: input.profileId ?? null,
           provider_id: providerId,
           program_id: input.programId || null,
           session_type: input.sessionType as any,
@@ -256,16 +275,15 @@ export class BookingService {
   // ─── Get Booking ─────────────────────────────────────────────
 
   async getBooking(bookingId: string, userId: string) {
-    const [booking] = await db
-      .select()
-      .from(bookings)
-      .where(eq(bookings.id, bookingId))
-      .limit(1);
+    const [booking] = await db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
 
     if (!booking) throw new NotFoundError('Booking', bookingId);
 
+    // A booking belonging to someone else must be indistinguishable from one
+    // that does not exist — a 403 here confirms the id is real and lets a
+    // caller enumerate valid booking UUIDs.
     if (booking.user_id !== userId && booking.provider_id !== userId) {
-      throw new ForbiddenError('You do not have access to this booking');
+      throw new NotFoundError('Booking', bookingId);
     }
 
     const reminders = await db
@@ -278,14 +296,26 @@ export class BookingService {
 
   // ─── List User Bookings ──────────────────────────────────────
 
-  async listUserBookings(userId: string, options: {
-    status?: string;
-    timeframe?: 'upcoming' | 'past';
-    page: number;
-    limit: number;
-  }) {
+  async listUserBookings(
+    userId: string,
+    options: {
+      status?: string;
+      timeframe?: 'upcoming' | 'past';
+      /** Narrow to one subject of care. Omitted, the account sees all of its own. */
+      profileId?: string;
+      page: number;
+      limit: number;
+    },
+  ) {
     const now = new Date();
+    // Scoped by account first: `profile_id` narrows within what the account
+    // already owns, and can never widen it. A profile id from another family
+    // simply matches nothing.
     const conditions: any[] = [eq(bookings.user_id, userId)];
+
+    if (options.profileId) {
+      conditions.push(eq(bookings.profile_id, options.profileId));
+    }
 
     if (options.status) {
       conditions.push(sql`${bookings.status}::text = ${options.status}`);
@@ -299,7 +329,8 @@ export class BookingService {
     }
 
     const whereClause = and(...conditions);
-    const orderCol = options.timeframe === 'past' ? sql`${bookings.start_time} DESC` : bookings.start_time;
+    const orderCol =
+      options.timeframe === 'past' ? sql`${bookings.start_time} DESC` : bookings.start_time;
 
     const [rows, [{ count }]] = await Promise.all([
       db
@@ -315,14 +346,48 @@ export class BookingService {
     return { bookings: rows, total: count };
   }
 
+  /**
+   * Whether a provider has an active engagement with a profile.
+   *
+   * This is the basis for a provider reading a patient's records: there is no
+   * ambient provider access, only access derived from a booking that exists and
+   * has not been cancelled. Called over HMAC by ai-content, which holds the
+   * documents but not the bookings.
+   *
+   * A cancelled or no-show booking does not count. A completed one does — a
+   * clinician still needs the notes for someone they saw last month.
+   */
+  async providerHasProfileAccess(providerId: string, profileId: string) {
+    const [row] = await db
+      .select({ id: bookings.id, status: bookings.status, startTime: bookings.start_time })
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.provider_id, providerId),
+          eq(bookings.profile_id, profileId),
+          inArray(bookings.status, ['pending', 'confirmed', 'in_progress', 'completed']),
+        ),
+      )
+      .orderBy(sql`${bookings.start_time} DESC`)
+      .limit(1);
+
+    return {
+      hasAccess: Boolean(row),
+      basis: row ? `booking:${row.id}` : null,
+    };
+  }
+
   // ─── List Provider Bookings ──────────────────────────────────
 
-  async listProviderBookings(providerId: string, options: {
-    status?: string;
-    date?: string;
-    page: number;
-    limit: number;
-  }) {
+  async listProviderBookings(
+    providerId: string,
+    options: {
+      status?: string;
+      date?: string;
+      page: number;
+      limit: number;
+    },
+  ) {
     const conditions: any[] = [eq(bookings.provider_id, providerId)];
 
     if (options.status) {
@@ -354,21 +419,21 @@ export class BookingService {
 
   // ─── Update Booking ─────────────────────────────────────────
 
-  async updateBooking(bookingId: string, userId: string, data: {
-    notes?: string;
-    sessionType?: string;
-    title?: string;
-  }) {
-    const [booking] = await db
-      .select()
-      .from(bookings)
-      .where(eq(bookings.id, bookingId))
-      .limit(1);
+  async updateBooking(
+    bookingId: string,
+    userId: string,
+    data: {
+      notes?: string;
+      sessionType?: string;
+      title?: string;
+    },
+  ) {
+    const [booking] = await db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
 
     if (!booking) throw new NotFoundError('Booking', bookingId);
 
     if (booking.user_id !== userId && booking.provider_id !== userId) {
-      throw new ForbiddenError('You do not have permission to update this booking');
+      throw new NotFoundError('Booking', bookingId);
     }
 
     if (['cancelled', 'completed', 'no_show'].includes(booking.status)) {
@@ -417,16 +482,15 @@ export class BookingService {
   // ─── Confirm Booking ─────────────────────────────────────────
 
   async confirmBooking(bookingId: string, providerId: string) {
-    const [booking] = await db
-      .select()
-      .from(bookings)
-      .where(eq(bookings.id, bookingId))
-      .limit(1);
+    const [booking] = await db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
 
     if (!booking) throw new NotFoundError('Booking', bookingId);
 
+    // The route already gated on the provider role; reaching here with a
+    // different provider_id is an ownership miss, not a capability one, so it
+    // answers exactly like a missing row.
     if (booking.provider_id !== providerId) {
-      throw new ForbiddenError('Only the assigned provider can confirm this booking');
+      throw new NotFoundError('Booking', bookingId);
     }
 
     if (booking.status !== 'pending') {
@@ -454,11 +518,7 @@ export class BookingService {
   // ─── Cancel Booking ──────────────────────────────────────────
 
   async cancelBooking(bookingId: string, userId: string, _userRole: string, reason?: string) {
-    const [booking] = await db
-      .select()
-      .from(bookings)
-      .where(eq(bookings.id, bookingId))
-      .limit(1);
+    const [booking] = await db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
 
     if (!booking) throw new NotFoundError('Booking', bookingId);
 
@@ -468,7 +528,7 @@ export class BookingService {
     } else if (booking.user_id === userId) {
       cancelledBy = 'user';
     } else {
-      throw new ForbiddenError('You do not have permission to cancel this booking');
+      throw new NotFoundError('Booking', bookingId);
     }
 
     if (!['pending', 'confirmed'].includes(booking.status)) {
@@ -483,7 +543,8 @@ export class BookingService {
       .set({
         status: 'cancelled',
         cancelled_by: cancelledBy,
-        cancellation_reason: reason || (isLateCancellation ? 'Late cancellation (within 24h)' : null),
+        cancellation_reason:
+          reason || (isLateCancellation ? 'Late cancellation (within 24h)' : null),
         cancelled_at: new Date(),
         updated_at: new Date(),
       })
@@ -494,10 +555,7 @@ export class BookingService {
       .update(booking_reminders)
       .set({ status: 'cancelled' })
       .where(
-        and(
-          eq(booking_reminders.booking_id, bookingId),
-          eq(booking_reminders.status, 'pending'),
-        ),
+        and(eq(booking_reminders.booking_id, bookingId), eq(booking_reminders.status, 'pending')),
       );
 
     await publishBookingCancelled(this.publisher, {
@@ -515,17 +573,19 @@ export class BookingService {
 
   // ─── Reschedule Booking ──────────────────────────────────────
 
-  async rescheduleBooking(bookingId: string, userId: string, newStartTime: string, newEndTime: string, reason?: string) {
-    const [booking] = await db
-      .select()
-      .from(bookings)
-      .where(eq(bookings.id, bookingId))
-      .limit(1);
+  async rescheduleBooking(
+    bookingId: string,
+    userId: string,
+    newStartTime: string,
+    newEndTime: string,
+    reason?: string,
+  ) {
+    const [booking] = await db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
 
     if (!booking) throw new NotFoundError('Booking', bookingId);
 
     if (booking.user_id !== userId && booking.provider_id !== userId) {
-      throw new ForbiddenError('You do not have permission to reschedule this booking');
+      throw new NotFoundError('Booking', bookingId);
     }
 
     if (!['pending', 'confirmed'].includes(booking.status)) {
@@ -556,10 +616,7 @@ export class BookingService {
       .update(booking_reminders)
       .set({ status: 'cancelled' })
       .where(
-        and(
-          eq(booking_reminders.booking_id, bookingId),
-          eq(booking_reminders.status, 'pending'),
-        ),
+        and(eq(booking_reminders.booking_id, bookingId), eq(booking_reminders.status, 'pending')),
       );
 
     const [updated] = await db
@@ -570,7 +627,7 @@ export class BookingService {
         duration_minutes: durationMinutes,
         status: 'pending',
         notes: reason
-          ? `${booking.notes ? booking.notes + '\n' : ''}Rescheduled: ${reason}`
+          ? `${booking.notes ? `${booking.notes}\n` : ''}Rescheduled: ${reason}`
           : booking.notes,
         updated_at: new Date(),
       })
@@ -610,25 +667,23 @@ export class BookingService {
   // ─── Complete Booking ────────────────────────────────────────
 
   async completeBooking(bookingId: string, providerId: string) {
-    const [booking] = await db
-      .select()
-      .from(bookings)
-      .where(eq(bookings.id, bookingId))
-      .limit(1);
+    const [booking] = await db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
 
     if (!booking) throw new NotFoundError('Booking', bookingId);
 
     if (booking.provider_id !== providerId) {
-      throw new ForbiddenError('Only the assigned provider can complete this booking');
+      throw new NotFoundError('Booking', bookingId);
     }
 
     if (!['confirmed', 'in_progress'].includes(booking.status)) {
       throw new BadRequestError(`Cannot complete booking with status '${booking.status}'`);
     }
 
+    const completedAt = new Date();
+
     const [updated] = await db
       .update(bookings)
-      .set({ status: 'completed', completed_at: new Date(), updated_at: new Date() })
+      .set({ status: 'completed', completed_at: completedAt, updated_at: completedAt })
       .where(eq(bookings.id, bookingId))
       .returning();
 
@@ -636,17 +691,14 @@ export class BookingService {
       .update(booking_reminders)
       .set({ status: 'cancelled' })
       .where(
-        and(
-          eq(booking_reminders.booking_id, bookingId),
-          eq(booking_reminders.status, 'pending'),
-        ),
+        and(eq(booking_reminders.booking_id, bookingId), eq(booking_reminders.status, 'pending')),
       );
 
     await publishBookingCompleted(this.publisher, {
       bookingId: updated.id,
       userId: updated.user_id,
       providerId: updated.provider_id,
-      completedAt: updated.completed_at!.toISOString(),
+      completedAt: completedAt.toISOString(),
     });
 
     logger.info({ bookingId, providerId }, 'Booking completed');
@@ -656,16 +708,12 @@ export class BookingService {
   // ─── No-Show ─────────────────────────────────────────────────
 
   async markNoShow(bookingId: string, providerId: string) {
-    const [booking] = await db
-      .select()
-      .from(bookings)
-      .where(eq(bookings.id, bookingId))
-      .limit(1);
+    const [booking] = await db.select().from(bookings).where(eq(bookings.id, bookingId)).limit(1);
 
     if (!booking) throw new NotFoundError('Booking', bookingId);
 
     if (booking.provider_id !== providerId) {
-      throw new ForbiddenError('Only the assigned provider can mark no-show');
+      throw new NotFoundError('Booking', bookingId);
     }
 
     if (!['confirmed', 'in_progress'].includes(booking.status)) {
@@ -682,10 +730,7 @@ export class BookingService {
       .update(booking_reminders)
       .set({ status: 'cancelled' })
       .where(
-        and(
-          eq(booking_reminders.booking_id, bookingId),
-          eq(booking_reminders.status, 'pending'),
-        ),
+        and(eq(booking_reminders.booking_id, bookingId), eq(booking_reminders.status, 'pending')),
       );
 
     logger.info({ bookingId, providerId }, 'Booking marked as no-show');
@@ -695,10 +740,7 @@ export class BookingService {
   // ─── GDPR ───────────────────────────────────────────────────
 
   async getUserBookingsForExport(userId: string) {
-    const userBookings = await db
-      .select()
-      .from(bookings)
-      .where(eq(bookings.user_id, userId));
+    const userBookings = await db.select().from(bookings).where(eq(bookings.user_id, userId));
 
     const enriched = await Promise.all(
       userBookings.map(async (b) => {
@@ -731,7 +773,10 @@ export class BookingService {
 
   // ─── Private helpers ─────────────────────────────────────────
 
-  private async fetchProviderAvailabilityRules(providerId: string, dayOfWeek: string): Promise<AvailabilityRule[]> {
+  private async fetchProviderAvailabilityRules(
+    providerId: string,
+    dayOfWeek: string,
+  ): Promise<AvailabilityRule[]> {
     try {
       const client = createServiceClient(
         'booking-service',
@@ -743,22 +788,30 @@ export class BookingService {
       );
       return response.data || [];
     } catch (error) {
-      logger.warn({ providerId, dayOfWeek, error }, 'Failed to fetch availability rules, using defaults');
+      logger.warn(
+        { providerId, dayOfWeek, error },
+        'Failed to fetch availability rules, using defaults',
+      );
       const weekdays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
       if (weekdays.includes(dayOfWeek)) {
-        return [{
-          day_of_week: dayOfWeek,
-          start_time: '09:00',
-          end_time: '17:00',
-          slot_duration_minutes: 60,
-          is_available: true,
-        }];
+        return [
+          {
+            day_of_week: dayOfWeek,
+            start_time: '09:00',
+            end_time: '17:00',
+            slot_duration_minutes: 60,
+            is_available: true,
+          },
+        ];
       }
       return [];
     }
   }
 
-  private async fetchProviderOverrides(providerId: string, date: string): Promise<AvailabilityOverride[]> {
+  private async fetchProviderOverrides(
+    providerId: string,
+    date: string,
+  ): Promise<AvailabilityOverride[]> {
     try {
       const client = createServiceClient(
         'booking-service',
@@ -792,7 +845,10 @@ export class BookingService {
     }
   }
 
-  private async fetchCalendarBlocks(providerId: string, _date: string): Promise<Array<{ start: string; end: string }>> {
+  private async fetchCalendarBlocks(
+    providerId: string,
+    _date: string,
+  ): Promise<Array<{ start: string; end: string }>> {
     try {
       const [calendarSyncRow] = await db
         .select()

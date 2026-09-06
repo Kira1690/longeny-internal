@@ -6,7 +6,8 @@ import { registerSubscribers } from './events/subscribers.js';
 const logger = createLogger('booking-service');
 
 async function bootstrap(): Promise<void> {
-  const { app, config, redis, publisher, reminderService, bookingService, notificationService } = createApp();
+  const { app, config, redis, publisher, reminderService, bookingService, notificationService } =
+    createApp();
 
   // ── Connect Redis ──
   await redis.connect();

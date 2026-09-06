@@ -1,17 +1,16 @@
-import { db } from '../db/index.js';
-import { eq, and, inArray } from 'drizzle-orm';
-import { gateway_webhook_events, orders, payments, refunds, subscriptions } from '../db/schema.js';
-import { createLogger } from '@longeny/utils';
 import { BadRequestError } from '@longeny/errors';
-import { getStripeGateway, getRazorpayGateway } from './gateway/factory.js';
-import * as paymentService from './payment.service.js';
-import * as subscriptionService from './subscription.service.js';
-import * as refundService from './refund.service.js';
+import { createLogger } from '@longeny/utils';
+import { type InferSelectModel, and, eq, inArray } from 'drizzle-orm';
+import { config } from '../config/index.js';
+import { db } from '../db/index.js';
+import { gateway_webhook_events, orders, payments, refunds, subscriptions } from '../db/schema.js';
+import { getRazorpayGateway, getStripeGateway } from './gateway/factory.js';
 import * as invoiceService from './invoice.service.js';
-import { loadConfig, paymentConfigSchema } from '@longeny/config';
+import * as paymentService from './payment.service.js';
+import * as refundService from './refund.service.js';
+import * as subscriptionService from './subscription.service.js';
 
 const logger = createLogger('payment-service:webhook');
-const config = loadConfig(paymentConfigSchema);
 
 // ── Stripe Webhook Processing ─────────────────────────────────
 
@@ -43,10 +42,11 @@ export async function processRazorpayWebhook(rawBody: string, signature: string)
 
   const payload = JSON.parse(rawBody);
   const eventType = payload.event;
-  const eventId = payload.payload?.payment?.entity?.id
-    || payload.payload?.subscription?.entity?.id
-    || payload.payload?.refund?.entity?.id
-    || `rzp_${Date.now()}`;
+  const eventId =
+    payload.payload?.payment?.entity?.id ||
+    payload.payload?.subscription?.entity?.id ||
+    payload.payload?.refund?.entity?.id ||
+    `rzp_${Date.now()}`;
 
   await processWebhookIdempotent(eventId, 'razorpay', eventType, payload);
 }
@@ -87,10 +87,13 @@ async function processWebhookIdempotent(
       await handleRazorpayEvent(eventType, payload);
     }
 
-    await db.update(gateway_webhook_events).set({
-      processed: true,
-      processed_at: new Date(),
-    }).where(eq(gateway_webhook_events.gateway_event_id, eventId));
+    await db
+      .update(gateway_webhook_events)
+      .set({
+        processed: true,
+        processed_at: new Date(),
+      })
+      .where(eq(gateway_webhook_events.gateway_event_id, eventId));
 
     logger.info({ eventId, eventType, gateway }, 'Webhook event processed successfully');
   } catch (error) {
@@ -197,10 +200,13 @@ async function handleCheckoutSessionCompleted(session: any) {
   if (session.payment_status === 'paid') {
     const paymentIntentId = session.payment_intent;
 
-    await db.update(orders).set({
-      gateway_payment_intent_id: paymentIntentId,
-      updated_at: new Date(),
-    }).where(eq(orders.id, orderId));
+    await db
+      .update(orders)
+      .set({
+        gateway_payment_intent_id: paymentIntentId,
+        updated_at: new Date(),
+      })
+      .where(eq(orders.id, orderId));
 
     await paymentService.handlePaymentSuccess(orderId, paymentIntentId);
     await invoiceService.createInvoiceForOrder(orderId);
@@ -256,10 +262,12 @@ async function handleChargeRefunded(charge: any) {
     const pendingRefunds = await db
       .select()
       .from(refunds)
-      .where(and(
-        eq(refunds.payment_id, payment.id),
-        inArray(refunds.status, ['processing', 'approved']),
-      ));
+      .where(
+        and(
+          eq(refunds.payment_id, payment.id),
+          inArray(refunds.status, ['processing', 'approved']),
+        ),
+      );
 
     for (const refund of pendingRefunds) {
       if (refund.gateway_refund_id) {
@@ -312,7 +320,7 @@ async function handleRazorpayPaymentCaptured(payload: any) {
   const orderId = payment.notes?.orderId;
   const razorpayOrderId = payment.order_id;
 
-  let order;
+  let order: InferSelectModel<typeof orders> | undefined;
   if (orderId) {
     const [found] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
     order = found;
@@ -348,7 +356,7 @@ async function handleRazorpayPaymentFailed(payload: any) {
   const orderId = payment.notes?.orderId;
   const razorpayOrderId = payment.order_id;
 
-  let order;
+  let order: InferSelectModel<typeof orders> | undefined;
   if (orderId) {
     const [found] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
     order = found;
@@ -378,7 +386,7 @@ async function handleRazorpayOrderPaid(payload: any) {
 
   const orderId = orderEntity.notes?.orderId;
 
-  let order;
+  let order: InferSelectModel<typeof orders> | undefined;
   if (orderId) {
     const [found] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
     order = found;
@@ -417,7 +425,10 @@ async function handleRazorpaySubscriptionActivated(payload: any) {
     subscription.current_end,
   );
 
-  logger.info({ razorpaySubscriptionId: subscription.id }, 'Razorpay subscription activated/charged');
+  logger.info(
+    { razorpaySubscriptionId: subscription.id },
+    'Razorpay subscription activated/charged',
+  );
 }
 
 async function handleRazorpaySubscriptionEnded(payload: any) {
@@ -459,13 +470,19 @@ async function handleRazorpayRefundProcessed(payload: any) {
     const pendingRefunds = await db
       .select()
       .from(refunds)
-      .where(and(
-        eq(refunds.payment_id, payment.id),
-        inArray(refunds.status, ['processing', 'approved']),
-      ));
+      .where(
+        and(
+          eq(refunds.payment_id, payment.id),
+          inArray(refunds.status, ['processing', 'approved']),
+        ),
+      );
 
     for (const dbRefund of pendingRefunds) {
-      await refundService.updateRefundStatus(dbRefund.gateway_refund_id || refund.id, 'approved', 'system');
+      await refundService.updateRefundStatus(
+        dbRefund.gateway_refund_id || refund.id,
+        'approved',
+        'system',
+      );
     }
   }
 

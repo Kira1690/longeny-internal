@@ -1,6 +1,6 @@
+import { createLogger } from '@longeny/utils';
 import { db } from './index.js';
 import { notification_templates } from './schema.js';
-import { createLogger } from '@longeny/utils';
 
 const logger = createLogger('booking-service:seed');
 
@@ -14,8 +14,10 @@ async function seed() {
       type: 'email' as const,
       category: 'booking' as const,
       subject: 'Your booking is confirmed',
-      body_template: 'Hello {{userName}}, your booking with {{providerName}} on {{startTime}} has been confirmed.',
-      body_html_template: '<p>Hello {{userName}}, your booking with <strong>{{providerName}}</strong> on {{startTime}} has been confirmed.</p>',
+      body_template:
+        'Hello {{userName}}, your booking with {{providerName}} on {{startTime}} has been confirmed.',
+      body_html_template:
+        '<p>Hello {{userName}}, your booking with <strong>{{providerName}}</strong> on {{startTime}} has been confirmed.</p>',
       variables: { userName: 'string', providerName: 'string', startTime: 'string' },
       status: 'active' as const,
     },
@@ -25,7 +27,8 @@ async function seed() {
       category: 'booking' as const,
       subject: 'Your booking has been cancelled',
       body_template: 'Hello {{userName}}, your booking on {{startTime}} has been cancelled.',
-      body_html_template: '<p>Hello {{userName}}, your booking on {{startTime}} has been cancelled.</p>',
+      body_html_template:
+        '<p>Hello {{userName}}, your booking on {{startTime}} has been cancelled.</p>',
       variables: { userName: 'string', startTime: 'string' },
       status: 'active' as const,
     },
@@ -34,8 +37,10 @@ async function seed() {
       type: 'email' as const,
       category: 'reminder' as const,
       subject: 'Reminder: Your session is tomorrow',
-      body_template: 'Hello {{userName}}, this is a reminder that your session with {{providerName}} is scheduled for tomorrow at {{startTime}}.',
-      body_html_template: '<p>Hello {{userName}}, this is a reminder that your session with <strong>{{providerName}}</strong> is scheduled for tomorrow at {{startTime}}.</p>',
+      body_template:
+        'Hello {{userName}}, this is a reminder that your session with {{providerName}} is scheduled for tomorrow at {{startTime}}.',
+      body_html_template:
+        '<p>Hello {{userName}}, this is a reminder that your session with <strong>{{providerName}}</strong> is scheduled for tomorrow at {{startTime}}.</p>',
       variables: { userName: 'string', providerName: 'string', startTime: 'string' },
       status: 'active' as const,
     },
@@ -44,8 +49,10 @@ async function seed() {
       type: 'email' as const,
       category: 'reminder' as const,
       subject: 'Reminder: Your session starts in 1 hour',
-      body_template: 'Hello {{userName}}, your session with {{providerName}} starts in 1 hour at {{startTime}}.',
-      body_html_template: '<p>Hello {{userName}}, your session with <strong>{{providerName}}</strong> starts in 1 hour at {{startTime}}.</p>',
+      body_template:
+        'Hello {{userName}}, your session with {{providerName}} starts in 1 hour at {{startTime}}.',
+      body_html_template:
+        '<p>Hello {{userName}}, your session with <strong>{{providerName}}</strong> starts in 1 hour at {{startTime}}.</p>',
       variables: { userName: 'string', providerName: 'string', startTime: 'string' },
       status: 'active' as const,
     },

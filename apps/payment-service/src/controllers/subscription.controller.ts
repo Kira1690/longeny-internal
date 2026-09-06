@@ -1,5 +1,5 @@
-import { z } from 'zod';
 import { BadRequestError } from '@longeny/errors';
+import { z } from 'zod';
 import * as subscriptionService from '../services/subscription.service.js';
 
 const createSubscriptionSchema = z.object({
@@ -53,7 +53,11 @@ export async function updateSubscription({ body, store, params }: any) {
     });
   }
 
-  const subscription = await subscriptionService.updateSubscription(subscriptionId, userId, parsed.data);
+  const subscription = await subscriptionService.updateSubscription(
+    subscriptionId,
+    userId,
+    parsed.data,
+  );
   return { success: true, data: subscription };
 }
 
@@ -62,8 +66,8 @@ export async function listSubscriptions({ store, query }: any) {
 
   const result = await subscriptionService.listSubscriptions(userId, {
     status: query.status,
-    page: query.page ? parseInt(query.page) : undefined,
-    limit: query.limit ? parseInt(query.limit) : undefined,
+    page: query.page ? Number.parseInt(query.page) : undefined,
+    limit: query.limit ? Number.parseInt(query.limit) : undefined,
   });
 
   return {

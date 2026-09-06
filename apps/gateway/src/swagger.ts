@@ -53,6 +53,11 @@ const CACHE_TTL_MS = 60_000; // 1 minute
 const FETCH_TIMEOUT_MS = 5_000;
 
 const EXCLUDED_PATH_PATTERNS = [
+  // Service-to-service routes: HMAC-signed, never proxied, and the gateway
+  // returns 404 for every one of them. Publishing them in the aggregate spec
+  // documented a surface no client can call and handed a reader a map of the
+  // internal API — including the GDPR erasure endpoint.
+  /\/internal\//,
   /\/providers\/me\/verification/,
   /\/providers\/me\/availability/,
   /\/providers\/me\/programs/,
@@ -64,11 +69,18 @@ const EXCLUDED_PATH_PATTERNS = [
   /\/providers\/[^/]+\/availability/,
   /\/marketplace/,
   /\/progress/,
-  /\/bookings/,
   /\/notifications/,
   /\/ai\//,
+  // ai-content's own /documents surface is not proxied; the profile reports
+  // timeline it also serves is, and is matched by the negative lookahead.
   /\/documents\//,
-  /\/payments/,
+  /\/kb\//,
+  /\/rag\//,
+  /\/recommendations/,
+  /\/matching/,
+  /\/scheduling/,
+  /\/provider-profiles/,
+  /\/admin\/(?:embeddings|prompts)/,
 ];
 
 // ── Module-level cache ───────────────────────────────────────────────────────
@@ -81,10 +93,30 @@ function buildServiceDescriptors(config: GatewayConfig): ServiceDescriptor[] {
   return [
     { name: 'auth', url: config.AUTH_SERVICE_URL, pathPrefix: 'auth' },
     { name: 'user-provider', url: config.USER_PROVIDER_SERVICE_URL, pathPrefix: '' },
+    // Both are proxied by the gateway and neither had a spec of its own until
+    // now, so the aggregate documented endpoints a client could call and stayed
+    // silent about booking and payment entirely.
+    { name: 'booking', url: config.BOOKING_SERVICE_URL, pathPrefix: '' },
+    { name: 'payment', url: config.PAYMENT_SERVICE_URL, pathPrefix: '' },
+    // Intake, the RRO results and the reports timeline are proxied, so they
+    // belong in the aggregate. Its /internal/* and /ai/* paths are filtered out
+    // below, as they are for every other service.
+    { name: 'ai-content', url: config.AI_CONTENT_SERVICE_URL, pathPrefix: '' },
   ];
 }
 
+/**
+ * In-scope paths that an exclusion pattern would otherwise swallow.
+ *
+ * booking-service owns a top-level `/notifications` resource that is out of the
+ * current scope, so `/notifications` is excluded wholesale. The profile
+ * notification log is nested under `/profiles/{id}` and only shares the word —
+ * it is Week 6 scope, is proxied, and belongs in the published spec.
+ */
+const EXCLUSION_OVERRIDES = [/\/profiles\/\{[^}]+\}\/notifications$/];
+
 function isExcludedPath(path: string): boolean {
+  if (EXCLUSION_OVERRIDES.some((pattern) => pattern.test(path))) return false;
   return EXCLUDED_PATH_PATTERNS.some((pattern) => pattern.test(path));
 }
 
@@ -309,10 +341,7 @@ async function buildMergedSpec(config: GatewayConfig): Promise<OpenApiSpec> {
  * Returns the merged OpenAPI spec, using the in-memory cache when fresh.
  * Pass `force = true` to bypass the cache and re-fetch immediately.
  */
-export async function getMergedSpec(
-  config: GatewayConfig,
-  force = false,
-): Promise<OpenApiSpec> {
+export async function getMergedSpec(config: GatewayConfig, force = false): Promise<OpenApiSpec> {
   const now = Date.now();
   if (!force && _cache && now - _cache.fetchedAt < CACHE_TTL_MS) {
     return _cache.spec;

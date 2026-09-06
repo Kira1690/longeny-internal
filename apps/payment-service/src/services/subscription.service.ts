@@ -1,10 +1,10 @@
-import { db } from '../db/index.js';
-import { eq, and, sql } from 'drizzle-orm';
-import { subscriptions, gateway_customers } from '../db/schema.js';
+import { BadRequestError, NotFoundError } from '@longeny/errors';
 import { createLogger } from '@longeny/utils';
-import { NotFoundError, BadRequestError } from '@longeny/errors';
+import { and, eq, sql } from 'drizzle-orm';
+import { db } from '../db/index.js';
+import { gateway_customers, subscriptions } from '../db/schema.js';
+import { publishSubscriptionCancelled, publishSubscriptionCreated } from '../events/publishers.js';
 import { createPaymentGateway } from './gateway/factory.js';
-import { publishSubscriptionCreated, publishSubscriptionCancelled } from '../events/publishers.js';
 
 const logger = createLogger('payment-service:subscription');
 
@@ -41,7 +41,9 @@ export async function createSubscription(input: CreateSubscriptionInput) {
   let [gatewayCustomer] = await db
     .select()
     .from(gateway_customers)
-    .where(and(eq(gateway_customers.user_id, userId), eq(gateway_customers.payment_gateway, gateway)))
+    .where(
+      and(eq(gateway_customers.user_id, userId), eq(gateway_customers.payment_gateway, gateway)),
+    )
     .limit(1);
 
   if (!gatewayCustomer) {
@@ -49,11 +51,14 @@ export async function createSubscription(input: CreateSubscriptionInput) {
       `user-${userId}@longeny.com`,
       `user-${userId}`,
     );
-    [gatewayCustomer] = await db.insert(gateway_customers).values({
-      user_id: userId,
-      payment_gateway: gateway,
-      gateway_customer_id: customerId,
-    }).returning();
+    [gatewayCustomer] = await db
+      .insert(gateway_customers)
+      .values({
+        user_id: userId,
+        payment_gateway: gateway,
+        gateway_customer_id: customerId,
+      })
+      .returning();
   }
 
   const result = await paymentGateway.createSubscription({
@@ -62,21 +67,24 @@ export async function createSubscription(input: CreateSubscriptionInput) {
     trialDays,
   });
 
-  const [subscription] = await db.insert(subscriptions).values({
-    user_id: userId,
-    provider_id: providerId,
-    program_id: programId || null,
-    gateway_subscription_id: result.subscriptionId,
-    gateway_price_id: priceId,
-    plan_name: planName,
-    amount: amount.toString(),
-    currency,
-    interval,
-    status: trialDays ? 'trialing' : 'active',
-    current_period_start: result.currentPeriodStart,
-    current_period_end: result.currentPeriodEnd,
-    trial_end: result.trialEnd,
-  }).returning();
+  const [subscription] = await db
+    .insert(subscriptions)
+    .values({
+      user_id: userId,
+      provider_id: providerId,
+      program_id: programId || null,
+      gateway_subscription_id: result.subscriptionId,
+      gateway_price_id: priceId,
+      plan_name: planName,
+      amount: amount.toString(),
+      currency,
+      interval,
+      status: trialDays ? 'trialing' : 'active',
+      current_period_start: result.currentPeriodStart,
+      current_period_end: result.currentPeriodEnd,
+      trial_end: result.trialEnd,
+    })
+    .returning();
 
   logger.info({ subscriptionId: subscription.id, userId }, 'Subscription created');
 
@@ -109,7 +117,11 @@ export async function updateSubscription(
   userId: string,
   input: UpdateSubscriptionInput,
 ) {
-  const [subscription] = await db.select().from(subscriptions).where(eq(subscriptions.id, subscriptionId)).limit(1);
+  const [subscription] = await db
+    .select()
+    .from(subscriptions)
+    .where(eq(subscriptions.id, subscriptionId))
+    .limit(1);
 
   if (!subscription) {
     throw new NotFoundError('Subscription', subscriptionId);
@@ -142,7 +154,11 @@ export async function updateSubscription(
   if (input.planName) updateData.plan_name = input.planName;
   if (input.amount !== undefined) updateData.amount = input.amount.toString();
 
-  const [updated] = await db.update(subscriptions).set(updateData as any).where(eq(subscriptions.id, subscriptionId)).returning();
+  const [updated] = await db
+    .update(subscriptions)
+    .set(updateData as any)
+    .where(eq(subscriptions.id, subscriptionId))
+    .returning();
 
   logger.info({ subscriptionId, gateway }, 'Subscription updated');
   return updated;
@@ -161,7 +177,13 @@ export async function listSubscriptions(
     : eq(subscriptions.user_id, userId);
 
   const [subscriptionList, [{ count }]] = await Promise.all([
-    db.select().from(subscriptions).where(whereClause).limit(limit).offset(offset).orderBy(subscriptions.created_at),
+    db
+      .select()
+      .from(subscriptions)
+      .where(whereClause)
+      .limit(limit)
+      .offset(offset)
+      .orderBy(subscriptions.created_at),
     db.select({ count: sql<number>`COUNT(*)::int` }).from(subscriptions).where(whereClause),
   ]);
 
@@ -182,7 +204,11 @@ export async function listSubscriptions(
 }
 
 export async function getSubscriptionDetail(subscriptionId: string, userId: string) {
-  const [subscription] = await db.select().from(subscriptions).where(eq(subscriptions.id, subscriptionId)).limit(1);
+  const [subscription] = await db
+    .select()
+    .from(subscriptions)
+    .where(eq(subscriptions.id, subscriptionId))
+    .limit(1);
 
   if (!subscription) {
     throw new NotFoundError('Subscription', subscriptionId);
@@ -201,7 +227,11 @@ export async function cancelSubscription(
   reason?: string,
   immediately = false,
 ) {
-  const [subscription] = await db.select().from(subscriptions).where(eq(subscriptions.id, subscriptionId)).limit(1);
+  const [subscription] = await db
+    .select()
+    .from(subscriptions)
+    .where(eq(subscriptions.id, subscriptionId))
+    .limit(1);
 
   if (!subscription) {
     throw new NotFoundError('Subscription', subscriptionId);
@@ -224,13 +254,17 @@ export async function cancelSubscription(
     await paymentGateway.cancelSubscription(subscription.gateway_subscription_id, immediately);
   }
 
-  const [updated] = await db.update(subscriptions).set({
-    status: immediately ? 'cancelled' : subscription.status,
-    cancel_at_period_end: !immediately,
-    cancelled_at: immediately ? new Date() : null,
-    cancellation_reason: reason || null,
-    updated_at: new Date(),
-  }).where(eq(subscriptions.id, subscriptionId)).returning();
+  const [updated] = await db
+    .update(subscriptions)
+    .set({
+      status: immediately ? 'cancelled' : subscription.status,
+      cancel_at_period_end: !immediately,
+      cancelled_at: immediately ? new Date() : null,
+      cancellation_reason: reason || null,
+      updated_at: new Date(),
+    })
+    .where(eq(subscriptions.id, subscriptionId))
+    .returning();
 
   logger.info({ subscriptionId, immediately }, 'Subscription cancellation processed');
 
@@ -294,9 +328,15 @@ export async function syncSubscriptionStatus(
   if (cancelAtPeriodEnd !== undefined) updateData.cancel_at_period_end = cancelAtPeriodEnd;
   if (mappedStatus === 'cancelled') updateData.cancelled_at = new Date();
 
-  await db.update(subscriptions).set(updateData as any).where(eq(subscriptions.id, subscription.id));
+  await db
+    .update(subscriptions)
+    .set(updateData as any)
+    .where(eq(subscriptions.id, subscription.id));
 
-  logger.info({ subscriptionId: subscription.id, status: mappedStatus }, 'Subscription status synced');
+  logger.info(
+    { subscriptionId: subscription.id, status: mappedStatus },
+    'Subscription status synced',
+  );
 }
 
 export async function handleSubscriptionDeleted(gatewaySubscriptionId: string) {
@@ -311,11 +351,14 @@ export async function handleSubscriptionDeleted(gatewaySubscriptionId: string) {
     return;
   }
 
-  await db.update(subscriptions).set({
-    status: 'cancelled',
-    cancelled_at: new Date(),
-    updated_at: new Date(),
-  }).where(eq(subscriptions.id, subscription.id));
+  await db
+    .update(subscriptions)
+    .set({
+      status: 'cancelled',
+      cancelled_at: new Date(),
+      updated_at: new Date(),
+    })
+    .where(eq(subscriptions.id, subscription.id));
 
   logger.info({ subscriptionId: subscription.id }, 'Subscription marked as cancelled (deleted)');
 

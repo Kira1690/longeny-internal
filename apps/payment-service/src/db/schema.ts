@@ -1,28 +1,73 @@
 import {
-  pgTable,
+  boolean,
+  decimal,
+  index,
+  integer,
+  json,
   pgEnum,
+  pgTable,
+  text,
+  timestamp,
   uuid,
   varchar,
-  boolean,
-  integer,
-  decimal,
-  text,
-  json,
-  timestamp,
 } from 'drizzle-orm/pg-core';
 
 // ── Enums ────────────────────────────────────────────────────
 
 export const paymentGatewayEnum = pgEnum('payment_gateway', ['stripe', 'razorpay']);
-export const orderTypeEnum = pgEnum('order_type', ['session', 'program', 'product', 'subscription']);
-export const orderStatusEnum = pgEnum('order_status', ['pending', 'paid', 'fulfilled', 'cancelled', 'refunded']);
+export const orderTypeEnum = pgEnum('order_type', [
+  'session',
+  'program',
+  'product',
+  'subscription',
+]);
+export const orderStatusEnum = pgEnum('order_status', [
+  'pending',
+  'paid',
+  'fulfilled',
+  'cancelled',
+  'refunded',
+]);
 export const entityTypeEnum = pgEnum('entity_type', ['session', 'program', 'product']);
-export const paymentStatusEnum = pgEnum('payment_status', ['pending', 'succeeded', 'failed', 'cancelled']);
-export const subscriptionIntervalEnum = pgEnum('subscription_interval', ['weekly', 'monthly', 'quarterly', 'yearly']);
-export const subscriptionStatusEnum = pgEnum('subscription_status', ['trialing', 'active', 'past_due', 'cancelled', 'paused']);
-export const refundStatusEnum = pgEnum('refund_status', ['pending', 'approved', 'processing', 'completed', 'rejected']);
-export const invoiceStatusEnum = pgEnum('invoice_status', ['draft', 'sent', 'paid', 'void', 'overdue']);
-export const payoutStatusEnum = pgEnum('payout_status', ['pending', 'processing', 'completed', 'failed']);
+export const paymentStatusEnum = pgEnum('payment_status', [
+  'pending',
+  'succeeded',
+  'failed',
+  'cancelled',
+]);
+export const subscriptionIntervalEnum = pgEnum('subscription_interval', [
+  'weekly',
+  'monthly',
+  'quarterly',
+  'yearly',
+]);
+export const subscriptionStatusEnum = pgEnum('subscription_status', [
+  'trialing',
+  'active',
+  'past_due',
+  'cancelled',
+  'paused',
+]);
+export const refundStatusEnum = pgEnum('refund_status', [
+  'pending',
+  'approved',
+  'processing',
+  'completed',
+  'rejected',
+]);
+export const invoiceStatusEnum = pgEnum('invoice_status', [
+  'draft',
+  'sent',
+  'paid',
+  'void',
+  'overdue',
+]);
+export const payoutStatusEnum = pgEnum('payout_status', [
+  'pending',
+  'processing',
+  'completed',
+  'failed',
+]);
 
 // ── Tables ───────────────────────────────────────────────────
 
@@ -37,35 +82,52 @@ export const gateway_customers = pgTable('gateway_customers', {
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const orders = pgTable('orders', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  order_number: varchar('order_number', { length: 20 }).notNull().unique(),
-  user_id: uuid('user_id').notNull(),
-  provider_id: uuid('provider_id').notNull(),
-  booking_id: uuid('booking_id'),
-  order_type: orderTypeEnum('order_type').notNull(),
-  status: orderStatusEnum('status').notNull().default('pending'),
-  subtotal: decimal('subtotal', { precision: 10, scale: 2 }).notNull(),
-  tax: decimal('tax', { precision: 10, scale: 2 }).notNull().default('0'),
-  platform_fee: decimal('platform_fee', { precision: 10, scale: 2 }).notNull().default('0'),
-  platform_fee_percent: decimal('platform_fee_percent', { precision: 4, scale: 2 }).notNull().default('10'),
-  discount: decimal('discount', { precision: 10, scale: 2 }).notNull().default('0'),
-  total: decimal('total', { precision: 10, scale: 2 }).notNull(),
-  currency: varchar('currency', { length: 3 }).notNull().default('USD'),
-  payment_gateway: paymentGatewayEnum('payment_gateway'),
-  gateway_payment_intent_id: varchar('gateway_payment_intent_id', { length: 100 }),
-  gateway_checkout_session_id: varchar('gateway_checkout_session_id', { length: 100 }),
-  notes: text('notes'),
-  metadata: json('metadata'),
-  paid_at: timestamp('paid_at', { withTimezone: true }),
-  cancelled_at: timestamp('cancelled_at', { withTimezone: true }),
-  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const orders = pgTable(
+  'orders',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    order_number: varchar('order_number', { length: 20 }).notNull().unique(),
+    /** Account that pays. Money always belongs to the account, never to a profile. */
+    user_id: uuid('user_id').notNull(),
+    /**
+     * Subject of care the purchase is for — a session booked for a parent is paid
+     * by the account and delivered to the parent. Recorded so a family can see
+     * what was bought for whom; it is never a scope for authorisation.
+     */
+    profile_id: uuid('profile_id'),
+    provider_id: uuid('provider_id').notNull(),
+    booking_id: uuid('booking_id'),
+    order_type: orderTypeEnum('order_type').notNull(),
+    status: orderStatusEnum('status').notNull().default('pending'),
+    subtotal: decimal('subtotal', { precision: 10, scale: 2 }).notNull(),
+    tax: decimal('tax', { precision: 10, scale: 2 }).notNull().default('0'),
+    platform_fee: decimal('platform_fee', { precision: 10, scale: 2 }).notNull().default('0'),
+    platform_fee_percent: decimal('platform_fee_percent', { precision: 4, scale: 2 })
+      .notNull()
+      .default('10'),
+    discount: decimal('discount', { precision: 10, scale: 2 }).notNull().default('0'),
+    total: decimal('total', { precision: 10, scale: 2 }).notNull(),
+    currency: varchar('currency', { length: 3 }).notNull().default('USD'),
+    payment_gateway: paymentGatewayEnum('payment_gateway'),
+    gateway_payment_intent_id: varchar('gateway_payment_intent_id', { length: 100 }),
+    gateway_checkout_session_id: varchar('gateway_checkout_session_id', { length: 100 }),
+    notes: text('notes'),
+    metadata: json('metadata'),
+    paid_at: timestamp('paid_at', { withTimezone: true }),
+    cancelled_at: timestamp('cancelled_at', { withTimezone: true }),
+    created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    idx_profile: index('orders_profile_idx').on(t.profile_id, t.created_at),
+  }),
+);
 
 export const order_items = pgTable('order_items', {
   id: uuid('id').primaryKey().defaultRandom(),
-  order_id: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  order_id: uuid('order_id')
+    .notNull()
+    .references(() => orders.id, { onDelete: 'cascade' }),
   entity_type: entityTypeEnum('entity_type').notNull(),
   entity_id: uuid('entity_id').notNull(),
   description: varchar('description', { length: 500 }).notNull(),
@@ -78,7 +140,9 @@ export const order_items = pgTable('order_items', {
 
 export const payments = pgTable('payments', {
   id: uuid('id').primaryKey().defaultRandom(),
-  order_id: uuid('order_id').notNull().references(() => orders.id),
+  order_id: uuid('order_id')
+    .notNull()
+    .references(() => orders.id),
   gateway_payment_id: varchar('gateway_payment_id', { length: 100 }).unique(),
   gateway_charge_id: varchar('gateway_charge_id', { length: 100 }),
   amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
@@ -119,8 +183,12 @@ export const subscriptions = pgTable('subscriptions', {
 
 export const refunds = pgTable('refunds', {
   id: uuid('id').primaryKey().defaultRandom(),
-  order_id: uuid('order_id').notNull().references(() => orders.id),
-  payment_id: uuid('payment_id').notNull().references(() => payments.id),
+  order_id: uuid('order_id')
+    .notNull()
+    .references(() => orders.id),
+  payment_id: uuid('payment_id')
+    .notNull()
+    .references(() => payments.id),
   gateway_refund_id: varchar('gateway_refund_id', { length: 100 }).unique(),
   amount: decimal('amount', { precision: 10, scale: 2 }).notNull(),
   reason: text('reason').notNull(),
@@ -136,7 +204,10 @@ export const refunds = pgTable('refunds', {
 
 export const invoices = pgTable('invoices', {
   id: uuid('id').primaryKey().defaultRandom(),
-  order_id: uuid('order_id').notNull().unique().references(() => orders.id),
+  order_id: uuid('order_id')
+    .notNull()
+    .unique()
+    .references(() => orders.id),
   user_id: uuid('user_id').notNull(),
   invoice_number: varchar('invoice_number', { length: 30 }).notNull().unique(),
   gateway_invoice_id: varchar('gateway_invoice_id', { length: 100 }),

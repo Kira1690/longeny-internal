@@ -1,10 +1,17 @@
-import { db } from '../db/index.js';
-import { eq, and, inArray, sql } from 'drizzle-orm';
-import { orders, order_items, payments, refunds, gateway_customers, invoices } from '../db/schema.js';
+import { BadRequestError, NotFoundError } from '@longeny/errors';
 import { createLogger } from '@longeny/utils';
-import { NotFoundError, BadRequestError } from '@longeny/errors';
-import { createPaymentGateway } from './gateway/factory.js';
+import { and, eq, inArray, sql } from 'drizzle-orm';
+import { db } from '../db/index.js';
+import {
+  gateway_customers,
+  invoices,
+  order_items,
+  orders,
+  payments,
+  refunds,
+} from '../db/schema.js';
 import { publishPaymentCompleted, publishPaymentFailed } from '../events/publishers.js';
+import { createPaymentGateway } from './gateway/factory.js';
 
 const logger = createLogger('payment-service:payment');
 
@@ -16,6 +23,8 @@ function generateOrderNumber(): string {
 
 export interface CreateOrderInput {
   userId: string;
+  /** Subject of care this purchase is for. Recorded, never used as a scope. */
+  profileId?: string;
   providerId: string;
   bookingId?: string;
   orderType: 'session' | 'program' | 'product' | 'subscription';
@@ -36,6 +45,7 @@ export interface CreateOrderInput {
 export async function createOrder(input: CreateOrderInput) {
   const {
     userId,
+    profileId,
     providerId,
     bookingId,
     orderType,
@@ -48,28 +58,32 @@ export async function createOrder(input: CreateOrderInput) {
   } = input;
 
   const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-  const tax = parseFloat((subtotal * (taxRate / 100)).toFixed(2));
-  const platformFee = parseFloat((subtotal * (platformFeePercent / 100)).toFixed(2));
+  const tax = Number.parseFloat((subtotal * (taxRate / 100)).toFixed(2));
+  const platformFee = Number.parseFloat((subtotal * (platformFeePercent / 100)).toFixed(2));
   const discount = 0;
-  const total = parseFloat((subtotal + tax - discount).toFixed(2));
+  const total = Number.parseFloat((subtotal + tax - discount).toFixed(2));
 
-  const [order] = await db.insert(orders).values({
-    order_number: generateOrderNumber(),
-    user_id: userId,
-    provider_id: providerId,
-    booking_id: bookingId || null,
-    order_type: orderType,
-    status: 'pending',
-    subtotal: subtotal.toString(),
-    tax: tax.toString(),
-    platform_fee: platformFee.toString(),
-    platform_fee_percent: platformFeePercent.toString(),
-    discount: discount.toString(),
-    total: total.toString(),
-    currency,
-    notes: notes || null,
-    metadata: metadata || null,
-  }).returning();
+  const [order] = await db
+    .insert(orders)
+    .values({
+      order_number: generateOrderNumber(),
+      user_id: userId,
+      profile_id: profileId ?? null,
+      provider_id: providerId,
+      booking_id: bookingId || null,
+      order_type: orderType,
+      status: 'pending',
+      subtotal: subtotal.toString(),
+      tax: tax.toString(),
+      platform_fee: platformFee.toString(),
+      platform_fee_percent: platformFeePercent.toString(),
+      discount: discount.toString(),
+      total: total.toString(),
+      currency,
+      notes: notes || null,
+      metadata: metadata || null,
+    })
+    .returning();
 
   await db.insert(order_items).values(
     items.map((item) => ({
@@ -79,7 +93,7 @@ export async function createOrder(input: CreateOrderInput) {
       description: item.description,
       quantity: item.quantity,
       unit_price: item.unitPrice.toString(),
-      total_price: parseFloat((item.unitPrice * item.quantity).toFixed(2)).toString(),
+      total_price: Number.parseFloat((item.unitPrice * item.quantity).toFixed(2)).toString(),
     })),
   );
 
@@ -110,7 +124,10 @@ export async function processCheckout(
     throw new BadRequestError(`Cannot checkout order with status: ${order.status}`);
   }
 
-  const orderItemsList = await db.select().from(order_items).where(eq(order_items.order_id, orderId));
+  const orderItemsList = await db
+    .select()
+    .from(order_items)
+    .where(eq(order_items.order_id, orderId));
 
   const paymentGateway = createPaymentGateway(gateway);
 
@@ -118,7 +135,9 @@ export async function processCheckout(
   let [gatewayCustomer] = await db
     .select()
     .from(gateway_customers)
-    .where(and(eq(gateway_customers.user_id, userId), eq(gateway_customers.payment_gateway, gateway)))
+    .where(
+      and(eq(gateway_customers.user_id, userId), eq(gateway_customers.payment_gateway, gateway)),
+    )
     .limit(1);
 
   if (!gatewayCustomer) {
@@ -126,11 +145,14 @@ export async function processCheckout(
       `user-${userId}@longeny.com`,
       `user-${userId}`,
     );
-    [gatewayCustomer] = await db.insert(gateway_customers).values({
-      user_id: userId,
-      payment_gateway: gateway,
-      gateway_customer_id: customerId,
-    }).returning();
+    [gatewayCustomer] = await db
+      .insert(gateway_customers)
+      .values({
+        user_id: userId,
+        payment_gateway: gateway,
+        gateway_customer_id: customerId,
+      })
+      .returning();
   }
 
   const session = await paymentGateway.createCheckoutSession({
@@ -148,11 +170,14 @@ export async function processCheckout(
     cancelUrl,
   });
 
-  await db.update(orders).set({
-    payment_gateway: gateway,
-    gateway_checkout_session_id: session.sessionId,
-    updated_at: new Date(),
-  }).where(eq(orders.id, orderId));
+  await db
+    .update(orders)
+    .set({
+      payment_gateway: gateway,
+      gateway_checkout_session_id: session.sessionId,
+      updated_at: new Date(),
+    })
+    .where(eq(orders.id, orderId));
 
   return { checkoutUrl: session.url, sessionId: session.sessionId };
 }
@@ -179,7 +204,9 @@ export async function createPaymentIntent(
   let [gatewayCustomer] = await db
     .select()
     .from(gateway_customers)
-    .where(and(eq(gateway_customers.user_id, userId), eq(gateway_customers.payment_gateway, gateway)))
+    .where(
+      and(eq(gateway_customers.user_id, userId), eq(gateway_customers.payment_gateway, gateway)),
+    )
     .limit(1);
 
   if (!gatewayCustomer) {
@@ -187,11 +214,14 @@ export async function createPaymentIntent(
       `user-${userId}@longeny.com`,
       `user-${userId}`,
     );
-    [gatewayCustomer] = await db.insert(gateway_customers).values({
-      user_id: userId,
-      payment_gateway: gateway,
-      gateway_customer_id: customerId,
-    }).returning();
+    [gatewayCustomer] = await db
+      .insert(gateway_customers)
+      .values({
+        user_id: userId,
+        payment_gateway: gateway,
+        gateway_customer_id: customerId,
+      })
+      .returning();
   }
 
   return paymentGateway.createPaymentIntent({
@@ -202,16 +232,15 @@ export async function createPaymentIntent(
   });
 }
 
-export async function createSetupIntent(
-  userId: string,
-  gateway: 'stripe' | 'razorpay',
-) {
+export async function createSetupIntent(userId: string, gateway: 'stripe' | 'razorpay') {
   const paymentGateway = createPaymentGateway(gateway);
 
   const [gatewayCustomer] = await db
     .select()
     .from(gateway_customers)
-    .where(and(eq(gateway_customers.user_id, userId), eq(gateway_customers.payment_gateway, gateway)))
+    .where(
+      and(eq(gateway_customers.user_id, userId), eq(gateway_customers.payment_gateway, gateway)),
+    )
     .limit(1);
 
   if (!gatewayCustomer) {
@@ -232,22 +261,32 @@ export async function approveRefund(refundId: string, approvedBy: string) {
     throw new BadRequestError(`Cannot approve refund with status: ${refund.status}`);
   }
 
-  const [payment] = await db.select().from(payments).where(eq(payments.id, refund.payment_id)).limit(1);
+  const [payment] = await db
+    .select()
+    .from(payments)
+    .where(eq(payments.id, refund.payment_id))
+    .limit(1);
   const [order] = await db.select().from(orders).where(eq(orders.id, refund.order_id)).limit(1);
 
   // Mark as approved
-  await db.update(refunds).set({
-    status: 'approved',
-    approved_by: approvedBy,
-    approved_at: new Date(),
-    updated_at: new Date(),
-  }).where(eq(refunds.id, refundId));
+  await db
+    .update(refunds)
+    .set({
+      status: 'approved',
+      approved_by: approvedBy,
+      approved_at: new Date(),
+      updated_at: new Date(),
+    })
+    .where(eq(refunds.id, refundId));
 
   const gateway = (order.payment_gateway as 'stripe' | 'razorpay') || 'stripe';
 
   if (payment?.gateway_payment_id) {
     try {
-      await db.update(refunds).set({ status: 'processing', updated_at: new Date() }).where(eq(refunds.id, refundId));
+      await db
+        .update(refunds)
+        .set({ status: 'processing', updated_at: new Date() })
+        .where(eq(refunds.id, refundId));
 
       const paymentGateway = createPaymentGateway(gateway);
       const { refundId: gatewayRefundId } = await paymentGateway.createRefund(
@@ -255,12 +294,16 @@ export async function approveRefund(refundId: string, approvedBy: string) {
         Number(refund.amount),
       );
 
-      const [updated] = await db.update(refunds).set({
-        status: 'completed',
-        gateway_refund_id: gatewayRefundId,
-        processed_at: new Date(),
-        updated_at: new Date(),
-      }).where(eq(refunds.id, refundId)).returning();
+      const [updated] = await db
+        .update(refunds)
+        .set({
+          status: 'completed',
+          gateway_refund_id: gatewayRefundId,
+          processed_at: new Date(),
+          updated_at: new Date(),
+        })
+        .where(eq(refunds.id, refundId))
+        .returning();
 
       // Update order status if fully refunded
       const completedRefunds = await db
@@ -270,17 +313,23 @@ export async function approveRefund(refundId: string, approvedBy: string) {
 
       const totalRefunded = completedRefunds.reduce((sum, r) => sum + Number(r.amount), 0);
       if (totalRefunded >= Number(order.total)) {
-        await db.update(orders).set({ status: 'refunded', updated_at: new Date() }).where(eq(orders.id, refund.order_id));
+        await db
+          .update(orders)
+          .set({ status: 'refunded', updated_at: new Date() })
+          .where(eq(orders.id, refund.order_id));
       }
 
       logger.info({ refundId, gatewayRefundId }, 'Refund approved and processed');
       return updated;
     } catch (error) {
-      await db.update(refunds).set({
-        status: 'rejected',
-        rejection_reason: 'Gateway processing failed',
-        updated_at: new Date(),
-      }).where(eq(refunds.id, refundId));
+      await db
+        .update(refunds)
+        .set({
+          status: 'rejected',
+          rejection_reason: 'Gateway processing failed',
+          updated_at: new Date(),
+        })
+        .where(eq(refunds.id, refundId));
       logger.error({ error, refundId }, 'Refund processing failed');
       throw error;
     }
@@ -309,12 +358,16 @@ export async function handlePaymentSuccess(
     return;
   }
 
-  const [updatedOrder] = await db.update(orders).set({
-    status: 'paid',
-    gateway_payment_intent_id: gatewayPaymentId,
-    paid_at: new Date(),
-    updated_at: new Date(),
-  }).where(eq(orders.id, orderId)).returning();
+  const [updatedOrder] = await db
+    .update(orders)
+    .set({
+      status: 'paid',
+      gateway_payment_intent_id: gatewayPaymentId,
+      paid_at: new Date(),
+      updated_at: new Date(),
+    })
+    .where(eq(orders.id, orderId))
+    .returning();
 
   await db.insert(payments).values({
     order_id: orderId,
@@ -399,7 +452,13 @@ export async function listOrders(
     : eq(orders.user_id, userId);
 
   const [orderList, [{ count }]] = await Promise.all([
-    db.select().from(orders).where(whereClause).limit(limit).offset(offset).orderBy(orders.created_at),
+    db
+      .select()
+      .from(orders)
+      .where(whereClause)
+      .limit(limit)
+      .offset(offset)
+      .orderBy(orders.created_at),
     db.select({ count: sql<number>`COUNT(*)::int` }).from(orders).where(whereClause),
   ]);
 
@@ -464,27 +523,37 @@ export async function getOrCreateGatewayCustomer(
   let [gatewayCustomer] = await db
     .select()
     .from(gateway_customers)
-    .where(and(eq(gateway_customers.user_id, userId), eq(gateway_customers.payment_gateway, gateway)))
+    .where(
+      and(eq(gateway_customers.user_id, userId), eq(gateway_customers.payment_gateway, gateway)),
+    )
     .limit(1);
 
   if (!gatewayCustomer) {
     const paymentGateway = createPaymentGateway(gateway);
     const { customerId } = await paymentGateway.createCustomer(email, `user-${userId}`);
-    [gatewayCustomer] = await db.insert(gateway_customers).values({
-      user_id: userId,
-      payment_gateway: gateway,
-      gateway_customer_id: customerId,
-    }).returning();
+    [gatewayCustomer] = await db
+      .insert(gateway_customers)
+      .values({
+        user_id: userId,
+        payment_gateway: gateway,
+        gateway_customer_id: customerId,
+      })
+      .returning();
   }
 
   return gatewayCustomer;
 }
 
-export async function listPaymentMethods(userId: string, gateway: 'stripe' | 'razorpay' = 'stripe') {
+export async function listPaymentMethods(
+  userId: string,
+  gateway: 'stripe' | 'razorpay' = 'stripe',
+) {
   const [gatewayCustomer] = await db
     .select()
     .from(gateway_customers)
-    .where(and(eq(gateway_customers.user_id, userId), eq(gateway_customers.payment_gateway, gateway)))
+    .where(
+      and(eq(gateway_customers.user_id, userId), eq(gateway_customers.payment_gateway, gateway)),
+    )
     .limit(1);
 
   if (!gatewayCustomer) {
@@ -499,7 +568,9 @@ export async function addPaymentMethod(userId: string, gateway: 'stripe' | 'razo
   const [gatewayCustomer] = await db
     .select()
     .from(gateway_customers)
-    .where(and(eq(gateway_customers.user_id, userId), eq(gateway_customers.payment_gateway, gateway)))
+    .where(
+      and(eq(gateway_customers.user_id, userId), eq(gateway_customers.payment_gateway, gateway)),
+    )
     .limit(1);
 
   if (!gatewayCustomer) {
@@ -523,7 +594,9 @@ export async function removePaymentMethod(
   const [gatewayCustomer] = await db
     .select()
     .from(gateway_customers)
-    .where(and(eq(gateway_customers.user_id, userId), eq(gateway_customers.payment_gateway, gateway)))
+    .where(
+      and(eq(gateway_customers.user_id, userId), eq(gateway_customers.payment_gateway, gateway)),
+    )
     .limit(1);
 
   if (!gatewayCustomer) {
@@ -581,11 +654,11 @@ export async function getProviderEarnings(providerId: string) {
   const totalRefunded = completedRefunds.reduce((sum, r) => sum + Number(r.amount), 0);
 
   return {
-    total: parseFloat(totalEarnings.toFixed(2)),
-    pending: parseFloat(pendingEarnings.toFixed(2)),
-    paid: parseFloat(paidOutEarnings.toFixed(2)),
-    refunded: parseFloat(totalRefunded.toFixed(2)),
-    net: parseFloat((totalEarnings - totalRefunded).toFixed(2)),
+    total: Number.parseFloat(totalEarnings.toFixed(2)),
+    pending: Number.parseFloat(pendingEarnings.toFixed(2)),
+    paid: Number.parseFloat(paidOutEarnings.toFixed(2)),
+    refunded: Number.parseFloat(totalRefunded.toFixed(2)),
+    net: Number.parseFloat((totalEarnings - totalRefunded).toFixed(2)),
     orderCount: paidOrders.length,
   };
 }
@@ -627,7 +700,7 @@ export async function getProviderPayouts(
     orderNumber: order.order_number,
     grossAmount: Number(order.total),
     platformFee: Number(order.platform_fee),
-    netAmount: parseFloat((Number(order.total) - Number(order.platform_fee)).toFixed(2)),
+    netAmount: Number.parseFloat((Number(order.total) - Number(order.platform_fee)).toFixed(2)),
     currency: order.currency,
     paidAt: order.paid_at,
     settledAt: order.updated_at,

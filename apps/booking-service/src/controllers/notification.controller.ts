@@ -1,5 +1,5 @@
+import { buildPaginationMeta, parsePaginationParams } from '@longeny/utils';
 import type { NotificationService } from '../services/notification.service.js';
-import { parsePaginationParams, buildPaginationMeta } from '@longeny/utils';
 
 export class NotificationController {
   constructor(private notificationService: NotificationService) {}
@@ -8,10 +8,13 @@ export class NotificationController {
   listNotifications = async ({ store, query }: any) => {
     const { page, limit } = parsePaginationParams(query);
 
-    const { notifications, total } = await this.notificationService.listNotifications(store.userId, {
-      page,
-      limit,
-    });
+    const { notifications, total } = await this.notificationService.listNotifications(
+      store.userId,
+      {
+        page,
+        limit,
+      },
+    );
 
     return {
       success: true,
@@ -179,8 +182,8 @@ export class NotificationController {
 
   // PUT /notifications/preferences
   updatePreferences = async ({ store, body }: any) => {
-    delete body.user_id;
-    delete body.updated_at;
+    body.user_id = undefined;
+    body.updated_at = undefined;
 
     const preferences = await this.notificationService.updatePreferences(store.userId, body);
 

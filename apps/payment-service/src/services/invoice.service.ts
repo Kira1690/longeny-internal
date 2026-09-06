@@ -1,8 +1,8 @@
-import { db } from '../db/index.js';
-import { eq, sql } from 'drizzle-orm';
-import { invoices, orders } from '../db/schema.js';
-import { createLogger } from '@longeny/utils';
 import { NotFoundError } from '@longeny/errors';
+import { createLogger } from '@longeny/utils';
+import { eq, sql } from 'drizzle-orm';
+import { db } from '../db/index.js';
+import { invoices, orders } from '../db/schema.js';
 
 const logger = createLogger('payment-service:invoice');
 
@@ -20,22 +20,29 @@ export async function createInvoiceForOrder(orderId: string) {
   }
 
   // Check if invoice already exists
-  const [existing] = await db.select().from(invoices).where(eq(invoices.order_id, orderId)).limit(1);
+  const [existing] = await db
+    .select()
+    .from(invoices)
+    .where(eq(invoices.order_id, orderId))
+    .limit(1);
   if (existing) {
     logger.debug({ orderId }, 'Invoice already exists');
     return existing;
   }
 
-  const [invoice] = await db.insert(invoices).values({
-    order_id: orderId,
-    user_id: order.user_id,
-    invoice_number: generateInvoiceNumber(),
-    amount: order.subtotal,
-    tax: order.tax,
-    total: order.total,
-    currency: order.currency,
-    status: 'draft',
-  }).returning();
+  const [invoice] = await db
+    .insert(invoices)
+    .values({
+      order_id: orderId,
+      user_id: order.user_id,
+      invoice_number: generateInvoiceNumber(),
+      amount: order.subtotal,
+      tax: order.tax,
+      total: order.total,
+      currency: order.currency,
+      status: 'draft',
+    })
+    .returning();
 
   logger.info({ invoiceId: invoice.id, orderId }, 'Invoice created');
   return invoice;
@@ -56,7 +63,13 @@ export async function listInvoices(
     : eqFn(invoices.user_id, userId);
 
   const [invoiceList, [{ count }]] = await Promise.all([
-    db.select().from(invoices).where(whereClause).limit(limit).offset(offset).orderBy(invoices.created_at),
+    db
+      .select()
+      .from(invoices)
+      .where(whereClause)
+      .limit(limit)
+      .offset(offset)
+      .orderBy(invoices.created_at),
     db.select({ count: sql<number>`COUNT(*)::int` }).from(invoices).where(whereClause),
   ]);
 
@@ -95,12 +108,15 @@ export async function getInvoiceDownloadUrl(invoiceId: string, userId: string) {
   // For now, return a placeholder URL
   const placeholderUrl = `https://invoices.longeny.com/${invoice.invoice_number}.pdf`;
 
-  await db.update(invoices).set({
-    pdf_url: placeholderUrl,
-    status: 'sent',
-    sent_at: new Date(),
-    updated_at: new Date(),
-  }).where(eq(invoices.id, invoiceId));
+  await db
+    .update(invoices)
+    .set({
+      pdf_url: placeholderUrl,
+      status: 'sent',
+      sent_at: new Date(),
+      updated_at: new Date(),
+    })
+    .where(eq(invoices.id, invoiceId));
 
   return { url: placeholderUrl, invoiceNumber: invoice.invoice_number };
 }
@@ -112,11 +128,15 @@ export async function markInvoicePaid(invoiceId: string, paidAt?: Date) {
     throw new NotFoundError('Invoice', invoiceId);
   }
 
-  const [updated] = await db.update(invoices).set({
-    status: 'paid',
-    paid_at: paidAt || new Date(),
-    updated_at: new Date(),
-  }).where(eq(invoices.id, invoiceId)).returning();
+  const [updated] = await db
+    .update(invoices)
+    .set({
+      status: 'paid',
+      paid_at: paidAt || new Date(),
+      updated_at: new Date(),
+    })
+    .where(eq(invoices.id, invoiceId))
+    .returning();
 
   logger.info({ invoiceId }, 'Invoice marked as paid');
   return updated;

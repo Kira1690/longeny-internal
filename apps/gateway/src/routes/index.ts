@@ -91,6 +91,34 @@ export function createRoutes(): any {
     .use(requireRole(UserRole.ADMIN, UserRole.SUPER_ADMIN))
     .all('/api/v1/admin/*', (ctx) => proxyRequest(ctx, USER_PROVIDER_URL));
 
+  // ── RRO intake and AI results (require auth) ──
+  //
+  // ai-content holds the intake, the classifications and the reports; the
+  // classifier itself is /internal and stays unreachable from here.
+  const intakeProxy = new Elysia()
+    .use(requireAuth())
+    .all('/api/v1/intake', (ctx) => proxyRequest(ctx, AI_CONTENT_URL))
+    .all('/api/v1/intake/*', (ctx) => proxyRequest(ctx, AI_CONTENT_URL))
+    .all('/api/v1/rro/*', (ctx) => proxyRequest(ctx, AI_CONTENT_URL));
+
+  // The reports timeline lives in ai-content while the rest of /profiles is
+  // user-provider's, so this one path is routed before the profiles proxy.
+  // Elysia matches in registration order, and a wildcard registered later does
+  // not shadow a specific path registered earlier.
+  const reportsProxy = new Elysia()
+    .use(requireAuth())
+    .all('/api/v1/profiles/:profileId/reports', (ctx) => proxyRequest(ctx, AI_CONTENT_URL));
+
+  // ── Profile routes — multi-profile / family (require auth) ──
+  // The service re-verifies the token and owns the "is this profile yours"
+  // check; the gateway only decides that the path is reachable at all.
+  // /internal/* is deliberately absent: those routes are HMAC-only and must not
+  // be reachable from outside.
+  const profilesProxy = new Elysia()
+    .use(requireAuth())
+    .all('/api/v1/profiles', (ctx) => proxyRequest(ctx, USER_PROVIDER_URL))
+    .all('/api/v1/profiles/*', (ctx) => proxyRequest(ctx, USER_PROVIDER_URL));
+
   // ── Progress routes (require auth) ──
   const progressProxy = new Elysia()
     .use(requireAuth())
@@ -107,9 +135,12 @@ export function createRoutes(): any {
     .use(requireAuth())
     .all('/api/v1/ai/onboarding', (ctx) => proxyRequest(ctx, AI_CONTENT_URL))
     .all('/api/v1/ai/onboarding/*', (ctx) => proxyRequest(ctx, AI_CONTENT_URL))
+    .all('/api/v1/ai/sessions/*', (ctx) => proxyRequest(ctx, AI_CONTENT_URL))
     .all('/api/v1/ai/patient-agent/:patientId/session', (ctx) => proxyRequest(ctx, AI_CONTENT_URL))
     .all('/api/v1/ai/patient-agent/:patientId/answer', (ctx) => proxyRequest(ctx, AI_CONTENT_URL))
-    .all('/api/v1/ai/patient-agent/:patientId/stream/:sessionId', (ctx) => proxyRequest(ctx, AI_CONTENT_URL));
+    .all('/api/v1/ai/patient-agent/:patientId/stream/:sessionId', (ctx) =>
+      proxyRequest(ctx, AI_CONTENT_URL),
+    );
 
   // ── Payment routes (require auth) ──
   const paymentProxy = new Elysia()
@@ -123,6 +154,9 @@ export function createRoutes(): any {
     .use(usersProxy)
     .use(providersProxy)
     .use(adminProxy)
+    .use(intakeProxy)
+    .use(reportsProxy)
+    .use(profilesProxy)
     .use(progressProxy)
     .use(bookingProxy)
     .use(aiProxy)

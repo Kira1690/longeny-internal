@@ -1,9 +1,8 @@
-import Stripe from 'stripe';
+import { BadRequestError, InternalError } from '@longeny/errors';
 import { createLogger } from '@longeny/utils';
-import { loadConfig, paymentConfigSchema } from '@longeny/config';
-import { InternalError, BadRequestError } from '@longeny/errors';
+import Stripe from 'stripe';
+import { config } from '../config/index.js';
 
-const config = loadConfig(paymentConfigSchema);
 const logger = createLogger('payment-service:stripe');
 
 let stripeInstance: Stripe | null = null;
@@ -21,10 +20,7 @@ function getStripe(): Stripe {
   return stripeInstance;
 }
 
-export async function createCustomer(
-  userId: string,
-  email: string,
-): Promise<Stripe.Customer> {
+export async function createCustomer(userId: string, email: string): Promise<Stripe.Customer> {
   const stripe = getStripe();
   try {
     const customer = await stripe.customers.create({
@@ -192,9 +188,7 @@ export function constructWebhookEvent(
   }
 }
 
-export async function listPaymentMethods(
-  customerId: string,
-): Promise<Stripe.PaymentMethod[]> {
+export async function listPaymentMethods(customerId: string): Promise<Stripe.PaymentMethod[]> {
   const stripe = getStripe();
   try {
     const methods = await stripe.paymentMethods.list({
@@ -208,9 +202,7 @@ export async function listPaymentMethods(
   }
 }
 
-export async function createSetupIntent(
-  customerId: string,
-): Promise<Stripe.SetupIntent> {
+export async function createSetupIntent(customerId: string): Promise<Stripe.SetupIntent> {
   const stripe = getStripe();
   try {
     const setupIntent = await stripe.setupIntents.create({
@@ -225,9 +217,7 @@ export async function createSetupIntent(
   }
 }
 
-export async function detachPaymentMethod(
-  paymentMethodId: string,
-): Promise<Stripe.PaymentMethod> {
+export async function detachPaymentMethod(paymentMethodId: string): Promise<Stripe.PaymentMethod> {
   const stripe = getStripe();
   try {
     const method = await stripe.paymentMethods.detach(paymentMethodId);
@@ -239,9 +229,7 @@ export async function detachPaymentMethod(
   }
 }
 
-export async function retrieveSubscription(
-  subscriptionId: string,
-): Promise<Stripe.Subscription> {
+export async function retrieveSubscription(subscriptionId: string): Promise<Stripe.Subscription> {
   const stripe = getStripe();
   try {
     return await stripe.subscriptions.retrieve(subscriptionId);
@@ -251,9 +239,7 @@ export async function retrieveSubscription(
   }
 }
 
-export async function deleteCustomer(
-  customerId: string,
-): Promise<Stripe.DeletedCustomer> {
+export async function deleteCustomer(customerId: string): Promise<Stripe.DeletedCustomer> {
   const stripe = getStripe();
   try {
     const deleted = await stripe.customers.del(customerId);

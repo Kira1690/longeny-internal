@@ -1,11 +1,11 @@
-import Stripe from 'stripe';
+import { BadRequestError, InternalError } from '@longeny/errors';
 import { createLogger } from '@longeny/utils';
-import { InternalError, BadRequestError } from '@longeny/errors';
+import Stripe from 'stripe';
 import type {
-  PaymentGateway,
   CheckoutParams,
-  SubscriptionParams,
+  PaymentGateway,
   PaymentIntentParams,
+  SubscriptionParams,
 } from './index.js';
 
 const logger = createLogger('payment-service:stripe-gateway');
@@ -40,14 +40,16 @@ export class StripeGateway implements PaymentGateway {
 
   async createCheckoutSession(params: CheckoutParams): Promise<{ sessionId: string; url: string }> {
     try {
-      const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = params.items.map((item) => ({
-        price_data: {
-          currency: params.currency.toLowerCase(),
-          product_data: { name: item.description },
-          unit_amount: Math.round(item.unitPrice * 100),
-        },
-        quantity: item.quantity,
-      }));
+      const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = params.items.map(
+        (item) => ({
+          price_data: {
+            currency: params.currency.toLowerCase(),
+            product_data: { name: item.description },
+            unit_amount: Math.round(item.unitPrice * 100),
+          },
+          quantity: item.quantity,
+        }),
+      );
 
       const session = await this.stripe.checkout.sessions.create({
         customer: params.customerId,
@@ -64,7 +66,10 @@ export class StripeGateway implements PaymentGateway {
       });
 
       logger.info({ orderId: params.orderId, sessionId: session.id }, 'Checkout session created');
-      return { sessionId: session.id, url: session.url! };
+      if (!session.url) {
+        throw new Error('Stripe returned a checkout session with no redirect URL');
+      }
+      return { sessionId: session.id, url: session.url };
     } catch (error) {
       logger.error({ error, orderId: params.orderId }, 'Failed to create checkout session');
       throw new InternalError('Failed to create checkout session');
@@ -95,9 +100,7 @@ export class StripeGateway implements PaymentGateway {
         currentPeriodEnd: subscription.current_period_end
           ? new Date(subscription.current_period_end * 1000)
           : null,
-        trialEnd: subscription.trial_end
-          ? new Date(subscription.trial_end * 1000)
-          : null,
+        trialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
         status: subscription.status,
       };
     } catch (error) {
@@ -106,24 +109,31 @@ export class StripeGateway implements PaymentGateway {
     }
   }
 
-  async updateSubscription(subscriptionId: string, params: { priceId?: string; quantity?: number }) {
+  async updateSubscription(
+    subscriptionId: string,
+    params: { priceId?: string; quantity?: number },
+  ) {
     try {
       const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
       const updateParams: Stripe.SubscriptionUpdateParams = {};
 
       if (params.priceId) {
-        updateParams.items = [{
-          id: subscription.items.data[0]?.id,
-          price: params.priceId,
-        }];
+        updateParams.items = [
+          {
+            id: subscription.items.data[0]?.id,
+            price: params.priceId,
+          },
+        ];
       }
 
       if (params.quantity !== undefined) {
-        updateParams.items = [{
-          id: subscription.items.data[0]?.id,
-          quantity: params.quantity,
-          ...(params.priceId ? { price: params.priceId } : {}),
-        }];
+        updateParams.items = [
+          {
+            id: subscription.items.data[0]?.id,
+            quantity: params.quantity,
+            ...(params.priceId ? { price: params.priceId } : {}),
+          },
+        ];
       }
 
       const updated = await this.stripe.subscriptions.update(subscriptionId, updateParams);
@@ -192,7 +202,9 @@ export class StripeGateway implements PaymentGateway {
     }
   }
 
-  async createPaymentIntent(params: PaymentIntentParams): Promise<{ intentId: string; clientSecret: string }> {
+  async createPaymentIntent(
+    params: PaymentIntentParams,
+  ): Promise<{ intentId: string; clientSecret: string }> {
     try {
       const paymentIntent = await this.stripe.paymentIntents.create({
         amount: Math.round(params.amount * 100),
@@ -202,7 +214,10 @@ export class StripeGateway implements PaymentGateway {
         automatic_payment_methods: { enabled: true },
       });
       logger.info({ paymentIntentId: paymentIntent.id }, 'Payment intent created');
-      return { intentId: paymentIntent.id, clientSecret: paymentIntent.client_secret! };
+      if (!paymentIntent.client_secret) {
+        throw new Error('Stripe returned a payment intent with no client secret');
+      }
+      return { intentId: paymentIntent.id, clientSecret: paymentIntent.client_secret };
     } catch (error) {
       logger.error({ error }, 'Failed to create payment intent');
       throw new InternalError('Failed to create payment intent');
@@ -216,7 +231,10 @@ export class StripeGateway implements PaymentGateway {
         payment_method_types: ['card'],
       });
       logger.info({ setupIntentId: setupIntent.id, customerId }, 'Setup intent created');
-      return { intentId: setupIntent.id, clientSecret: setupIntent.client_secret! };
+      if (!setupIntent.client_secret) {
+        throw new Error('Stripe returned a setup intent with no client secret');
+      }
+      return { intentId: setupIntent.id, clientSecret: setupIntent.client_secret };
     } catch (error) {
       logger.error({ error, customerId }, 'Failed to create setup intent');
       throw new InternalError('Failed to create setup intent');

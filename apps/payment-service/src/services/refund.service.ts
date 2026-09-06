@@ -1,10 +1,10 @@
-import { db } from '../db/index.js';
-import { eq, and, inArray, sql } from 'drizzle-orm';
-import { refunds, payments, orders } from '../db/schema.js';
+import { BadRequestError, NotFoundError } from '@longeny/errors';
 import { createLogger } from '@longeny/utils';
-import { NotFoundError, BadRequestError, ForbiddenError } from '@longeny/errors';
-import { createPaymentGateway } from './gateway/factory.js';
+import { and, eq, inArray, sql } from 'drizzle-orm';
+import { db } from '../db/index.js';
+import { orders, payments, refunds } from '../db/schema.js';
 import { publishRefundProcessed } from '../events/publishers.js';
+import { createPaymentGateway } from './gateway/factory.js';
 
 const logger = createLogger('payment-service:refund');
 
@@ -24,8 +24,11 @@ export async function requestRefund(input: RequestRefundInput) {
     throw new NotFoundError('Order', orderId);
   }
 
+  // 404, not 403: a 403 here confirms the order id is real, which turns this
+  // route into an oracle for enumerating other users' order UUIDs. Someone
+  // else's order is indistinguishable from no order at all.
   if (order.user_id !== requestedBy) {
-    throw new ForbiddenError('You do not have permission to refund this order');
+    throw new NotFoundError('Order', orderId);
   }
 
   if (order.status !== 'paid' && order.status !== 'fulfilled') {
@@ -49,14 +52,17 @@ export async function requestRefund(input: RequestRefundInput) {
     throw new BadRequestError('Refund amount exceeds order total');
   }
 
-  const [refund] = await db.insert(refunds).values({
-    order_id: orderId,
-    payment_id: payment.id,
-    amount: refundAmount.toString(),
-    reason,
-    status: 'pending',
-    requested_by: requestedBy,
-  }).returning();
+  const [refund] = await db
+    .insert(refunds)
+    .values({
+      order_id: orderId,
+      payment_id: payment.id,
+      amount: refundAmount.toString(),
+      reason,
+      status: 'pending',
+      requested_by: requestedBy,
+    })
+    .returning();
 
   logger.info({ refundId: refund.id, orderId, requestedBy }, 'Refund requested');
   return refund;
@@ -73,7 +79,11 @@ export async function processRefund(refundId: string) {
     throw new BadRequestError(`Cannot process refund with status: ${refund.status}`);
   }
 
-  const [payment] = await db.select().from(payments).where(eq(payments.id, refund.payment_id)).limit(1);
+  const [payment] = await db
+    .select()
+    .from(payments)
+    .where(eq(payments.id, refund.payment_id))
+    .limit(1);
   const [order] = await db.select().from(orders).where(eq(orders.id, refund.order_id)).limit(1);
 
   if (!payment?.gateway_payment_id) {
@@ -84,19 +94,26 @@ export async function processRefund(refundId: string) {
   const paymentGateway = createPaymentGateway(gateway);
 
   try {
-    await db.update(refunds).set({ status: 'processing', updated_at: new Date() }).where(eq(refunds.id, refundId));
+    await db
+      .update(refunds)
+      .set({ status: 'processing', updated_at: new Date() })
+      .where(eq(refunds.id, refundId));
 
     const { refundId: gatewayRefundId } = await paymentGateway.createRefund(
       payment.gateway_payment_id,
       Number(refund.amount),
     );
 
-    const [updated] = await db.update(refunds).set({
-      status: 'completed',
-      gateway_refund_id: gatewayRefundId,
-      processed_at: new Date(),
-      updated_at: new Date(),
-    }).where(eq(refunds.id, refundId)).returning();
+    const [updated] = await db
+      .update(refunds)
+      .set({
+        status: 'completed',
+        gateway_refund_id: gatewayRefundId,
+        processed_at: new Date(),
+        updated_at: new Date(),
+      })
+      .where(eq(refunds.id, refundId))
+      .returning();
 
     // Update order status if fully refunded
     const completedRefunds = await db
@@ -106,7 +123,10 @@ export async function processRefund(refundId: string) {
 
     const totalRefunded = completedRefunds.reduce((sum, r) => sum + Number(r.amount), 0);
     if (totalRefunded >= Number(order.total)) {
-      await db.update(orders).set({ status: 'refunded', updated_at: new Date() }).where(eq(orders.id, refund.order_id));
+      await db
+        .update(orders)
+        .set({ status: 'refunded', updated_at: new Date() })
+        .where(eq(orders.id, refund.order_id));
     }
 
     await publishRefundProcessed({
@@ -121,11 +141,14 @@ export async function processRefund(refundId: string) {
     logger.info({ refundId, gatewayRefundId }, 'Refund processed');
     return updated;
   } catch (error) {
-    await db.update(refunds).set({
-      status: 'rejected',
-      rejection_reason: 'Gateway processing failed',
-      updated_at: new Date(),
-    }).where(eq(refunds.id, refundId));
+    await db
+      .update(refunds)
+      .set({
+        status: 'rejected',
+        rejection_reason: 'Gateway processing failed',
+        updated_at: new Date(),
+      })
+      .where(eq(refunds.id, refundId));
     logger.error({ error, refundId }, 'Refund processing failed');
     throw error;
   }
@@ -159,7 +182,13 @@ export async function listRefunds(
     : inArray(refunds.order_id, orderIds);
 
   const [refundList, [{ count }]] = await Promise.all([
-    db.select().from(refunds).where(statusFilter).limit(limit).offset(offset).orderBy(refunds.created_at),
+    db
+      .select()
+      .from(refunds)
+      .where(statusFilter)
+      .limit(limit)
+      .offset(offset)
+      .orderBy(refunds.created_at),
     db.select({ count: sql<number>`COUNT(*)::int` }).from(refunds).where(statusFilter),
   ]);
 
@@ -195,13 +224,17 @@ export async function updateRefundStatus(
     throw new BadRequestError(`Cannot update refund with status: ${refund.status}`);
   }
 
-  const [updated] = await db.update(refunds).set({
-    status,
-    approved_by: approvedBy,
-    approved_at: status === 'approved' ? new Date() : null,
-    rejection_reason: rejectionReason || null,
-    updated_at: new Date(),
-  }).where(eq(refunds.id, refundId)).returning();
+  const [updated] = await db
+    .update(refunds)
+    .set({
+      status,
+      approved_by: approvedBy,
+      approved_at: status === 'approved' ? new Date() : null,
+      rejection_reason: rejectionReason || null,
+      updated_at: new Date(),
+    })
+    .where(eq(refunds.id, refundId))
+    .returning();
 
   logger.info({ refundId, status, approvedBy }, 'Refund status updated');
   return updated;

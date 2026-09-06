@@ -1,10 +1,9 @@
 import { createLogger } from '@longeny/utils';
-import { loadConfig, paymentConfigSchema } from '@longeny/config';
 import app from './app.js';
-import { startConsumer, stopConsumer } from './events/subscribers.js';
+import { config } from './config/index.js';
 import { disconnectPublisher } from './events/publishers.js';
+import { startConsumer, stopConsumer } from './events/subscribers.js';
 
-const config = loadConfig(paymentConfigSchema);
 const logger = createLogger('payment-service');
 
 const port = config.PAYMENT_SERVICE_PORT;
