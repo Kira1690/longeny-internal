@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Put the box back on the previous deploy, or on a named commit.
+#   deploy-rollback            → the commit that was running before the last push
+#   deploy-rollback <sha>      → any commit in the deploy history
+set -euo pipefail
+GIT_DIR=/home/ubuntu/longeny-repo.git
+WORK_TREE=/home/ubuntu/longeny
+TARGET="${1:-$(cat "$GIT_DIR/PREVIOUS_DEPLOY" 2>/dev/null)}"
+[[ -n "$TARGET" ]] || { echo "no previous deploy recorded — pass a commit sha"; exit 1; }
+echo "rolling back to ${TARGET:0:8}"
+git --git-dir="$GIT_DIR" --work-tree="$WORK_TREE" checkout -f "$TARGET"
+cd "$WORK_TREE" && /home/ubuntu/.bun/bin/bun install 2>&1 | tail -2
+sudo systemctl restart longeny-auth longeny-user-provider longeny-ai-content longeny-gateway
+sleep 8
+for p in 4002 4003 3004 4001; do printf ":%s " "$p"; curl -sf --max-time 3 "http://localhost:$p/health" >/dev/null && echo ok || echo UNHEALTHY; done

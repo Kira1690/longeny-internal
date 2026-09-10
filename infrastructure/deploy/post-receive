@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+#
+# Deploy hook — runs on the dev box every time a branch is pushed here.
+#
+# The box used to hold a file copy with no git and no way back: a bad deploy
+# meant restoring from a tarball and guessing what had changed. The work tree is
+# now a checkout of this repo, so a rollback is `deploy-rollback <sha>` and the
+# history of what ran is the history of what was pushed.
+#
+# .env is deliberately untracked and lives in the work tree. `checkout -f` only
+# touches tracked files, so the box keeps its own secrets across every deploy.
+
+set -uo pipefail
+
+WORK_TREE=/home/ubuntu/longeny
+GIT_DIR=/home/ubuntu/longeny-repo.git
+BUN=/home/ubuntu/.bun/bin/bun
+SERVICES=(longeny-auth longeny-user-provider longeny-ai-content longeny-gateway)
+# health port per service, in the same order
+declare -A PORT=([longeny-auth]=4002 [longeny-user-provider]=4003 [longeny-ai-content]=3004 [longeny-gateway]=4001)
+
+while read -r _old new ref; do
+  [[ "$ref" == "refs/heads/main" ]] || { echo "  skipping $ref"; continue; }
+
+  PREV=$(git --git-dir="$GIT_DIR" --work-tree="$WORK_TREE" rev-parse HEAD 2>/dev/null || echo "")
+  echo "── deploying ${new:0:8}${PREV:+ (previous ${PREV:0:8})}"
+
+  git --git-dir="$GIT_DIR" --work-tree="$WORK_TREE" checkout -f "$new" || { echo "checkout failed"; exit 1; }
+  echo "$PREV" > "$GIT_DIR/PREVIOUS_DEPLOY"
+
+  cd "$WORK_TREE" || exit 1
+  echo "── installing dependencies"
+  "$BUN" install --frozen-lockfile 2>&1 | tail -3 || "$BUN" install 2>&1 | tail -3
+
+  # Migrations before restart: a service that boots against an old schema fails
+  # in a way that looks like a code bug.
+  echo "── migrations"
+  set -a; . "$WORK_TREE/.env"; set +a
+  for svc in user-provider-service ai-content-service; do
+    if [[ -f "$WORK_TREE/apps/$svc/drizzle.config.ts" ]]; then
+      ( cd "$WORK_TREE/apps/$svc" && "$BUN" x drizzle-kit migrate 2>&1 | tail -2 ) && echo "   $svc ok"
+    fi
+  done
+
+  # Roles and permissions are seeded, not migrated, so a release that adds a
+  # permission ships code that every real user is refused by. That is exactly
+  # what happened on the first Week 7 deploy: `intake:write` existed in the seed
+  # and not in the database, and the API answered 403 to a correctly built
+  # request. The E2E suites could not catch it — they mint their own tokens with
+  # the permission list hard-coded, so they never read the role map at all.
+  #
+  # The seed is idempotent (it checks before every insert and deletes nothing),
+  # so running it on each deploy is safe. It does not close its database pool,
+  # hence the timeout: the work commits well before the process would exit.
+  echo "── seeding roles and permissions"
+  ( cd "$WORK_TREE/apps/auth-service" && timeout 120 "$BUN" run src/db/seed.ts >/dev/null 2>&1 )
+  echo "   done (exit ${?})"
+
+  echo "── restarting"
+  sudo systemctl restart "${SERVICES[@]}"
+
+  echo "── health"
+  sleep 8
+  FAILED=0
+
+  # The gateway aggregates its downstreams and answers 503 whenever any of them
+  # is missing. booking and payment are deliberately not deployed here, so a
+  # plain `curl -sf` calls a perfectly healthy gateway dead — and, worse, would
+  # call a genuinely dead one dead for the same reason, so the signal is
+  # useless either way. Read the gateway's own status out of the body instead,
+  # and print the downstream list so a real outage is visible rather than
+  # buried under an expected 503.
+  check_health() {
+    local svc=$1 port=$2 body
+    body=$(curl -s --max-time 3 "http://localhost:$port/health" 2>/dev/null) || return 1
+    if [[ "$svc" == "longeny-gateway" ]]; then
+      grep -q '"gateway":"healthy"' <<< "$body" || return 1
+    else
+      grep -q '"status":"healthy"\|"status":"ok"' <<< "$body" || return 1
+    fi
+    return 0
+  }
+
+  for svc in "${SERVICES[@]}"; do
+    p="${PORT[$svc]}"
+    ok=0
+    for _ in $(seq 1 10); do
+      if check_health "$svc" "$p"; then ok=1; break; fi
+      sleep 2
+    done
+    if [[ $ok -eq 1 ]]; then
+      echo "   $svc :$p ok"
+    else
+      echo "   $svc :$p UNHEALTHY"
+      FAILED=1
+    fi
+  done
+
+  # Say plainly which downstreams the gateway cannot see. Expected here:
+  # booking and payment, which are out of the deployed scope.
+  DOWN=$(curl -s --max-time 3 http://localhost:4001/health 2>/dev/null \
+    | grep -o '"name":"[a-z-]*","status":"unreachable"' | cut -d'"' -f4 | paste -sd', ')
+  [[ -n "$DOWN" ]] && echo "   gateway reports unreachable: $DOWN (expected: booking, payment)"
+
+  if [[ $FAILED -eq 1 ]]; then
+    echo "── DEPLOY UNHEALTHY. roll back with:  deploy-rollback"
+    exit 1
+  fi
+  echo "── deployed ${new:0:8}"
+done
