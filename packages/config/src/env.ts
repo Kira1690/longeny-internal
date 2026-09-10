@@ -151,8 +151,21 @@ export const aiContentConfigSchema = requireDeployedSecrets(
      * can never transition a profile's RRO state. See plan/rro/week-07-ai-core.md.
      */
     RRO_AI_PROVIDER: z.enum(['bedrock', 'rules']).default('rules'),
-    BEDROCK_MODEL_ID_RRO: z.string().default('anthropic.claude-3-5-sonnet-20241022-v2:0'),
-    AWS_BEDROCK_REGION: z.string().default('us-east-1'),
+    /**
+     * Note the `apac.` prefix. In ap-south-1 this model is only reachable through
+     * a regional inference profile — the bare model id raises
+     * `ValidationException: Invocation of model ID ... with on-demand throughput
+     * isn't supported`, which is what the previous default did on every call.
+     *
+     * `apac.` rather than `global.`: an inference profile decides where the
+     * request is actually served, and this payload is patient health data under
+     * India's DPDP Act. The APAC profile keeps it in the region; the global one
+     * does not promise that. Newer models exist on this account's list but are
+     * `global.`-only and not yet access-enabled, so moving to one is both an
+     * access request and a data-residency decision, not a config change.
+     */
+    BEDROCK_MODEL_ID_RRO: z.string().default('apac.anthropic.claude-3-5-sonnet-20241022-v2:0'),
+    AWS_BEDROCK_REGION: z.string().default('ap-south-1'),
     BEDROCK_MODEL_ID_PRIMARY: z.string().default('meta.llama3-1-70b-instruct-v1:0'),
     BEDROCK_MODEL_ID_LIGHT: z.string().default('meta.llama3-1-8b-instruct-v1:0'),
     BEDROCK_EMBEDDING_MODEL_ID: z.string().default('amazon.titan-embed-text-v2:0'),
