@@ -20,7 +20,7 @@ and the reasoning.
 | A1 | **Care team model.** One team per patient, one lead (partial unique index). Role lives on the membership. Profile-scoped, never account-scoped. A lead or admin may add; **membership grants no access until per-member consent exists**. Deactivating a profile ends every membership in the same transaction. | **DECIDED** — D-1…D-5 all answered | [care-team-model.md](./care-team-model.md) |
 | A2 | **Verified consent by email.** Threshold 18 / DPDP, held in config with the jurisdiction written onto each row. `pending` is usable and labelled, but blocks AI analysis and every provider surface. Two reminders, expire at 14d, one manual re-send. | **DECIDED** — all four answered | [verified-consent-design.md](./verified-consent-design.md) |
 | A3 | **Bedrock model id is wrong for the region.** `BEDROCK_MODEL_ID_RRO` defaults to a model not in the ap-south-1 list. Bedrock access itself works. | Open — Milan (M-W7-1) | `internal-notes/aws/README.md` |
-| A4 | **M-W6-2 calendar invite** cannot close without shipping booking-service to the client repo, which is out of client scope. | Open — a scope decision | Trello, Blocked list |
+| A4 | **M-W6-2 calendar invite** — **RESOLVED 2026-09-10.** booking-service stays internal, so the card was descoped and archived. The invite service, ICS attachment, calendar channel and delivery logging all still work internally and need no rebuild if booking-service is ever brought into client scope. | **CLOSED** | Trello, archived |
 
 ### The consequence of A1+A2 that changes Week 8's shape
 
@@ -52,8 +52,8 @@ rebuild here.**
 
 | # | What | State | Next step |
 |---|---|---|---|
-| B1 | **Seven API defects** — soft-deleted profiles still readable/editable/consentable/**contactable**; 500 on malformed uuid; optional `""` rejected; four broken Swagger examples; `consent_type` unenforced; **and the three internal HMAC routes that never had the status check at all** (see D7) | Fixed and committed in `longeny-internal`. typecheck 15/15, lint clean, `profiles-rro` 86/86 | Migrate to `BraveLabs/` under card **V-W7-7** |
-| B2 | **Week 7 backend** — 12 endpoints, 7 tables | Complete and committed (2026-09-06, nine commits from `0eafab0`) | Migrate under the Week 7 cards |
+| B1 | **Seven API defects** — soft-deleted profiles readable/editable/consentable/**contactable**; 500 on malformed uuid; optional `""` rejected; four broken Swagger examples; `consent_type` unenforced; and the three internal HMAC routes that never had the status check (D7) | **Shipped to `BraveLabs/` 2026-09-10.** V-W7-7 is Done. | Done |
+| B2 | **Week 7 backend** — 12 endpoints, 7 tables | **Shipped to `BraveLabs/` 2026-09-10** (`f244c55..0627e12`, six commits). Client typecheck 13/13, lint 0 errors, all four services boot. `docs/18-intake-and-rro-ai.md` written for frontend engineers. | Done |
 
 ---
 
