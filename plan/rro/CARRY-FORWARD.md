@@ -19,7 +19,7 @@ and the reasoning.
 |---|---|---|---|
 | A1 | **Care team model.** One team per patient, one lead (partial unique index). Role lives on the membership. Profile-scoped, never account-scoped. A lead or admin may add; **membership grants no access until per-member consent exists**. Deactivating a profile ends every membership in the same transaction. | **DECIDED** — D-1…D-5 all answered | [care-team-model.md](./care-team-model.md) |
 | A2 | **Verified consent by email.** Threshold 18 / DPDP, held in config with the jurisdiction written onto each row. `pending` is usable and labelled, but blocks AI analysis and every provider surface. Two reminders, expire at 14d, one manual re-send. | **DECIDED** — all four answered | [verified-consent-design.md](./verified-consent-design.md) |
-| A3 | **Bedrock model id is wrong for the region.** `BEDROCK_MODEL_ID_RRO` defaults to a model not in the ap-south-1 list. Bedrock access itself works. | Open — Milan (M-W7-1) | `internal-notes/aws/README.md` |
+| A3 | **Bedrock.** Model id, region, IAM role and the credential bug are all **fixed and proven** (see D9). What remains is not engineering: the AWS account cannot invoke any Bedrock model — `AccessDeniedException: INVALID_PAYMENT_INSTRUMENT`. The same call succeeded at 13:05 on 2026-09-10 and failed from 13:32 onwards, for the IAM user and the instance role alike, so it is the account's payment method. | **Blocked on AWS billing** — account `836533914754`. Nothing to build. | `infrastructure/deploy/README.md` |
 | A4 | **M-W6-2 calendar invite** — **RESOLVED 2026-09-10.** booking-service stays internal, so the card was descoped and archived. The invite service, ICS attachment, calendar channel and delivery logging all still work internally and need no rebuild if booking-service is ever brought into client scope. | **CLOSED** | Trello, archived |
 
 ### The consequence of A1+A2 that changes Week 8's shape
@@ -98,6 +98,21 @@ rebuild here.**
 8. **A mock would have hidden it.** The delivery check asks mailpit, not the API response.
    A fake transport reports "not delivered" whether or not the message left the building —
    which is why `prep/testing/README.md` requires real Postgres, Redis and SMTP.
+9. **Bedrock in ap-south-1 needs the `apac.` inference-profile prefix.** The bare model id
+   raises `ValidationException: on-demand throughput isn't supported`. `apac.` rather than
+   `global.` is a data-residency choice, not a style one: an inference profile decides
+   where the request is served, and this is patient health data under DPDP. Newer models on
+   this account are `global.`-only and not access-enabled.
+10. **An explicit AWS credential beats an IAM role, including a placeholder one.**
+   `AWS_ACCESS_KEY_ID` defaults to the literal `'test'` for LocalStack, and the Bedrock
+   provider passed it unconditionally — so the instance role we attached was silently
+   ignored and Bedrock answered `UnrecognizedClientException`. Only pass credentials when
+   they are real; otherwise let the SDK's default chain find the role.
+11. **Roles and permissions are seeded, not migrated — and the E2E suites cannot catch a
+   gap.** The suites mint their own tokens with the permission list hard-coded, so they
+   never read the role map from the database. `intake:write` existed in the seed and not in
+   the deployed database, and the live API answered 403 to a correctly built request while
+   646 local checks stayed green. The seed now runs on every deploy.
 
 ---
 
