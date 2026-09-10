@@ -41,13 +41,38 @@ export class RroBedrockProvider implements RroAiProvider {
 
   private getClient(): BedrockRuntimeClient {
     if (!this.client) {
+      // Only hand the SDK explicit keys when there are real ones to hand it.
+      //
+      // `AWS_ACCESS_KEY_ID` defaults to the literal `'test'` for LocalStack, and
+      // an explicit credential — even a placeholder — wins over every other
+      // source in the SDK's chain. So passing it unconditionally silently
+      // disables IAM roles: the dev box was given a least-privilege instance
+      // role for exactly this call and Bedrock still answered
+      // `UnrecognizedClientException`, because the client was signing with the
+      // word "test".
+      //
+      // Falling through to the default chain is what makes a role work in
+      // deployment while a developer's `.env` keys still work locally. It is
+      // also the safer default: no long-lived key has to sit on the box.
+      const hasRealKeys =
+        config.AWS_ACCESS_KEY_ID !== 'test' && config.AWS_SECRET_ACCESS_KEY !== 'test';
+
       this.client = new BedrockRuntimeClient({
         region: config.AWS_BEDROCK_REGION,
-        credentials: {
-          accessKeyId: config.AWS_ACCESS_KEY_ID,
-          secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
-        },
+        ...(hasRealKeys
+          ? {
+              credentials: {
+                accessKeyId: config.AWS_ACCESS_KEY_ID,
+                secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
+              },
+            }
+          : {}),
       });
+
+      logger.info(
+        { region: config.AWS_BEDROCK_REGION, modelId: this.modelId, explicitKeys: hasRealKeys },
+        'Bedrock RRO client created',
+      );
     }
     return this.client;
   }
