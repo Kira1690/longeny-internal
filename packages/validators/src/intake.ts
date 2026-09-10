@@ -37,9 +37,17 @@ export type Intake = z.infer<typeof intakeSchema>;
  * client-controlled scope, which is the whole problem the profile context
  * exists to solve.
  */
-export const submitIntakeSchema = intakeSchema.extend({
-  notes: z.string().trim().max(5000).optional(),
-});
+export const submitIntakeSchema = intakeSchema
+  .extend({
+    notes: z.string().trim().max(5000).optional(),
+  })
+  // Unknown keys are rejected, not dropped. Every field here has a `.default([])`,
+  // so a client that wraps its answers in the wrong envelope — `{answers: {...}}`
+  // instead of the flat body — had every real field stripped and still got a 201
+  // with an empty intake stored against the patient. Silent field-dropping is
+  // tolerable on a search filter; on a clinical form it means the patient
+  // believes they submitted and the record says they said nothing.
+  .strict();
 
 export type SubmitIntake = z.infer<typeof submitIntakeSchema>;
 

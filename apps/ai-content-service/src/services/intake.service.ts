@@ -1,6 +1,6 @@
-import { NotFoundError } from '@longeny/errors';
+import { BadRequestError, NotFoundError } from '@longeny/errors';
 import { createLogger } from '@longeny/utils';
-import type { SubmitIntake } from '@longeny/validators';
+import { type SubmitIntake, isEmptyIntake } from '@longeny/validators';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { intake_submissions } from '../db/schema.js';
@@ -30,6 +30,16 @@ export class IntakeService {
    * retries.
    */
   async submit(profileId: string, authId: string, body: SubmitIntake) {
+    // An intake with no symptom, goal or condition carries nothing to reason
+    // about: the classifier declines it and the summary declines it, so storing
+    // it only creates a versioned clinical record that every consumer refuses.
+    // `isEmptyIntake` already encoded this rule but was called only by the
+    // classifier, which meant the refusal happened long after the patient had
+    // been told their form was accepted. Refuse at the door instead.
+    if (isEmptyIntake(body)) {
+      throw new BadRequestError('An intake needs at least one symptom, goal or condition');
+    }
+
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const [row] = await db
