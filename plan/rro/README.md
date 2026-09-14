@@ -171,13 +171,20 @@ health data. Every isolation test passed against it, because they ran serially.
 |---|---|---|
 | 6 | [week-06-foundations.md](./week-06-foundations.md) | tenancy close-out, gateway, D2 stage 1, D9 |
 | 7 | [week-07-ai-core.md](./week-07-ai-core.md) · [completion](./week-07-completion.md) | intake, classifier, pre-consult summary, reports timeline |
-| 8 | [week-08-workspace.md](./week-08-workspace.md) | clinician queue + patient workspace + gateway re-open |
+| 8 | [week-08-reports-benchmarks-scoring.md](./week-08-reports-benchmarks-scoring.md) | biomarker readings, reference ranges, trends, pillar scoring |
+| — | [week-08-workspace.md](./week-08-workspace.md) | clinician queue + patient workspace — **deferred, no slot yet** |
 | 9 | [week-09-care-plans-checkins.md](./week-09-care-plans-checkins.md) | document/care-plan builder, check-ins, adherence |
 | 10 | [week-10-dashboards-reporting.md](./week-10-dashboards-reporting.md) | user dashboard, outcomes, reporting |
 | 11 | [week-11-integration-qa.md](./week-11-integration-qa.md) | E2E family flows, AI eval, hardening |
 | 12 | [week-12-pilot-readiness.md](./week-12-pilot-readiness.md) | backend tail, security pass, production deploy, handover |
 
 Open design awaiting a scope decision:
+**Week 8 is reports, benchmarks and scoring**, not the clinician workspace — reassigned
+2026-09-14. See
+[week-08-reports-benchmarks-scoring.md](./week-08-reports-benchmarks-scoring.md). The
+workspace is deferred with no slot, and the finish date is now around Weeks 14–15 rather
+than 13: [capacity-weeks-07-12.md §0](./capacity-weeks-07-12.md).
+
 [care-team-model.md](./care-team-model.md) — a patient's care team (lead clinician plus
 nutrition/coach/ancillary) has no model at all; Week 8 §8.1 and §8.2 assume one exists.
 

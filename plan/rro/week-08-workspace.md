@@ -1,4 +1,11 @@
-# Week 8 — Clinician Workspace
+# Clinician Workspace — deferred, no longer Week 8
+
+> **Moved 2026-09-14.** Week 8 was reassigned to reports, benchmarks and scoring —
+> [week-08-reports-benchmarks-scoring.md](./week-08-reports-benchmarks-scoring.md). This
+> week's content did not shrink; it has no slot yet.
+>
+> The file keeps its name so existing links resolve. Read the week number as "whenever
+> this lands", not as 8.
 
 > **Unblocked 2026-09-06.** §8.1 and §8.2 are written against "profiles assigned to the
 > calling provider", and no assignment existed in any schema — provider access was derived

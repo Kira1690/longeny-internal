@@ -1,13 +1,66 @@
-# Capacity — Weeks 7 to 12 (Week 13 at current resourcing)
+# Capacity — Weeks 7 onward
 
-Why this track needs six more weeks, and what each person is doing in each of them.
-
-Caps: **6h/day, 35h/week** per person; Milan is allocated 20h in Week 7 and less
-thereafter, because DevOps work on this track is bursty rather than continuous.
+> **Superseded in part, 2026-09-14.** The per-week tables below still describe the work
+> correctly, but the **finish date and the Week 8 contents are out of date**. Two things
+> changed after they were written:
+>
+> 1. **Week 8 was reassigned** to reports, benchmarks and scoring
+>    ([week-08-reports-benchmarks-scoring.md](./week-08-reports-benchmarks-scoring.md)).
+>    The clinician workspace it used to hold is deferred with no slot.
+> 2. **There is no second backend developer.** That was the recommended way to hold
+>    Week 13, and it is not happening — so Week 13 is no longer reachable.
+>
+> Current arithmetic is §0 below. Read that first; treat the rest as the breakdown of the
+> work, not as a date.
 
 ---
 
-## 1. Why Week 12 exists
+## 0. Where the track actually lands — 2026-09-14
+
+| | BE hours |
+|---|---|
+| XLS Weeks 8–11 backend | 168 |
+| Verified consent by email — decided, not in the XLS | 27 |
+| Care team model — decided, not in the XLS | 23 |
+| Week 8 as now scoped, being built | −35 |
+| **Remaining after Week 8** | **~183** |
+
+One backend developer at 35h/week clears that in **~5.2 weeks**, which puts the finish
+around **Weeks 14–15**, not Week 13.
+
+Roughly 22h of Week 8's new content was Week 10's reporting work (M16) pulled forward, so
+not all of it is additional. What *is* genuinely additional is the 50h of consent and care
+team — neither was ever in the XLS, and both are prerequisites for the clinician
+workspace.
+
+**Two levers remain, and only two:**
+
+1. **Cut scope.** Candidates, in the order I would cut them: admin console (10h),
+   document builder (18h), load testing (12h).
+2. **Accept the date.** Same scope, later finish — told to the client now rather than
+   discovered in Week 12.
+
+**Recommendation: accept the date.** Cutting load testing before a clinical pilot buys one
+week and removes the thing that tells you the system holds under real use. Cutting the
+admin console is the least damaging 10h if something must go.
+
+Either way this is a client conversation, not something to absorb quietly. It belongs next
+to the consent question in the same discussion.
+
+**What is no longer available:** the earlier Option B — a second backend developer from
+Week 8, which was the recommended way to hold Week 12–13. Options A and C from that
+decision are also closed: A was "make Week 8 the consent foundation week", which the scope
+change overtook, and C was "skip the care team and build the workspace on booking-derived
+access", which was rejected because a coach never holds a booking.
+
+---
+
+## 1. Why the track runs as long as it does
+
+Why this track needs the weeks it needs, and what each person is doing in each of them.
+
+Caps: **6h/day, 35h/week** per person; Milan is allocated 20h in Week 7 and less
+thereafter, because DevOps work on this track is bursty rather than continuous.
 
 The backend is the binding constraint, and it has been since the plan sheet said so.
 Adding up the backend hours the week plans themselves specify:

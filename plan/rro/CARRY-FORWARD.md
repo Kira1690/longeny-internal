@@ -1,7 +1,7 @@
 # Carry-Forward Register
 
 **The one file to read before planning any week.** Everything decided, found or designed
-but not yet built, in the order it has to happen. Updated 2026-09-04.
+but not yet built, in the order it has to happen. Updated 2026-09-14.
 
 If this disagrees with a week file, this is newer. If it disagrees with
 `prep/RRO_MVP_Gantt_Chart.xlsx`, the XLS wins on scope and this wins on "what did we learn
@@ -19,7 +19,7 @@ and the reasoning.
 |---|---|---|---|
 | A1 | **Care team model.** One team per patient, one lead (partial unique index). Role lives on the membership. Profile-scoped, never account-scoped. A lead or admin may add; **membership grants no access until per-member consent exists**. Deactivating a profile ends every membership in the same transaction. | **DECIDED** — D-1…D-5 all answered | [care-team-model.md](./care-team-model.md) |
 | A2 | **Verified consent by email.** Threshold 18 / DPDP, held in config with the jurisdiction written onto each row. `pending` is usable and labelled, but blocks AI analysis and every provider surface. Two reminders, expire at 14d, one manual re-send. | **DECIDED** — all four answered | [verified-consent-design.md](./verified-consent-design.md) |
-| A3 | **Bedrock.** Model id, region, IAM role and the credential bug are all **fixed and proven** (see D9). What remains is not engineering: the AWS account cannot invoke any Bedrock model — `AccessDeniedException: INVALID_PAYMENT_INSTRUMENT`. The same call succeeded at 13:05 on 2026-09-10 and failed from 13:32 onwards, for the IAM user and the instance role alike, so it is the account's payment method. | **Blocked on AWS billing** — account `836533914754`. Nothing to build. | `infrastructure/deploy/README.md` |
+| A3 | **Bedrock is unusable — and it is the client's to fix.** Account `836533914754` refuses every model invocation with `INVALID_PAYMENT_INSTRUMENT`. Everything on our side is done and proven (see D9, D10). **28h of paid work is idle**: M-W7-1, P-W7-2, P-W7-3, P-W7-4, all carrying a red *Client Action* label on the board. Nothing for the team to build. | **Blocked on the client's AWS billing** | `infrastructure/deploy/README.md` |
 | A4 | **M-W6-2 calendar invite** — **RESOLVED 2026-09-10.** booking-service stays internal, so the card was descoped and archived. The invite service, ICS attachment, calendar channel and delivery logging all still work internally and need no rebuild if booking-service is ever brought into client scope. | **CLOSED** | Trello, archived |
 
 ### The consequence of A1+A2 that changes Week 8's shape
@@ -48,7 +48,7 @@ rebuild here.**
 
 ---
 
-## B. Done in `longeny-internal`, not yet shipped
+## B. Shipped — Week 7, for the record
 
 | # | What | State | Next step |
 |---|---|---|---|
@@ -62,7 +62,7 @@ rebuild here.**
 | # | What | Why it was deferred | Where it goes |
 |---|---|---|---|
 | C1 | **R6** — ai-content's 112 TypeBox `t.*` usages across 14 route files converge on `@longeny/validators` | Mechanical, touches every legacy ai-content surface, week was over cap | Week 8, V-W7-3 remainder |
-| C2 | **D2 query conversion** — progress / habits / goals still filter on `user_id`, not `profile_id`. Columns and middleware exist; the queries do not use them | Displaced from Week 7 when V-W7-7 grew 9h → 12h | **Week 8 §8.8**, 6h. Written up in [week-08-workspace.md](./week-08-workspace.md). **Not on the board** — no Week 8 cards exist until Week 8 is planned |
+| C2 | **D2 query conversion** — progress / habits / goals still filter on `user_id`, not `profile_id`. Columns and middleware exist; the queries do not use them | Displaced from Week 7, then displaced again by the Week 8 scope change | **Still unscheduled.** Written up in [week-08-workspace.md](./week-08-workspace.md) §8.8. Not on the board. |
 | C3 | **SMS has no transport.** Every SMS notification records `failed` with that reason — deliberate and visible, but a dependent reachable only by phone is not reachable | No carrier chosen | Needs a product decision, not an engineering one |
 | C4 | **481 `noExplicitAny` warnings**, mostly `({ body, store }: any)` in controllers | Not failing the build; the standard forbids *new* ones | Opportunistic |
 
@@ -70,10 +70,14 @@ rebuild here.**
 
 ## D. Facts that keep getting re-derived — stop re-deriving them
 
-1. **The track ends Week 13, not Week 12**, on one backend developer. 203h remain after
-   Week 7 at 35h/week. Week 8 alone is 83h against 35h — the worst overrun in the plan —
-   and adding A1 or A2 makes it worse. Arithmetic and the three ways out:
-   [capacity-weeks-07-12.md](./capacity-weeks-07-12.md).
+1. **The track ends around Week 14–15, not Week 12 and no longer Week 13.** ~183h of
+   backend remain after Week 8 at 35h/week. The Week 13 figure assumed a second backend
+   developer from Week 8; **that is not happening**, so it is gone. Consent (27h) and the
+   care team (23h) are 50h that were never in the XLS and are both prerequisites for the
+   clinician workspace. Current arithmetic and the two remaining levers — cut scope, or
+   accept the date — are in
+   [capacity-weeks-07-12.md §0](./capacity-weeks-07-12.md). **Do not quote Week 12 or
+   Week 13.**
 2. **6h/day and 35h/week only reconcile on a six-day week.** 5 × 6 = 30h. Every schedule
    here assumes Mon–Fri 6h plus Sat 5h.
 3. **The dev server has no git and no rollback.** `~/longeny` is a file copy. Its schema
@@ -130,38 +134,46 @@ Sequencing, not hours, is what will cost a rebuild:
 
 ---
 
-## G. Week 7 verification — done 2026-09-06
+## G. Where things stand — 2026-09-14
 
-Everything §G asked for, except the migration to the client repo, which was deliberately
-not done: this pass was internal-repo only, by instruction.
+### Week 7 — closed
 
-| | Result |
+| | |
 |---|---|
-| G1 Commit | 265 files in nine commits from `0eafab0`, plus two more for the fixes below. Working tree clean. |
-| G2 `consent_type` | Now the `caregiver_consent_type` pg enum. Migration `0004` maps off-taxonomy rows rather than dropping them and aborts loudly on anything it cannot map — two live rows held `caregiver_access` and would have failed the generated cast. Verified: the column itself refuses an off-list value. |
-| G3 Suites | **12/12 pass, 646 checks + 7 unit assertions, 0 failures**, on real Postgres, Redis and SMTP. Baseline was 606. |
-| G4 Regression tests | Six sections added (29–34), all green. |
-| G5 Migrate | **Not done — internal only this pass.** Still open under V-W7-7. |
+| Built, tested, shipped | 12 endpoints, 7 tables. 12/12 suites, 646 checks + 7 unit assertions, 0 failures, on real Postgres, Redis and SMTP. |
+| Client repo | `f244c55..158284a`, pushed. typecheck 13/13, lint 0 errors. `docs/18-intake-and-rro-ai.md` written for frontend engineers. |
+| Deployed | Live on `13.126.33.146:4001` and verified there — intake, classification, summary, report timeline, RRO state, cross-account 404s. |
+| Deploys | Now `git push production main`, with migrations, role seeding, health gate and `deploy-rollback`. Scripts in `infrastructure/deploy/`. |
 
-### What the run found that §G did not know about
+**Three defects survived 646 green local checks and only appeared on the deployed box.**
+They are D11 and the two below it; the lesson is that local green is not evidence about a
+server.
 
-A seventh defect, and the reason it survived the first fix: **the internal HMAC routes never
-pass through `assertOwnership`**, and three of them checked only that the profile row
-existed. A deactivated profile stayed reachable through `notifyProfile`, `recordTransition`
-and `getRroStateForService`. The first of those actually delivered mail to a removed person
-— confirmed by reading mailpit, not by trusting the API's own answer.
+**Not done and honest about it:** the migration was not file-by-file. Whole service
+directories were rsynced, so 8 files outside Week 7 scope went across (admin ×3,
+progress ×3, seed-providers ×2). Two one-off internal repair scripts went with them and
+were removed again. **Open question for the user: leave the 8, or strip them back.**
 
-All three now share `assertActiveProfileForService()`. See D7 and D8, and the new line in
-the per-card checklist in [00-engineering-standards.md](./00-engineering-standards.md).
+### Week 8 — reports, benchmarks and scoring
 
-### Still open
+Scope reassigned by the client-side lead on 2026-09-14, replacing the clinician workspace.
+Plan: [week-08-reports-benchmarks-scoring.md](./week-08-reports-benchmarks-scoring.md).
+Board: 20 cards, 97h active, 28h blocked on the client.
 
-- **Migrate Week 7's 12 endpoints to `BraveLabs/`** under the Week 7 cards. Scope-scan the
-  diff first: no Claude reference, no `internal-notes/` content, no `plan/rro/` content,
-  nothing outside the week's cards. This is the only part of V-W7-7 not done.
-- The 44h overrun is **settled**: Week 7 stands as delivered, and D2 moved out to
-  [week-08-workspace.md](./week-08-workspace.md) §8.8. A1 and A2 are **decided** — see
-  section A.
+The chain being built: `report (file) → readings → benchmark → score → advice`.
+
+Two things to hold on to:
+
+- **VG-W8-1 blocks 19h.** Reference ranges are a hard dependency, not paperwork — three
+  backend cards have nothing to compare a value against without them.
+- **A score never moves a patient between care stages on its own.** Easy to hold while the
+  input was intake prose; much harder now the input is a lab panel and the output feels
+  objective. V-W8-6 asserts it with a test; VG-W8-2 asks for it in writing.
+
+### Deferred again, and the order still binds
+
+consent (27h) → care team (23h) → queue + workspace (45h). Nothing in Week 8 advances that
+chain; it simply does not break it. Built out of order, the workspace gets written twice.
 
 ---
 

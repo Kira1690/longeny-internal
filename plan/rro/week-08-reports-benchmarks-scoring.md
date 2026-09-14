@@ -1,0 +1,146 @@
+# Week 8 — Reports, Benchmarks and Scoring
+
+**Scope set 2026-09-14 by the client-side lead**, replacing the clinician workspace that
+this slot previously held. The workspace week did not shrink — it moved, and is now
+[week-08-workspace.md](./week-08-workspace.md) awaiting a slot. See §6.
+
+Gate: [00-engineering-standards.md](./00-engineering-standards.md).
+Register: [CARRY-FORWARD.md](./CARRY-FORWARD.md).
+
+---
+
+## 1. Why this week exists
+
+**A report today is only a file.** `documents` stores a title, a type, a `reported_at` and
+an S3 key. Nothing inside it is readable by the system. And the RRO classifier scores the
+five pillars from **intake text alone** — no measured number has ever reached it.
+
+So the care stage a patient is placed in currently rests on what they typed into a form.
+This week puts measurement underneath it:
+
+```
+report (file)  →  readings (values)  →  benchmark (judgement)  →  score  →  advice
+```
+
+Each arrow is a card. The last one deliberately stops short of acting — see §4.
+
+---
+
+## 2. Cards
+
+### Vishal — backend — 35h
+
+| # | Card | h |
+|---|---|---|
+| V-W8-1 | Biomarker readings schema — give a report a body | 6 |
+| V-W8-2 | Report → readings API, values tied to their source file | 7 |
+| V-W8-3 | Reference ranges + benchmark | 6 |
+| V-W8-4 | Trend API — direction of travel | 6 |
+| V-W8-5 | Pillar scoring engine — versioned and explainable | 7 |
+| V-W8-6 | Overall RRO score — advisory, never automatic | 3 |
+
+### Pushparaj — AI — 26h
+
+| # | Card | h |
+|---|---|---|
+| P-W7-1 | Classifier fixture corpus *(carry-over, no AWS needed)* | 8 |
+| P-W7-5 | Pre-consult summary prompt *(carry-over, no AWS needed)* | 4 |
+| P-W8-1 | Report extraction prompt + eval set | 8 |
+| P-W8-2 | Score validation against clinician judgement | 6 |
+
+### Milan — DevOps — 15h (+1h waiting on the client)
+
+| # | Card | h |
+|---|---|---|
+| M-W8-2 | Report storage hardening — the bucket holds patient labs now | 5 |
+| M-W8-3 | Week 8 deploy and server verification | 4 |
+| M-W8-4 | Gateway health honesty | 6 |
+| M-W8-5 | Switch RRO provider to Bedrock — **blocked on client billing** | 1 |
+
+### Vijay — architect — 21h
+
+| # | Card | h |
+|---|---|---|
+| VG-W7-1…4 | *carry-over reviews* | 14 |
+| VG-W8-1 | **Reference ranges** | 4 |
+| VG-W8-2 | Scoring weights + the no-auto-transition rule | 3 |
+
+**97h active. 28h blocked on the client.**
+
+---
+
+## 3. The dependency that decides the week
+
+**VG-W8-1 blocks 19h of backend work.** V-W8-3, V-W8-4 and V-W8-5 have nothing to compare
+a value against until a clinician says what normal is. If reference ranges arrive on
+Friday, more than half of Vishal's week cannot finish.
+
+It is named "blocks 19h of backend" on the board for that reason. Start narrow — ten
+biomarkers that change a care decision beat sixty that fill a table.
+
+Each range carries its **source**. Ranges differ by lab and by guideline body; a patient
+told they are out of range is entitled to an answer to "according to whom".
+
+---
+
+## 4. The rule this week must not lose
+
+**A computed score never moves a patient between care stages on its own.**
+
+The rules classifier already works this way, deliberately: its confidence never reaches the
+transition floor, so it can advise and cannot act. That was an easy rule to hold when the
+input was intake prose.
+
+It gets harder now. When the input is a lab panel the output *feels* objective, and the
+pull to let it transition automatically is much stronger. But a wrong automatic transition
+is the least visible failure this system can produce — the patient cannot see it, and the
+clinician has no reason to go looking. It silently changes what care someone is offered.
+
+V-W8-6 enforces it with a test that scoring writes no `rro_transition` row. VG-W8-2 asks
+Vijay to confirm it in writing rather than leaving it as an engineering habit.
+
+---
+
+## 5. Manual entry before AI extraction
+
+V-W8-2 (a human types the values) ships before P-W8-1 (a model reads the PDF).
+
+Partly forced: Bedrock is unreachable while the client's AWS billing is unresolved. But it
+is the right order regardless. A misread decimal in a lab value is a clinical error, and
+scanned-report OCR is exactly where that happens. Extraction should propose draft readings
+a human confirms — speeding up a step that already works, rather than being the only way
+the step works.
+
+P-W8-1's eval records **miss rate separately from accuracy**: a value silently skipped is
+worse than one read wrongly, because nobody goes looking for it.
+
+---
+
+## 6. What moved out, and what it costs
+
+| Deferred | h | Why it matters |
+|---|---|---|
+| Verified consent by email | 27 | [verified-consent-design.md](./verified-consent-design.md) — decided, not built |
+| Care team model | 23 | [care-team-model.md](./care-team-model.md) — decided, not built |
+| Clinician queue + patient workspace | 45 | [week-08-workspace.md](./week-08-workspace.md) — needs the care team first |
+| D2 profile scoping | 6 | carried since Week 7 |
+
+The ordering constraint from the care-team decision still stands and still binds:
+
+> consent machinery → care team + access resolver → queue + workspace
+
+Nothing this week breaks that chain; it simply does not advance it.
+
+---
+
+## 7. Exit criteria
+
+- A value entered from a real report appears in a trend, is benchmarked against a range
+  that names its source, and contributes to a pillar score.
+- A score can be recomputed from stored readings and produces the identical number.
+- Every score names the readings behind it.
+- Producing a score writes no transition — asserted by a test.
+- Missing data lowers confidence; it does not score zero.
+- Unit mismatch is an error, never a silent comparison.
+- Verified on the deployed server, not only locally — Week 7 lost three defects to that gap.
+- `typecheck` 0 · `lint` clean · E2E green on real infrastructure · migrated to `BraveLabs`.
