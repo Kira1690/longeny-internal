@@ -195,11 +195,7 @@ for suite in \
   "intake+rro|http://localhost:3004|apps/ai-content-service/test/intake-rro.e2e.ts" \
   "ai classify+summary|http://localhost:3004|apps/ai-content-service/test/ai-classify.e2e.ts" \
   "reports timeline|http://localhost:3004|apps/ai-content-service/test/reports-timeline.e2e.ts" \
-  "benchmarks|http://localhost:3004|apps/ai-content-service/test/benchmarks.e2e.ts" \
-  "readings|http://localhost:3004|apps/ai-content-service/test/readings.e2e.ts" \
-  "trends|http://localhost:3004|apps/ai-content-service/test/trends.e2e.ts" \
   "report storage|http://localhost:3004|apps/ai-content-service/test/report-storage.e2e.ts" \
-  "scores|http://localhost:3004|apps/ai-content-service/test/scores.e2e.ts" \
   "booking profiles+invite|http://localhost:3003|apps/booking-service/test/booking-profile.e2e.ts" \
   "payments rbac|http://localhost:3005|apps/payment-service/test/payments-rbac.e2e.ts" \
   "bookings ownership|http://localhost:3003|apps/booking-service/test/bookings-ownership.e2e.ts" \
@@ -222,15 +218,6 @@ done
 [[ -f apps/ai-content-service/test/eval-scoring.test.ts ]] && \
   run_suite "eval scorers" "http://localhost:3004" \
     bun test apps/ai-content-service/test/eval-scoring.test.ts
-
-[[ -f apps/ai-content-service/test/extraction-scoring.test.ts ]] && \
-  run_suite "extraction scorer" "http://localhost:3004" \
-    bun test apps/ai-content-service/test/extraction-scoring.test.ts
-
-# Pure engines — benchmark, trend and scoring rules
-for t in apps/ai-content-service/test/*-engine.test.ts; do
-  [[ -f "$t" ]] && run_suite "$(basename "$t" .test.ts)" "http://localhost:3004" bun test "$t"
-done
 
 # ── Summary ──────────────────────────────────────────────────────────────────
 

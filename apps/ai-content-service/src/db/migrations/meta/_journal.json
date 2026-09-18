@@ -43,6 +43,13 @@
       "when": 1789731064583,
       "tag": "0005_rro_scores",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789742610689,
+      "tag": "0006_drop_readings_benchmarks_scores",
+      "breakpoints": true
     }
   ]
 }

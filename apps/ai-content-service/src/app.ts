@@ -31,11 +31,6 @@ export function createApp() {
               description: 'RRO intake — the answers a classification derives from',
             },
             { name: 'rro-ai', description: 'RRO classifier and pre-consult summary' },
-            { name: 'readings', description: 'Values entered from lab reports' },
-            {
-              name: 'benchmarks',
-              description: 'Report readings judged against reference ranges',
-            },
           ],
         },
       }),
