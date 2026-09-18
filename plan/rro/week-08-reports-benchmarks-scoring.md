@@ -45,6 +45,7 @@ Each arrow is a card. The last one deliberately stops short of acting — see §
 |---|---|---|
 | P-W7-1 | Classifier fixture corpus *(carry-over, no AWS needed)* | 8 |
 | P-W7-5 | Pre-consult summary prompt *(carry-over, no AWS needed)* | 4 |
+| P-W8-1 | written, **cannot run (Bedrock)**; eval set synthetic | Contract `readingExtractionOutputSchema` (extract-v1): per-value `uncertain` + reason, `unmapped`, `unreadable` — nothing seen may go unsaid. Versioned prompt with a closed code list (13 markers). 3 synthetic layouts (tabular+flags, key–value with an injected instruction, scanned two-column with OCR noise), hand-labelled. Scorer reports **silent misses separately from accuracy**, plus wrong value/unit/code, unflagged uncertainty and extra values (reference interval read as a value). 10 scorer tests. **Needs anonymised real reports from ≥3 labs** to be done — ask the client. |
 | P-W8-1 | Report extraction prompt + eval set | 8 |
 | P-W8-2 | Score validation against clinician judgement | 6 |
 

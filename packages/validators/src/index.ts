@@ -102,3 +102,11 @@ export {
   uploadDocumentSchema,
 } from './documents.js';
 export type { UploadDocument } from './documents.js';
+
+// Report extraction (Week 8) — what a model proposes from a lab report
+export {
+  READING_EXTRACTION_CONTRACT,
+  extractedReadingSchema,
+  readingExtractionOutputSchema,
+} from './readings-extraction.js';
+export type { ExtractedReading, ReadingExtractionOutput } from './readings-extraction.js';
