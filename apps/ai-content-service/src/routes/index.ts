@@ -12,6 +12,7 @@ import { OnboardingController } from '../controllers/onboarding.controller.js';
 import { PostOnboardingController } from '../controllers/post-onboarding.controller.js';
 import { ProviderController } from '../controllers/provider.controller.js';
 import { RagController } from '../controllers/rag.controller.js';
+import { ReadingsController } from '../controllers/readings.controller.js';
 import { RecommendationController } from '../controllers/recommendation.controller.js';
 import { RroAiController } from '../controllers/rro-ai.controller.js';
 import { SchedulingController } from '../controllers/scheduling.controller.js';
@@ -31,6 +32,7 @@ import { OnboardingOwnershipService } from '../services/onboarding-ownership.ser
 import { PostOnboardingService } from '../services/post-onboarding.service.js';
 import { ProfileAccessService } from '../services/profile-access.service.js';
 import { ProviderProfileService } from '../services/provider-profile.service.js';
+import { ReadingsService } from '../services/readings.service.js';
 import { RecommendationService } from '../services/recommendation.service.js';
 import { RroAiService } from '../services/rro-ai.service.js';
 import { S3Service } from '../services/s3.service.js';
@@ -50,6 +52,7 @@ import { createOnboardingRoutes } from './onboarding.routes.js';
 import { createPostOnboardingRoutes } from './post-onboarding.routes.js';
 import { createProviderRoutes } from './provider.routes.js';
 import { createRagRoutes } from './rag.routes.js';
+import { createReadingsRoutes } from './readings.routes.js';
 import { createRecommendationRoutes } from './recommendation.routes.js';
 import { createRroAiRoutes } from './rro-ai.routes.js';
 import { createSchedulingRoutes } from './scheduling.routes.js';
@@ -82,6 +85,7 @@ export function createRoutes() {
   const intakeService = new IntakeService();
   const rroAiService = new RroAiService(intakeService);
   const benchmarkService = new BenchmarkService();
+  const readingsService = new ReadingsService();
 
   // ── Initialize controllers ──
   const recommendationController = new RecommendationController(recommendationService);
@@ -104,6 +108,7 @@ export function createRoutes() {
   const intakeController = new IntakeController(intakeService, profileAccessService);
   const rroAiController = new RroAiController(rroAiService, profileAccessService);
   const benchmarkController = new BenchmarkController(benchmarkService, profileAccessService);
+  const readingsController = new ReadingsController(readingsService, profileAccessService);
 
   return new Elysia()
     .use(createOnboardingRoutes(onboardingController))
@@ -122,5 +127,6 @@ export function createRoutes() {
     .use(createNotificationRoutes(notificationController))
     .use(createIntakeRoutes(intakeController))
     .use(createRroAiRoutes(rroAiController))
-    .use(createBenchmarkRoutes(benchmarkController));
+    .use(createBenchmarkRoutes(benchmarkController))
+    .use(createReadingsRoutes(readingsController));
 }

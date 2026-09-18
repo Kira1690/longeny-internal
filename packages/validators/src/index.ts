@@ -84,3 +84,12 @@ export type {
   RroSummaryInput,
   RroSummaryOutput,
 } from './rro-ai.js';
+
+// Biomarker readings (Week 8) — values typed in from a lab report
+export {
+  correctReadingSchema,
+  markerCodeSchema,
+  readingEntrySchema,
+  submitReadingsSchema,
+} from './readings.js';
+export type { CorrectReading, ReadingEntry, SubmitReadings } from './readings.js';

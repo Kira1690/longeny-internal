@@ -191,6 +191,7 @@ for suite in \
   "ai classify+summary|http://localhost:3004|apps/ai-content-service/test/ai-classify.e2e.ts" \
   "reports timeline|http://localhost:3004|apps/ai-content-service/test/reports-timeline.e2e.ts" \
   "benchmarks|http://localhost:3004|apps/ai-content-service/test/benchmarks.e2e.ts" \
+  "readings|http://localhost:3004|apps/ai-content-service/test/readings.e2e.ts" \
   "booking profiles+invite|http://localhost:3003|apps/booking-service/test/booking-profile.e2e.ts" \
   "payments rbac|http://localhost:3005|apps/payment-service/test/payments-rbac.e2e.ts" \
   "bookings ownership|http://localhost:3003|apps/booking-service/test/bookings-ownership.e2e.ts" \
