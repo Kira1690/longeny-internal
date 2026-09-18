@@ -418,7 +418,7 @@ export const rroPillarEnum = pgEnum('rro_pillar', [
   'stress',
   'environment',
 ]);
-/** Which implementation produced a classification. See plan/rro/week-07-ai-core.md D-2. */
+/** Which implementation produced a classification. */
 export const aiProviderEnum = pgEnum('ai_provider', ['bedrock', 'rules']);
 export const carePlanStatusEnum = pgEnum('care_plan_status', [
   'draft',
@@ -512,7 +512,7 @@ export const rro_classifications = pgTable(
 );
 
 /**
- * Pre-consult summary, stored so the Week 8 workspace can read it without
+ * Pre-consult summary, stored so the clinician workspace can read it without
  * paying for the model again. Tied to the intake version it was derived from:
  * a summary whose input has since changed is stale, and the workspace has to be
  * able to tell.
@@ -546,8 +546,8 @@ export const rro_summaries = pgTable(
 );
 
 /**
- * D6 — care plans and their versions. Created this week per the plan sheet;
- * the endpoints that write them are Week 9.
+ * Care plans and their versions. The tables exist ahead of the endpoints that
+ * write them.
  */
 export const care_plans = pgTable(
   'care_plans',
@@ -662,11 +662,11 @@ export const onboarding_sessions = pgTable(
 );
 
 // ─────────────────────────────────────────────────────────────
-// Biomarkers — Week 8: readings, reference ranges, benchmarks
+// Biomarkers — readings, reference ranges, benchmarks
 //
 // A report used to be only a file. These tables give it a body: the values it
 // contains, and the ranges those values are judged against. Scoring reads from
-// here and never writes back to the care state (plan/rro/week-08 §4).
+// here and never writes back to the care state.
 // ─────────────────────────────────────────────────────────────
 
 export const readingEntryMethodEnum = pgEnum('reading_entry_method', ['manual', 'extracted']);
@@ -736,7 +736,7 @@ export const biomarker_readings = pgTable(
  * named source.
  *
  * `is_placeholder` defaults to true on purpose. Until the clinical ranges are
- * supplied (VG-W8-1), every row here is a test value, and a row has to be
+ * supplied, every row here is a test value, and a row has to be
  * deliberately marked real rather than accidentally left looking real. Every
  * benchmark computed against a placeholder row is returned as `provisional`.
  *

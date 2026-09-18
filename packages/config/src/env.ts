@@ -178,7 +178,7 @@ export const aiContentConfigSchema = requireDeployedSecrets(
     /**
      * Which classifier/summary implementation runs. `bedrock` is the model;
      * `rules` is the deterministic baseline, whose output is advisory only and
-     * can never transition a profile's RRO state. See plan/rro/week-07-ai-core.md.
+     * can never transition a profile's RRO state.
      */
     RRO_AI_PROVIDER: z.enum(['bedrock', 'rules']).default('rules'),
     /**

@@ -1,7 +1,7 @@
 import { type RangeInput, sameUnit } from './engine.js';
 
 /**
- * Direction of travel for one marker (Week 8, V-W8-4).
+ * Direction of travel for one marker.
  *
  * Pure, like the benchmark engine. Two separate answers, because they mean
  * different things:

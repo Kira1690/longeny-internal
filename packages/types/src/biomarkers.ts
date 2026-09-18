@@ -1,7 +1,7 @@
 /**
  * Biomarker taxonomy — readings, reference ranges and benchmark verdicts.
  *
- * Week 8 puts measured values underneath the RRO classification. The chain is
+ * Biomarkers put measured values underneath the RRO classification. The chain is
  * `report (file) → readings → benchmark → score`, and this file holds the words
  * each step speaks, so the database enums, the validators and the API contract
  * cannot drift apart.

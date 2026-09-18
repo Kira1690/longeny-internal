@@ -17,7 +17,7 @@ const logger = createLogger('rro-score');
 type ScoreRow = typeof rro_scores.$inferSelect;
 
 /**
- * Pillar and overall RRO scores (V-W8-5, V-W8-6).
+ * Pillar and overall RRO scores.
  *
  * Deliberately has no dependency on anything that can change a care state:
  * there is no user-provider client here, no transition call, no event. The

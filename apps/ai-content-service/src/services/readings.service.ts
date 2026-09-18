@@ -36,7 +36,7 @@ function present(row: ReadingRow, supersededBy: string | null = null) {
 }
 
 /**
- * Readings — the values inside a report (Week 8, V-W8-2).
+ * Readings — the values inside a report.
  *
  * Every reading belongs to one report, and takes its subject of care from that
  * report rather than from the request: the report was scoped to a profile when

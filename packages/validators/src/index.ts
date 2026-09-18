@@ -85,7 +85,7 @@ export type {
   RroSummaryOutput,
 } from './rro-ai.js';
 
-// Biomarker readings (Week 8) — values typed in from a lab report
+// Biomarker readings — values typed in from a lab report
 export {
   correctReadingSchema,
   markerCodeSchema,
@@ -103,7 +103,7 @@ export {
 } from './documents.js';
 export type { UploadDocument } from './documents.js';
 
-// Report extraction (Week 8) — what a model proposes from a lab report
+// Report extraction — what a model proposes from a lab report
 export {
   READING_EXTRACTION_CONTRACT,
   extractedReadingSchema,

@@ -196,7 +196,7 @@ const BENCHMARK_EXAMPLE = [
 ];
 
 /**
- * Benchmarks (Week 8, V-W8-3).
+ * Benchmarks, trends and scores.
  *
  * `/profiles/:id/benchmarks` is served here while the rest of `/profiles` is
  * user-provider's; the gateway routes this one path to ai-content, as it does

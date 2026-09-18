@@ -1,12 +1,12 @@
 import type { GatewayDownstream } from '@longeny/config';
 
 /**
- * What the gateway's health means (M-W8-4).
+ * What the gateway's health means.
  *
  * It used to answer 503 whenever any downstream was missing. booking and
  * payment are deliberately not deployed on the dev box, so it read `degraded`
  * permanently — and a real outage looked exactly like the normal state. The
- * Week 7 deploy hook called a perfectly healthy gateway dead for that reason.
+ * deploy health gate once called a perfectly healthy gateway dead for that reason.
  *
  * Now a downstream is either expected here or not. One that is not expected is
  * `not_deployed` and is not a fault. One that is expected and does not answer

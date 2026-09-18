@@ -70,7 +70,7 @@ const accessErrors: OpenApiFragment = {
 };
 
 /**
- * Readings (Week 8, V-W8-2) — the values inside a lab report.
+ * Readings — the values inside a lab report.
  */
 export function createReadingsRoutes(controller: ReadingsController) {
   const audit = auditLog({

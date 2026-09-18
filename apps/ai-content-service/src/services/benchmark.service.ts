@@ -68,8 +68,8 @@ interface CurrentReading {
  * so this service does not know the subject's sex or age. Only ranges that do
  * not depend on either are applied, and a marker whose only ranges are sex- or
  * age-specific answers `no_reference / needs_demographics` rather than borrowing
- * someone else's range. Supplying demographics is a follow-up (see the Week 8
- * plan) and needs no change here beyond passing a `Subject`.
+ * someone else's range. Supplying demographics is a follow-up and needs no
+ * change here beyond passing a `Subject`.
  */
 export class BenchmarkService {
   /** Ranges currently in force, optionally for one marker. */

@@ -1,11 +1,11 @@
 import { type BenchmarkStatus, RRO_PILLARS, type RroPillar } from '@longeny/types';
 
 /**
- * Pillar and overall RRO scores (Week 8, V-W8-5 and V-W8-6).
+ * Pillar and overall RRO scores.
  *
  * Pure and versioned. A score names the rule set that produced it, and the
- * same inputs under the same version always give the same number — the Week 8
- * exit criterion is that a stored score can be recomputed from stored readings
+ * same inputs under the same version always give the same number, so a
+ * stored score can always be recomputed from stored readings
  * and match exactly.
  *
  * **The numbers below are placeholders.** How many points a verdict is worth,
