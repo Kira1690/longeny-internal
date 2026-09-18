@@ -1,7 +1,9 @@
+import { GATEWAY_DOWNSTREAMS, type GatewayDownstream } from '@longeny/config';
 import { requireAuth, requireRole } from '@longeny/middleware';
 import { UserRole } from '@longeny/types';
 import Elysia from 'elysia';
 import { getConfig } from '../config/index.js';
+import { type Probe, summariseHealth } from '../health/summarise.js';
 import { optionalAuth } from '../middleware/optional-auth.js';
 import { proxyRequest } from '../proxy.js';
 
@@ -15,54 +17,49 @@ export function createRoutes(): any {
   const AI_CONTENT_URL = config.AI_CONTENT_SERVICE_URL;
   const PAYMENT_URL = config.PAYMENT_SERVICE_URL;
 
-  // ── Health check (aggregated) ──
-  const healthRoute = new Elysia().get('/health', async () => {
-    const services = [
-      { name: 'auth', url: AUTH_URL },
-      { name: 'user-provider', url: USER_PROVIDER_URL },
-      { name: 'booking', url: BOOKING_URL },
-      { name: 'ai-content', url: AI_CONTENT_URL },
-      { name: 'payment', url: PAYMENT_URL },
-    ];
+  // ── Health ──
+  //
+  // /health/live is the gateway process alone: it answers, so it is up.
+  // /health is the aggregate, and 503 only when a service that is supposed to
+  // be deployed here is not healthy. See health/summarise.ts.
+  const downstreamUrls: Record<GatewayDownstream, string> = {
+    auth: AUTH_URL,
+    'user-provider': USER_PROVIDER_URL,
+    booking: BOOKING_URL,
+    'ai-content': AI_CONTENT_URL,
+    payment: PAYMENT_URL,
+  };
+  const absent = config.GATEWAY_ABSENT_SERVICES;
 
-    const results = await Promise.allSettled(
-      services.map(async (svc) => {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 3000);
-        try {
-          const res = await fetch(`${svc.url}/health`, { signal: controller.signal });
-          return {
-            name: svc.name,
-            status: res.ok ? 'healthy' : 'unhealthy',
-            statusCode: res.status,
-          };
-        } catch {
-          return { name: svc.name, status: 'unreachable' as const };
-        } finally {
-          clearTimeout(timeout);
-        }
-      }),
-    );
+  const healthRoute = new Elysia()
+    .get('/health/live', () => ({ gateway: 'healthy', timestamp: new Date().toISOString() }))
+    .get('/health', async () => {
+      // Absent services are not probed: a stray process on their port says
+      // nothing about this environment.
+      const toProbe = GATEWAY_DOWNSTREAMS.filter((name) => !absent.includes(name));
+      const probes: Probe[] = await Promise.all(
+        toProbe.map(async (name) => {
+          try {
+            const res = await fetch(`${downstreamUrls[name]}/health`, {
+              signal: AbortSignal.timeout(3000),
+            });
+            return {
+              name,
+              status: res.ok ? ('healthy' as const) : ('unhealthy' as const),
+              statusCode: res.status,
+            };
+          } catch {
+            return { name, status: 'unreachable' as const };
+          }
+        }),
+      );
 
-    const serviceStatuses = results.map((r) =>
-      r.status === 'fulfilled' ? r.value : { name: 'unknown', status: 'error' },
-    );
-
-    const allHealthy = serviceStatuses.every((s) => s.status === 'healthy');
-
-    return new Response(
-      JSON.stringify({
-        status: allHealthy ? 'healthy' : 'degraded',
-        gateway: 'healthy',
-        services: serviceStatuses,
-        timestamp: new Date().toISOString(),
-      }),
-      {
-        status: allHealthy ? 200 : 503,
+      const report = summariseHealth(GATEWAY_DOWNSTREAMS, absent, probes);
+      return new Response(JSON.stringify({ ...report, timestamp: new Date().toISOString() }), {
+        status: report.status === 'healthy' ? 200 : 503,
         headers: { 'Content-Type': 'application/json' },
-      },
-    );
-  });
+      });
+    });
 
   // ── Auth routes (public — login, register, refresh, etc.) ──
   const authProxy = new Elysia().all('/api/v1/auth/*', (ctx) => proxyRequest(ctx, AUTH_URL));

@@ -50,6 +50,16 @@ function requireDeployedSecrets<Output extends BaseConfig, Def extends z.ZodType
 
 export const baseConfigSchema = requireDeployedSecrets(baseConfigShape);
 
+/** Every service the gateway fronts, by the name its health report uses. */
+export const GATEWAY_DOWNSTREAMS = [
+  'auth',
+  'user-provider',
+  'booking',
+  'ai-content',
+  'payment',
+] as const;
+export type GatewayDownstream = (typeof GATEWAY_DOWNSTREAMS)[number];
+
 // ── Per-service config schemas ──
 export const gatewayConfigSchema = requireDeployedSecrets(
   baseConfigShape.extend({
@@ -60,6 +70,23 @@ export const gatewayConfigSchema = requireDeployedSecrets(
     BOOKING_SERVICE_URL: z.string().url().default('http://localhost:3003'),
     AI_CONTENT_SERVICE_URL: z.string().url().default('http://localhost:3004'),
     PAYMENT_SERVICE_URL: z.string().url().default('http://localhost:3005'),
+    /**
+     * Downstreams that are deliberately not deployed in this environment, comma
+     * separated (e.g. `booking,payment`). The gateway reports them as
+     * `not_deployed` instead of counting them as an outage. The one place that
+     * decides what "expected here" means — the deploy hook reads the gateway's
+     * answer rather than keeping its own list.
+     */
+    GATEWAY_ABSENT_SERVICES: z
+      .string()
+      .default('')
+      .transform((raw) =>
+        raw
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+      )
+      .pipe(z.array(z.enum(GATEWAY_DOWNSTREAMS))),
     RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000),
     RATE_LIMIT_MAX_REQUESTS: z.coerce.number().default(100),
   }),

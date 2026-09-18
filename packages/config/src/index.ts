@@ -7,6 +7,7 @@ export {
   aiContentConfigSchema,
   paymentConfigSchema,
   loadConfig,
+  GATEWAY_DOWNSTREAMS,
 } from './env.js';
 
 export type {
@@ -17,4 +18,5 @@ export type {
   BookingConfig,
   AiContentConfig,
   PaymentConfig,
+  GatewayDownstream,
 } from './env.js';

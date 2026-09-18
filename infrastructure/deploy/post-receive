@@ -63,19 +63,19 @@ while read -r _old new ref; do
   sleep 8
   FAILED=0
 
-  # The gateway aggregates its downstreams and answers 503 whenever any of them
-  # is missing. booking and payment are deliberately not deployed here, so a
-  # plain `curl -sf` calls a perfectly healthy gateway dead — and, worse, would
-  # call a genuinely dead one dead for the same reason, so the signal is
-  # useless either way. Read the gateway's own status out of the body instead,
-  # and print the downstream list so a real outage is visible rather than
-  # buried under an expected 503.
+  # The gateway's /health is the contract: 200 only when every downstream that
+  # is supposed to be deployed here is healthy. Which ones are supposed to be is
+  # GATEWAY_ABSENT_SERVICES in this box's .env — the single place that decides
+  # it, so this hook keeps no list of its own and cannot disagree with the
+  # endpoint. (It used to: the gateway answered 503 whenever booking or payment
+  # was missing, so this hook read a string out of the body instead, and an
+  # expected 503 looked exactly like an outage.)
   check_health() {
     local svc=$1 port=$2 body
-    body=$(curl -s --max-time 3 "http://localhost:$port/health" 2>/dev/null) || return 1
     if [[ "$svc" == "longeny-gateway" ]]; then
-      grep -q '"gateway":"healthy"' <<< "$body" || return 1
+      curl -sf --max-time 5 -o /dev/null "http://localhost:$port/health" || return 1
     else
+      body=$(curl -s --max-time 3 "http://localhost:$port/health" 2>/dev/null) || return 1
       grep -q '"status":"healthy"\|"status":"ok"' <<< "$body" || return 1
     fi
     return 0
@@ -96,11 +96,12 @@ while read -r _old new ref; do
     fi
   done
 
-  # Say plainly which downstreams the gateway cannot see. Expected here:
-  # booking and payment, which are out of the deployed scope.
-  DOWN=$(curl -s --max-time 3 http://localhost:4001/health 2>/dev/null \
-    | grep -o '"name":"[a-z-]*","status":"unreachable"' | cut -d'"' -f4 | paste -sd', ')
-  [[ -n "$DOWN" ]] && echo "   gateway reports unreachable: $DOWN (expected: booking, payment)"
+  # Say what the gateway sees: what is failing, and what is not deployed here.
+  GW=$(curl -s --max-time 5 http://localhost:4001/health 2>/dev/null)
+  FAILING=$(grep -o '"failing":\[[^]]*\]' <<< "$GW" | tr -d '"[]' | cut -d: -f2)
+  ABSENT=$(grep -o '"notDeployed":\[[^]]*\]' <<< "$GW" | tr -d '"[]' | cut -d: -f2)
+  [[ -n "$ABSENT" ]] && echo "   not deployed here (by configuration): $ABSENT"
+  [[ -n "$FAILING" ]] && echo "   gateway reports FAILING: $FAILING"
 
   if [[ $FAILED -eq 1 ]]; then
     echo "── DEPLOY UNHEALTHY. roll back with:  deploy-rollback"

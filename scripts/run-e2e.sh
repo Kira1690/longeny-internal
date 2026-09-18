@@ -198,6 +198,7 @@ for suite in \
   "payments rbac|http://localhost:3005|apps/payment-service/test/payments-rbac.e2e.ts" \
   "bookings ownership|http://localhost:3003|apps/booking-service/test/bookings-ownership.e2e.ts" \
   "gateway routing|http://localhost:3000|apps/gateway/test/gateway-routing.e2e.ts" \
+  "gateway health|http://localhost:3000|apps/gateway/test/gateway-health.e2e.ts" \
 ; do
   IFS='|' read -r label base path <<< "$suite"
   [[ -f "$path" ]] && run_suite "$label" "$base" bun run "$path"
@@ -207,6 +208,10 @@ done
 [[ -f apps/booking-service/test/calendar-oauth-state.test.ts ]] && \
   run_suite "calendar oauth state" "http://localhost:3003" \
     bun test apps/booking-service/test/calendar-oauth-state.test.ts
+
+[[ -f apps/gateway/test/health-summary.test.ts ]] && \
+  run_suite "gateway health rules" "http://localhost:3000" \
+    bun test apps/gateway/test/health-summary.test.ts
 
 # Pure engines — benchmark, trend and scoring rules
 for t in apps/ai-content-service/test/*-engine.test.ts; do

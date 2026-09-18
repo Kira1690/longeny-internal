@@ -28,10 +28,11 @@ new access. It also means the deploy history *is* the push history.
 
 - **No git at all.** `~/longeny` was a file copy. A bad deploy meant restoring a tarball
   and guessing what had changed. There was no answer to "what is actually running?".
-- **The gateway health check.** `curl -sf` calls the gateway dead, because it answers
-  503 whenever a downstream is missing — and booking and payment are deliberately not
-  deployed here. An expected 503 and a real outage looked identical. The hook now reads
-  the gateway's own status out of the body and prints which downstreams are unreachable.
+- **The gateway health check.** The gateway used to answer 503 whenever any downstream
+  was missing, and booking and payment are deliberately not deployed here — so it read
+  `degraded` permanently and a real outage looked identical. It now distinguishes *not
+  deployed in this environment* from *deployed and failing* (M-W8-4). The hook trusts its
+  HTTP status again.
 - **Roles and permissions are seeded, not migrated.** A release that adds a permission
   ships code that every real user is refused by. `intake:write` did exactly that on the
   first Week 7 deploy: the seed had it, the database did not, and the API answered 403 to
@@ -42,8 +43,16 @@ new access. It also means the deploy history *is* the push history.
 
 ## What is deliberately not deployed
 
-`booking-service` and `payment-service`. The gateway reports them unreachable and that is
-expected. See the calendar-invite descope in `plan/rro/CARRY-FORWARD.md`.
+`booking-service` and `payment-service`. That is configuration, in the box's `.env`:
+
+```
+GATEWAY_ABSENT_SERVICES=booking,payment
+```
+
+The gateway reports those as `not_deployed` and does not count them as faults. Any
+*other* downstream that is not healthy makes `/health` answer 503 with its name under
+`failing`. `/health/live` is the gateway process alone. An unknown name in the variable
+stops the gateway at boot rather than being ignored.
 
 ## Secrets
 
