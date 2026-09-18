@@ -6,16 +6,21 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { createLogger } from '@longeny/utils';
+import { explicitAwsCredentials } from '../config/aws.js';
 import { config } from '../config/index.js';
 
 const logger = createLogger('ai-content:s3');
 
 const s3Client = new S3Client({
   region: config.AWS_REGION,
-  credentials: {
-    accessKeyId: config.AWS_ACCESS_KEY_ID,
-    secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
-  },
+  ...explicitAwsCredentials(),
+  // Since SDK 3.729 the client computes a checksum for every request by
+  // default. For a presigned PUT it computes it over the empty body it has at
+  // signing time and bakes `x-amz-checksum-crc32` into the link — so S3 rejects
+  // every real file uploaded through that link. No upload link this service
+  // issued could ever have worked. Only checksum when an operation requires it.
+  requestChecksumCalculation: 'WHEN_REQUIRED',
+  responseChecksumValidation: 'WHEN_REQUIRED',
   ...(config.NODE_ENV === 'development' && {
     endpoint: config.AWS_ENDPOINT_URL,
     forcePathStyle: true,
@@ -42,7 +47,15 @@ export class S3Service {
       ContentLength: maxSizeBytes,
     });
 
-    const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn });
+    // Both headers are signed, so S3 itself refuses an upload whose size or type
+    // differs from what was declared and checked. The SDK signs content-length
+    // by default but not content-type: without this, a link issued for a 2 KB
+    // PDF accepted any file of that size — HTML, an executable — labelled as
+    // whatever the uploader liked.
+    const uploadUrl = await getSignedUrl(s3Client, command, {
+      expiresIn,
+      signableHeaders: new Set(['content-type', 'content-length']),
+    });
 
     logger.debug({ key, contentType, bucket: targetBucket }, 'Generated upload presigned URL');
 

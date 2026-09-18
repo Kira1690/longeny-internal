@@ -93,3 +93,12 @@ export {
   submitReadingsSchema,
 } from './readings.js';
 export type { CorrectReading, ReadingEntry, SubmitReadings } from './readings.js';
+
+// Document upload — the declaration signed into the presigned upload link
+export {
+  DOCUMENT_TYPES,
+  MAX_UPLOAD_BYTES,
+  UPLOAD_MIME_TYPES,
+  uploadDocumentSchema,
+} from './documents.js';
+export type { UploadDocument } from './documents.js';

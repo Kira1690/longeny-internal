@@ -49,10 +49,15 @@ set -a; source .env; set +a
 
 # w7mail is a real SMTP server. The calendar-invite suite reads the delivered
 # message out of it — a fake transport would let a broken send pass.
-for container in w7pg w7redis w7mail; do
+# w8s3 is LocalStack S3 with signature validation ON, so "S3 refused the
+# upload" is S3 checking the signed size and type, not LocalStack ignoring them.
+for container in w7pg w7redis w7mail w8s3; do
   if ! docker ps --format '{{.Names}}' | grep -qx "$container"; then
     echo "${RED}container '$container' is not running${OFF}"
-    if [[ "$container" == "w7mail" ]]; then
+    if [[ "$container" == "w8s3" ]]; then
+      echo "  docker run -d --name w8s3 -p 4566:4566 -e SERVICES=s3 -e S3_SKIP_SIGNATURE_VALIDATION=0 localstack/localstack:3"
+      echo "  docker start w8s3   # if it already exists"
+    elif [[ "$container" == "w7mail" ]]; then
       echo "  docker run -d --name w7mail -p 1026:1025 -p 8026:8025 axllent/mailpit:latest"
       echo "  docker start w7mail   # if it already exists"
     else
@@ -193,6 +198,7 @@ for suite in \
   "benchmarks|http://localhost:3004|apps/ai-content-service/test/benchmarks.e2e.ts" \
   "readings|http://localhost:3004|apps/ai-content-service/test/readings.e2e.ts" \
   "trends|http://localhost:3004|apps/ai-content-service/test/trends.e2e.ts" \
+  "report storage|http://localhost:3004|apps/ai-content-service/test/report-storage.e2e.ts" \
   "scores|http://localhost:3004|apps/ai-content-service/test/scores.e2e.ts" \
   "booking profiles+invite|http://localhost:3003|apps/booking-service/test/booking-profile.e2e.ts" \
   "payments rbac|http://localhost:3005|apps/payment-service/test/payments-rbac.e2e.ts" \

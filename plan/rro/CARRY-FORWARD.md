@@ -117,6 +117,22 @@ rebuild here.**
    never read the role map from the database. `intake:write` existed in the seed and not in
    the deployed database, and the live API answered 403 to a correctly built request while
    646 local checks stayed green. The seed now runs on every deploy.
+12. **A presigned S3 upload link from SDK ≥ 3.729 cannot work unless checksums are
+   turned down.** The client bakes `x-amz-checksum-crc32` of the *empty* body into the
+   link, so S3 rejects every real file sent to it. Every report upload link ai-content
+   ever issued was dead; no test noticed because none sent bytes. Fixed in ai-content with
+   `requestChecksumCalculation: 'WHEN_REQUIRED'` (M-W8-2). **user-provider's provider
+   onboarding presigns the same way and is not yet fixed** — out of Week 8's scope,
+   one line, needs a card.
+13. **The dev box had no reports bucket at all.** Its `.env` sets no `S3_*` and no
+   `AWS_REGION`, so ai-content signed links for `longeny-documents` (LocalStack's name —
+   doesn't exist on our account, and bucket names are global) in `us-east-1` with the
+   placeholder key `test`. ai-content now refuses to boot in production on the LocalStack
+   bucket name, and uses the instance role instead of the placeholder key.
+14. **S3 enforces upload size and type only if both are signed headers.** The SDK signs
+   `content-length` by default but not `content-type`. Both are now signed; LocalStack
+   with `S3_SKIP_SIGNATURE_VALIDATION=0` proves S3 refuses a mismatch (its default skips
+   signature checks and would pass that test for the wrong reason).
 
 ---
 

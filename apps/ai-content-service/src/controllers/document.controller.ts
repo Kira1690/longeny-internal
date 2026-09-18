@@ -1,5 +1,6 @@
 import { BadRequestError } from '@longeny/errors';
 import { buildPaginationMeta, parsePaginationParams } from '@longeny/utils';
+import type { UploadDocument } from '@longeny/validators';
 import type { DocumentService } from '../services/document.service.js';
 import type { ProfileAccessService } from '../services/profile-access.service.js';
 
@@ -13,17 +14,6 @@ type DocumentType =
 type DocOwnerType = 'user' | 'provider';
 type AccessPermission = 'view' | 'download';
 
-const ALLOWED_MIME_TYPES = [
-  'application/pdf',
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/dicom',
-  'application/dicom',
-];
-
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-
 export class DocumentController {
   constructor(
     private documentService: DocumentService,
@@ -33,18 +23,10 @@ export class DocumentController {
   /**
    * POST /documents/upload
    */
-  upload = async ({ store, body, set }: any) => {
-    if (!body.title) throw new BadRequestError('title is required');
-    if (!body.fileName) throw new BadRequestError('fileName is required');
-    if (!body.fileSize || body.fileSize <= 0)
-      throw new BadRequestError('fileSize must be positive');
-    if (body.fileSize > MAX_FILE_SIZE)
-      throw new BadRequestError('File exceeds maximum size of 50MB');
-    if (!body.mimeType) throw new BadRequestError('mimeType is required');
-    if (!ALLOWED_MIME_TYPES.includes(body.mimeType)) {
-      throw new BadRequestError(`Unsupported MIME type. Allowed: ${ALLOWED_MIME_TYPES.join(', ')}`);
-    }
-
+  upload = async ({ store, body, set }: { store: any; body: UploadDocument; set: any }) => {
+    // Size, type and every other field are checked by the route's schema
+    // (`uploadDocumentSchema`) before this runs, and the size and type are then
+    // signed into the upload link so S3 enforces them too.
     const ownerType = (body.ownerType as DocOwnerType) || 'user';
 
     // A patient document is about a subject of care. The header names one when

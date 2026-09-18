@@ -11,6 +11,9 @@ const DEV_SECRET_DEFAULTS = [
   ['ENCRYPTION_KEY', 'dev-encryption-key'],
 ] as const;
 
+/** LocalStack bucket for patient documents. Never valid outside development. */
+const LOCAL_DOCUMENTS_BUCKET = 'longeny-documents';
+
 // ── Base config schema (shared across all services) ──
 const baseConfigShape = z.object({
   NODE_ENV: z.enum(['development', 'staging', 'production', 'test']).default('development'),
@@ -201,9 +204,22 @@ export const aiContentConfigSchema = requireDeployedSecrets(
     AWS_SECRET_ACCESS_KEY: z.string().default('test'),
     AWS_ENDPOINT_URL: z.string().default('http://localhost:4566'),
     S3_UPLOADS_BUCKET: z.string().default('longeny-uploads'),
-    S3_DOCUMENTS_BUCKET: z.string().default('longeny-documents'),
+    S3_DOCUMENTS_BUCKET: z.string().default(LOCAL_DOCUMENTS_BUCKET),
   }),
-);
+).superRefine((cfg, ctx) => {
+  // Patient lab reports go to this bucket. The default is a LocalStack name
+  // that does not exist on our AWS account — and bucket names are global, so it
+  // is a name anyone could own. A deployment that falls back to it hands every
+  // patient an upload link to a bucket that is not ours. Refuse to boot instead.
+  if (cfg.NODE_ENV !== 'production' && cfg.NODE_ENV !== 'staging') return;
+  if (cfg.S3_DOCUMENTS_BUCKET === LOCAL_DOCUMENTS_BUCKET) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['S3_DOCUMENTS_BUCKET'],
+      message: `must be set to this account's reports bucket when NODE_ENV=${cfg.NODE_ENV}; the default is a local development name`,
+    });
+  }
+});
 
 export type AiContentConfig = z.infer<typeof aiContentConfigSchema>;
 

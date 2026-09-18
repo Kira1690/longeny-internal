@@ -1,5 +1,6 @@
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime';
 import { createLogger } from '@longeny/utils';
+import { explicitAwsCredentials } from '../config/aws.js';
 import { config } from '../config/index.js';
 import { db } from '../db/index.js';
 import { ai_requests } from '../db/schema.js';
@@ -35,10 +36,7 @@ function getBedrockClient(): BedrockRuntimeClient {
   if (!bedrockClient) {
     bedrockClient = new BedrockRuntimeClient({
       region: config.AWS_BEDROCK_REGION,
-      credentials: {
-        accessKeyId: config.AWS_ACCESS_KEY_ID,
-        secretAccessKey: config.AWS_SECRET_ACCESS_KEY,
-      },
+      ...explicitAwsCredentials(),
       ...(config.NODE_ENV === 'development' && config.AWS_ENDPOINT_URL !== 'http://localhost:4566'
         ? { endpoint: config.AWS_ENDPOINT_URL }
         : {}),

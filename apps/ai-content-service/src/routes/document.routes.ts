@@ -6,11 +6,12 @@ import {
   requireRole,
 } from '@longeny/middleware';
 import { ConsentType, UserRole } from '@longeny/types';
+import { uploadDocumentSchema } from '@longeny/validators';
 import { Elysia } from 'elysia';
 import { config } from '../config/index.js';
 import type { DocumentController } from '../controllers/document.controller.js';
 import { writePhiAccessLog } from '../services/phi-audit.service.js';
-import { type OpenApiFragment, errorDoc, okDoc } from './swagger-helpers.js';
+import { type OpenApiFragment, bodyDoc, documented, errorDoc, okDoc } from './swagger-helpers.js';
 
 const REPORT_SHAPE: OpenApiFragment = {
   type: 'object',
@@ -66,7 +67,24 @@ export function createDocumentRoutes(controller: DocumentController) {
     )
     .get('/tags', controller.tagCloud)
     .get('/timeline', controller.timeline)
-    .post('/upload', controller.upload)
+    .post('/upload', controller.upload, {
+      body: documented(uploadDocumentSchema, {
+        title: 'HbA1c and lipid panel',
+        fileName: 'panel-2026-09-01.pdf',
+        fileSize: 184320,
+        mimeType: 'application/pdf',
+        documentType: 'lab_report',
+        reportedAt: '2026-09-01T08:30:00Z',
+      }),
+      detail: {
+        tags: ['documents'],
+        summary: 'Declare an upload and get a presigned link',
+        description:
+          'Returns a link valid for 15 minutes. The declared `fileSize` and `mimeType` are signed into it: the `PUT` must send exactly that `Content-Length` and `Content-Type`, or S3 refuses it. Maximum 50 MB; PDF, JPEG, PNG, WebP and DICOM only.',
+        security: [{ BearerAuth: [] }],
+        requestBody: bodyDoc(uploadDocumentSchema),
+      },
+    })
     .get('/', controller.listDocuments)
     .get('/:id', controller.getDocument)
     .put('/:id', controller.updateDocument)
