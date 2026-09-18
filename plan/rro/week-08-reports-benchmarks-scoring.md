@@ -1,5 +1,59 @@
 # Week 8 — Reports, Benchmarks and Scoring
 
+## Refocus — 2026-09-18
+
+**Week 8 is now reports only.** Decided by Vishal on 2026-09-18, after the readings /
+benchmark / score chain below was built and briefly deployed. Full spec:
+`prep/planning/10-week8-reports-and-ocr.md`. Test plan:
+`prep/testing/week-08-reports-and-ocr-tests.md`.
+
+**What the week is now:**
+
+1. Every report lands in the right account and the right family profile.
+2. Every report records the profile's RRO stage at upload (`rro_state_at_upload`).
+3. Strict security: 404 on anything not yours, PHI audit on every look, nothing leaks.
+4. Text extraction so a later step can read reports: PDF text layer for free, AWS Textract
+   (ap-south-1) only on scanned pages, photos and screenshots. DICOM stored, not read.
+
+AI interpretation of reports is designed later, not this week.
+
+**Why:** the readings were typed by hand, the ranges and weights were placeholders, and
+nothing that came out had clinical value. The report pipeline has to be solid first.
+
+**Parked, not deleted** — git tag `parked/week8-readings-benchmarks-scores` (commit
+`bc3996c` sets it aside). 8 APIs removed: report readings (POST/GET), reading corrections,
+benchmarks, trends, scores (POST/GET), reference ranges. Tables `biomarker_readings`,
+`reference_ranges`, `rro_scores` dropped by ai-content migration
+`0006_drop_readings_benchmarks_scores`. The same removal has to reach `BraveLabs/` and the
+dev server, where the APIs were briefly live. See CARRY-FORWARD C5.
+
+| Card | Status after refocus |
+|---|---|
+| V-W8-1 readings schema | **Parked** — `parked/week8-readings-benchmarks-scores` |
+| V-W8-2 report → readings API | **Parked** — same tag |
+| V-W8-3 reference ranges + benchmark | **Parked** — same tag |
+| V-W8-4 trend API | **Parked** — same tag |
+| V-W8-5 pillar scoring engine | **Parked** — same tag |
+| V-W8-6 overall RRO score | **Parked** — same tag |
+| P-W8-1 extraction prompt + eval set | **Parked** — same tag; starting point for the later AI report-reading design |
+| P-W8-2 score validation | **Parked** — same tag |
+| VG-W8-1 reference ranges | **Not needed this week** — only revives with the parked work |
+| VG-W8-2 scoring weights + no-auto-transition rule | **Not needed this week** — the rule in §4 still stands for when scoring returns |
+| M-W8-2 report storage hardening | **Kept** — 50 MB, strict MIME (WebP dropped, TIFF added), signed size+type, checksum fix, `explicitAwsCredentials()`, real bucket |
+| M-W8-4 gateway health honesty | **Kept** |
+| M-W8-3 deploy + server verification | **Kept** — now deploys the reports pipeline and the 0006 removal |
+
+**New this week:** 9 endpoints + the timeline change (declare, complete, get, patch,
+download, text, ocr/retry, delete, access-log), `documents` processing columns, new
+`report_pages` table, extraction worker in ai-content, Textract permissions on role
+`longeny-dev-bedrock`. Build in longeny-internal → full E2E → migrate card by card →
+deploy through the BraveLabs `production` remote only.
+
+Everything below this line is the original plan and its 2026-09-18 progress, kept as the
+record of what was built before the refocus.
+
+---
+
 **Scope set 2026-09-14 by the client-side lead**, replacing the clinician workspace that
 this slot previously held. The workspace week did not shrink — it moved, and is now
 [week-08-workspace.md](./week-08-workspace.md) awaiting a slot. See §6.
@@ -32,12 +86,12 @@ Each arrow is a card. The last one deliberately stops short of acting — see §
 
 | # | Card | h |
 |---|---|---|
-| V-W8-1 | Biomarker readings schema — give a report a body | 6 |
-| V-W8-2 | Report → readings API, values tied to their source file | 7 |
-| V-W8-3 | Reference ranges + benchmark | 6 |
-| V-W8-4 | Trend API — direction of travel | 6 |
-| V-W8-5 | Pillar scoring engine — versioned and explainable | 7 |
-| V-W8-6 | Overall RRO score — advisory, never automatic | 3 |
+| V-W8-1 | Biomarker readings schema — give a report a body *(parked)* | 6 |
+| V-W8-2 | Report → readings API, values tied to their source file *(parked)* | 7 |
+| V-W8-3 | Reference ranges + benchmark *(parked)* | 6 |
+| V-W8-4 | Trend API — direction of travel *(parked)* | 6 |
+| V-W8-5 | Pillar scoring engine — versioned and explainable *(parked)* | 7 |
+| V-W8-6 | Overall RRO score — advisory, never automatic *(parked)* | 3 |
 
 ### Pushparaj — AI — 26h
 
@@ -45,10 +99,10 @@ Each arrow is a card. The last one deliberately stops short of acting — see §
 |---|---|---|
 | P-W7-1 | Classifier fixture corpus *(carry-over, no AWS needed)* | 8 |
 | P-W7-5 | Pre-consult summary prompt *(carry-over, no AWS needed)* | 4 |
-| P-W8-1 | written, **cannot run (Bedrock)**; eval set synthetic | Contract `readingExtractionOutputSchema` (extract-v1): per-value `uncertain` + reason, `unmapped`, `unreadable` — nothing seen may go unsaid. Versioned prompt with a closed code list (13 markers). 3 synthetic layouts (tabular+flags, key–value with an injected instruction, scanned two-column with OCR noise), hand-labelled. Scorer reports **silent misses separately from accuracy**, plus wrong value/unit/code, unflagged uncertainty and extra values (reference interval read as a value). 10 scorer tests. **Needs anonymised real reports from ≥3 labs** to be done — ask the client. |
-| P-W8-2 | tooling built, **needs a clinician** | 10 lab-panel cases chosen to find where the engine misleads. `eval/score-validation/generate.ts` → CSV with the engine's pillar and overall scores beside blank `clinician_score`/`category`/`note`; `compare.ts` reads it back and lists **engine-healthier-than-clinician first**, by category (bad_weight, missing_data, wrong_range, ambiguous). Placeholder ranges now live in one module shared with the seed. **Visible before any clinician looks:** averaging lets one bad value hide — sv-02 (HbA1c 6.2, prediabetic) scores nutrition 82.5 because three lipids are optimal; sv-04 scores triglycerides 620 the same as 151. Take both to VG-W8-2. |
-| P-W8-1 | Report extraction prompt + eval set | 8 |
-| P-W8-2 | Score validation against clinician judgement | 6 |
+| P-W8-1 | written, **cannot run (Bedrock)**; eval set synthetic *(parked)* | Contract `readingExtractionOutputSchema` (extract-v1): per-value `uncertain` + reason, `unmapped`, `unreadable` — nothing seen may go unsaid. Versioned prompt with a closed code list (13 markers). 3 synthetic layouts (tabular+flags, key–value with an injected instruction, scanned two-column with OCR noise), hand-labelled. Scorer reports **silent misses separately from accuracy**, plus wrong value/unit/code, unflagged uncertainty and extra values (reference interval read as a value). 10 scorer tests. **Needs anonymised real reports from ≥3 labs** to be done — ask the client. |
+| P-W8-2 | tooling built, **needs a clinician** *(parked)* | 10 lab-panel cases chosen to find where the engine misleads. `eval/score-validation/generate.ts` → CSV with the engine's pillar and overall scores beside blank `clinician_score`/`category`/`note`; `compare.ts` reads it back and lists **engine-healthier-than-clinician first**, by category (bad_weight, missing_data, wrong_range, ambiguous). Placeholder ranges now live in one module shared with the seed. **Visible before any clinician looks:** averaging lets one bad value hide — sv-02 (HbA1c 6.2, prediabetic) scores nutrition 82.5 because three lipids are optimal; sv-04 scores triglycerides 620 the same as 151. Take both to VG-W8-2. |
+| P-W8-1 | Report extraction prompt + eval set *(parked)* | 8 |
+| P-W8-2 | Score validation against clinician judgement *(parked)* | 6 |
 
 ### Milan — DevOps — 15h (+1h waiting on the client)
 
@@ -158,12 +212,12 @@ run is 13/14 suites green plus one stale Week 7 suite fixed (below).
 
 | Card | State | What exists |
 |---|---|---|
-| V-W8-1 | built, tested | `biomarker_readings` (append-only, corrections via `supersedes_id`, every value tied to a report by FK) and `reference_ranges` (source required, `is_placeholder` defaults **true**, retire instead of delete, check constraints for bound order and optimal-inside-normal). Migration `0004`. |
-| V-W8-3 | engine built, **ranges are placeholders** | Pure engine `services/benchmark/engine.ts` (24 unit tests). `GET /profiles/:id/benchmarks`, `GET /reference-ranges`, both through the gateway. 56 E2E checks. |
-| V-W8-2 | built, tested | `POST /reports/:id/readings` (batch, all-or-nothing, lab reports only, sample date defaults to the report date), `GET /reports/:id/readings` (history incl. corrections), `POST /readings/:id/corrections` (append-only; 409 on a replaced reading; racing corrections decided by the unique constraint). Owner-only writes — a booked provider can read but not write until the care team model says who may. 66 E2E checks. |
-| V-W8-4 | built, tested | `GET /profiles/:id/trends?marker=`. `direction` (rising/falling/flat) is arithmetic; `toward_range` (improving/worsening/unchanged) is judged against the target band and is null without a usable range — rising is good for HDL and bad for HbA1c, and is never guessed. Mixed units are cut to the newest unit and counted, never converted. 18 unit tests, E2E through the readings API. |
-| V-W8-5 | built, tested, **rules are placeholders** | Pure scorer `benchmark/scoring.ts`, `SCORING_VERSION = placeholder-2026-09.1`. Pillar = mean points of its markers (optimal 100 / normal 70 / low·high 30 — placeholders); readings with no reference, a unit mismatch or no pillar are listed as `unscored` with the reason. Every score is `provisional` until VG-W8-2. `rro_scores` keeps each score with its full explanation and a sha256 fingerprint of its inputs; `stale` when inputs change. |
-| V-W8-6 | built, tested | Overall = weighted mean of pillars **that have data** (missing labs are not bad labs; weights equal until VG-W8-2). `POST /profiles/:id/scores` (201 new / 200 reused), `GET /profiles/:id/scores`. `advisory: true` always. `ScoreService` has no path to user-provider; the E2E asserts no `rro_transition` row and an unchanged `rro_state`. Recompute after deleting a stored score gives a byte-identical result. |
+| V-W8-1 | **parked** (`parked/week8-readings-benchmarks-scores`) · built, tested | `biomarker_readings` (append-only, corrections via `supersedes_id`, every value tied to a report by FK) and `reference_ranges` (source required, `is_placeholder` defaults **true**, retire instead of delete, check constraints for bound order and optimal-inside-normal). Migration `0004`. |
+| V-W8-3 | **parked** (`parked/week8-readings-benchmarks-scores`) · engine built, **ranges are placeholders** | Pure engine `services/benchmark/engine.ts` (24 unit tests). `GET /profiles/:id/benchmarks`, `GET /reference-ranges`, both through the gateway. 56 E2E checks. |
+| V-W8-2 | **parked** (`parked/week8-readings-benchmarks-scores`) · built, tested | `POST /reports/:id/readings` (batch, all-or-nothing, lab reports only, sample date defaults to the report date), `GET /reports/:id/readings` (history incl. corrections), `POST /readings/:id/corrections` (append-only; 409 on a replaced reading; racing corrections decided by the unique constraint). Owner-only writes — a booked provider can read but not write until the care team model says who may. 66 E2E checks. |
+| V-W8-4 | **parked** (`parked/week8-readings-benchmarks-scores`) · built, tested | `GET /profiles/:id/trends?marker=`. `direction` (rising/falling/flat) is arithmetic; `toward_range` (improving/worsening/unchanged) is judged against the target band and is null without a usable range — rising is good for HDL and bad for HbA1c, and is never guessed. Mixed units are cut to the newest unit and counted, never converted. 18 unit tests, E2E through the readings API. |
+| V-W8-5 | **parked** (`parked/week8-readings-benchmarks-scores`) · built, tested, **rules are placeholders** | Pure scorer `benchmark/scoring.ts`, `SCORING_VERSION = placeholder-2026-09.1`. Pillar = mean points of its markers (optimal 100 / normal 70 / low·high 30 — placeholders); readings with no reference, a unit mismatch or no pillar are listed as `unscored` with the reason. Every score is `provisional` until VG-W8-2. `rro_scores` keeps each score with its full explanation and a sha256 fingerprint of its inputs; `stale` when inputs change. |
+| V-W8-6 | **parked** (`parked/week8-readings-benchmarks-scores`) · built, tested | Overall = weighted mean of pillars **that have data** (missing labs are not bad labs; weights equal until VG-W8-2). `POST /profiles/:id/scores` (201 new / 200 reused), `GET /profiles/:id/scores`. `advisory: true` always. `ScoreService` has no path to user-provider; the E2E asserts no `rro_transition` row and an unchanged `rro_state`. Recompute after deleting a stored score gives a byte-identical result. |
 | M-W8-4 | built, tested | `GATEWAY_ABSENT_SERVICES` (validated against the downstream list; a typo stops boot) is the one definition of "not deployed here". `/health` is 200 only when every *expected* downstream is healthy, names `failing` and `notDeployed`; `/health/live` is the process alone. The deploy hook trusts the gateway's HTTP status again and keeps no list of its own. 7 unit + 12 E2E (real gateway processes on spare ports). **Needs `GATEWAY_ABSENT_SERVICES=booking,payment` in the dev box `.env` at the next deploy (M-W8-3).** |
 | M-W8-2 | code built + tested; **AWS not applied (needs approval)** | Upload body validated by `uploadDocumentSchema` (50 MB, PDF/JPEG/PNG/WebP/DICOM); size **and type** signed into the presigned link so S3 refuses a mismatch (13 E2E against LocalStack with signature validation on). Fixed the SDK checksum defect that made every upload link dead, and the placeholder-key/region/bucket defaults (CARRY-FORWARD D12–14). `infrastructure/s3/reports-bucket.sh apply|verify`: SSE-KMS, public-access block, ACLs off, versioning, deny non-TLS, access logs to their own bucket, abandoned-upload cleanup, CORS, role grant. **Retention not set** — current reports are kept until the consent text names a period. |
 

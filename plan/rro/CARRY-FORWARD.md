@@ -1,7 +1,7 @@
 # Carry-Forward Register
 
 **The one file to read before planning any week.** Everything decided, found or designed
-but not yet built, in the order it has to happen. Updated 2026-09-14.
+but not yet built, in the order it has to happen. Updated 2026-09-18.
 
 If this disagrees with a week file, this is newer. If it disagrees with
 `prep/RRO_MVP_Gantt_Chart.xlsx`, the XLS wins on scope and this wins on "what did we learn
@@ -21,6 +21,7 @@ and the reasoning.
 | A2 | **Verified consent by email.** Threshold 18 / DPDP, held in config with the jurisdiction written onto each row. `pending` is usable and labelled, but blocks AI analysis and every provider surface. Two reminders, expire at 14d, one manual re-send. | **DECIDED** — all four answered | [verified-consent-design.md](./verified-consent-design.md) |
 | A3 | **Bedrock is unusable — and it is the client's to fix.** Account `836533914754` refuses every model invocation with `INVALID_PAYMENT_INSTRUMENT`. Everything on our side is done and proven (see D9, D10). **28h of paid work is idle**: M-W7-1, P-W7-2, P-W7-3, P-W7-4, all carrying a red *Client Action* label on the board. Nothing for the team to build. | **Blocked on the client's AWS billing** | `infrastructure/deploy/README.md` |
 | A4 | **M-W6-2 calendar invite** — **RESOLVED 2026-09-10.** booking-service stays internal, so the card was descoped and archived. The invite service, ICS attachment, calendar channel and delivery logging all still work internally and need no rebuild if booking-service is ever brought into client scope. | **CLOSED** | Trello, archived |
+| A5 | **Report text extraction: text layer first, AWS Textract only where needed.** Decided 2026-09-18 by Vishal. PDF text layer is read page by page for free; only pages with too little text are split out and sent to Textract `AnalyzeDocument` (TABLES), synchronously, in **ap-south-1** (data stays in India; HIPAA-eligible). JPEG / PNG / TIFF always go to Textract. DICOM is stored, not read (`not_applicable`). WebP dropped (Textract can't read it); HEIC converted to JPEG by the app. Unreadable photo → `failed`, "could not read — please retake". Runs as a worker inside ai-content (poll loop, `FOR UPDATE SKIP LOCKED`, no public endpoint). OCR text is never final values; a later AI step may only propose. Cost ~$15 / 1,000 OCR pages (AnalyzeDocument TABLES), ~$1.50 / 1,000 for DetectDocumentText, pay per page — verify on AWS pricing before quoting. User approved enabling Textract. **Still to do:** add `textract:AnalyzeDocument` + `textract:DetectDocumentText` to role `longeny-dev-bedrock` (S3 GetObject on the reports bucket is already granted). | **DECIDED** — IAM change not yet applied | `prep/planning/10-week8-reports-and-ocr.md` §5, §7, §8 |
 
 ### The consequence of A1+A2 that changes Week 8's shape
 
@@ -64,6 +65,7 @@ rebuild here.**
 | C1 | **R6** — ai-content's 112 TypeBox `t.*` usages across 14 route files converge on `@longeny/validators` | Mechanical, touches every legacy ai-content surface, week was over cap | Week 8, V-W7-3 remainder |
 | C2 | **D2 query conversion** — progress / habits / goals still filter on `user_id`, not `profile_id`. Columns and middleware exist; the queries do not use them | Displaced from Week 7, then displaced again by the Week 8 scope change | **Still unscheduled.** Written up in [week-08-workspace.md](./week-08-workspace.md) §8.8. Not on the board. |
 | C3 | **SMS has no transport.** Every SMS notification records `failed` with that reason — deliberate and visible, but a dependent reachable only by phone is not reachable | No carrier chosen | Needs a product decision, not an engineering one |
+| C5 | **Readings, benchmarks, trends and scores — parked 2026-09-18.** Git tag `parked/week8-readings-benchmarks-scores` in longeny-internal (commit `bc3996c` sets it aside). Contains: V-W8-1…6 (tables `biomarker_readings`, `reference_ranges`, `rro_scores`; benchmark engine and 24 unit tests; trend engine; versioned pillar scorer and advisory overall score with the no-`rro_transition` test; placeholder range seed), the 8 APIs (readings POST/GET, reading corrections, benchmarks, trends, scores POST/GET, reference ranges), P-W8-1's extraction contract `extract-v1` + prompt + eval set, and P-W8-2's score-validation sheet. Tables dropped by ai-content migration `0006_drop_readings_benchmarks_scores`. | Values were typed by hand, ranges and weights were placeholders — no clinical value yet. The report pipeline (right profile, RRO stage at upload, no leaks, text available) had to be solid first. **The 8 APIs were briefly live on the dev server and in `BraveLabs/`**; the route removal and `0006` must reach both as part of Week 8's migration. | **Revives when both exist:** (1) the AI report-reading design — model proposes values from `report_pages` text, a human confirms; `extract-v1` is the starting contract, and it needs anonymised real reports from ≥3 labs; (2) real reference ranges and scoring weights from Vijay (VG-W8-1 / VG-W8-2 table: marker, unit, sex, age band, normal/optimal bounds, pillar, source). Also still needed then: the demographics HMAC route (sex + age band). The no-auto-transition rule stands unchanged. Restore with `git checkout parked/week8-readings-benchmarks-scores -- <paths>`, then a new migration — never revert `0006`. |
 | C4 | **481 `noExplicitAny` warnings**, mostly `({ body, store }: any)` in controllers | Not failing the build; the standard forbids *new* ones | Opportunistic |
 
 ---
@@ -170,7 +172,13 @@ directories were rsynced, so 8 files outside Week 7 scope went across (admin ×3
 progress ×3, seed-providers ×2). Two one-off internal repair scripts went with them and
 were removed again. **Open question for the user: leave the 8, or strip them back.**
 
-### Week 8 — reports, benchmarks and scoring
+### Week 8 — refocused on reports only (2026-09-18)
+
+**Superseded in part.** Vishal refocused Week 8 on reports: upload to the right profile,
+RRO stage at upload, strict access and audit, text extraction with Textract only where
+needed (A5). Readings, benchmarks, trends and scores are parked (C5). Spec:
+`prep/planning/10-week8-reports-and-ocr.md`. The text below is the scope as set on
+2026-09-14, kept for the record.
 
 Scope reassigned by the client-side lead on 2026-09-14, replacing the clinician workspace.
 Plan: [week-08-reports-benchmarks-scoring.md](./week-08-reports-benchmarks-scoring.md).
