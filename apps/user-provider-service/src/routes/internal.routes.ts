@@ -506,6 +506,12 @@ export function createInternalRoutes(controller: InternalController, profile: Pr
                   },
                   isSelf: { type: 'boolean' },
                   status: { type: 'string', enum: ['active', 'inactive'] },
+                  rroState: {
+                    type: 'string',
+                    enum: ['intake', 'reverse', 'restore', 'optimise'],
+                    nullable: true,
+                    description: 'Current care stage; null when none has been recorded',
+                  },
                 },
               },
               {
@@ -514,6 +520,7 @@ export function createInternalRoutes(controller: InternalController, profile: Pr
                 relation: 'father',
                 isSelf: false,
                 status: 'active',
+                rroState: 'restore',
               },
             ),
             400: errorDoc('Request body failed validation', 'VALIDATION_ERROR'),

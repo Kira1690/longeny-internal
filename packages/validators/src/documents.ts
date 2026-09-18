@@ -11,15 +11,32 @@ import { z } from 'zod';
  * it reaches storage.
  */
 
-/** Patient reports hold labs and imaging. Nothing executable, nothing that renders as a page. */
+/**
+ * Patient reports hold labs and imaging. Nothing executable, nothing that
+ * renders as a page.
+ *
+ * Every type here except DICOM can be read for text: PDFs from their own text
+ * layer, and scans, screenshots and photos by OCR, which reads JPEG, PNG and
+ * TIFF. WebP and HEIC are not accepted because OCR cannot read them — the app
+ * converts a phone's HEIC photo to JPEG before declaring it. DICOM is medical
+ * imaging: stored, never read.
+ */
 export const UPLOAD_MIME_TYPES = [
   'application/pdf',
   'image/jpeg',
   'image/png',
-  'image/webp',
-  'image/dicom',
+  'image/tiff',
   'application/dicom',
 ] as const;
+export type UploadMimeType = (typeof UPLOAD_MIME_TYPES)[number];
+
+/** The types whose text the reader can obtain. */
+export const READABLE_MIME_TYPES: readonly UploadMimeType[] = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/tiff',
+];
 
 export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 

@@ -205,6 +205,23 @@ export const aiContentConfigSchema = requireDeployedSecrets(
     AWS_ENDPOINT_URL: z.string().default('http://localhost:4566'),
     S3_UPLOADS_BUCKET: z.string().default('longeny-uploads'),
     S3_DOCUMENTS_BUCKET: z.string().default(LOCAL_DOCUMENTS_BUCKET),
+    /**
+     * Who reads scanned pages and photos. `textract` is AWS Textract; `fake`
+     * returns fixed text so tests need no AWS; `disabled` marks such pages
+     * unreadable. A PDF's own text layer is read locally in every mode — only
+     * pages without one reach this.
+     */
+    REPORT_OCR_PROVIDER: z.enum(['textract', 'fake', 'disabled']).default('fake'),
+    /** Textract stays in the bucket's region so report data does not leave India. */
+    TEXTRACT_REGION: z.string().default('ap-south-1'),
+    /** Pages beyond this are not sent for OCR: every page costs money. */
+    REPORT_OCR_MAX_PAGES: z.coerce.number().int().positive().default(30),
+    /** The background reader. Off only for a process that must not pick up work. */
+    REPORT_READER_ENABLED: z
+      .enum(['true', 'false'])
+      .default('true')
+      .transform((v) => v === 'true'),
+    REPORT_READER_POLL_MS: z.coerce.number().int().min(250).default(5000),
   }),
 ).superRefine((cfg, ctx) => {
   // Patient lab reports go to this bucket. The default is a LocalStack name
@@ -217,6 +234,15 @@ export const aiContentConfigSchema = requireDeployedSecrets(
       code: z.ZodIssueCode.custom,
       path: ['S3_DOCUMENTS_BUCKET'],
       message: `must be set to this account's reports bucket when NODE_ENV=${cfg.NODE_ENV}; the default is a local development name`,
+    });
+  }
+  // The fake reader returns fixed text. Deployed, that would put invented words
+  // on a real patient's report.
+  if (cfg.REPORT_OCR_PROVIDER === 'fake') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['REPORT_OCR_PROVIDER'],
+      message: `must be 'textract' or 'disabled' when NODE_ENV=${cfg.NODE_ENV}; 'fake' is for tests`,
     });
   }
 });

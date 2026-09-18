@@ -711,51 +711,6 @@ export class DocumentService {
   }
 
   /**
-   * A profile's reports, newest report-date first.
-   *
-   * Ordered by when the report was produced rather than when it was uploaded: a
-   * clinician reading a timeline wants the lab work in the order it happened,
-   * and a patient uploading three years of history in one afternoon would
-   * otherwise see it in upload order. Rows predating `reported_at` fall back to
-   * their upload date so the timeline stays continuous.
-   *
-   * Scope is the profile, not the account. The caller's right to read this
-   * profile is established before this runs — by ownership for a patient, or by
-   * an active booking for a provider.
-   */
-  async getProfileReports(profileId: string, page: number, limit: number) {
-    const conditions = [eq(documents.profile_id, profileId), ne(documents.status, 'deleted')];
-
-    const [rows, [{ count }]] = await Promise.all([
-      db
-        .select({
-          id: documents.id,
-          document_type: documents.document_type,
-          title: documents.title,
-          description: documents.description,
-          file_name: documents.file_name,
-          mime_type: documents.mime_type,
-          tags: documents.tags,
-          ai_generated: documents.ai_generated,
-          status: documents.status,
-          reported_at: documents.reported_at,
-          created_at: documents.created_at,
-        })
-        .from(documents)
-        .where(and(...conditions))
-        .orderBy(sql`COALESCE(${documents.reported_at}, ${documents.created_at}) DESC`)
-        .limit(limit)
-        .offset((page - 1) * limit),
-      db
-        .select({ count: sql<number>`COUNT(*)::int` })
-        .from(documents)
-        .where(and(...conditions)),
-    ]);
-
-    return { reports: rows, total: count };
-  }
-
-  /**
    * Backfill `profile_id` for documents uploaded before the multi-profile model.
    *
    * `owner_id` on a patient document is the account's auth id, so the caller

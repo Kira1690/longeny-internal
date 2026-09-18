@@ -1,5 +1,5 @@
 import { NotFoundError, ServiceUnavailableError } from '@longeny/errors';
-import { UserRole } from '@longeny/types';
+import { type RroState, UserRole } from '@longeny/types';
 import { ServiceCallError, createLogger, createServiceClient } from '@longeny/utils';
 import { config } from '../config/index.js';
 
@@ -11,6 +11,8 @@ export interface ResolvedProfile {
   relation: string;
   isSelf: boolean;
   status: string;
+  /** Current care stage, or null when none has been recorded. */
+  rroState: RroState | null;
 }
 
 /**

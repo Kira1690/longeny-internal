@@ -89,7 +89,17 @@ export type {
 export {
   DOCUMENT_TYPES,
   MAX_UPLOAD_BYTES,
+  READABLE_MIME_TYPES,
   UPLOAD_MIME_TYPES,
   uploadDocumentSchema,
 } from './documents.js';
-export type { UploadDocument } from './documents.js';
+export type { UploadDocument, UploadMimeType } from './documents.js';
+
+// Patient reports — declare, correct, filter the timeline
+export {
+  declareReportSchema,
+  reportDateSchema,
+  reportTimelineQuerySchema,
+  updateReportSchema,
+} from './reports.js';
+export type { DeclareReport, ReportTimelineQuery, UpdateReport } from './reports.js';

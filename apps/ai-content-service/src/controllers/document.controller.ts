@@ -63,32 +63,6 @@ export class DocumentController {
   };
 
   /**
-   * GET /profiles/:profileId/reports
-   *
-   * The owner, or a provider with an active booking — see
-   * `ProfileAccessService.assertCanRead`.
-   */
-  reportsForProfile = async ({ params, query, store }: any) => {
-    await this.profileAccess.assertCanRead(store, params.profileId);
-
-    const pagination = parsePaginationParams(query);
-    const { reports, total } = await this.documentService.getProfileReports(
-      params.profileId,
-      pagination.page,
-      pagination.limit,
-    );
-
-    return {
-      success: true,
-      data: reports,
-      meta: {
-        ...buildPaginationMeta(total, pagination.page, pagination.limit),
-        timestamp: new Date().toISOString(),
-      },
-    };
-  };
-
-  /**
    * GET /documents
    */
   listDocuments = async ({ store, query }: any) => {

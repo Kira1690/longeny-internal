@@ -68,6 +68,9 @@ for container in w7pg w7redis w7mail w8s3; do
 done
 
 export MAILPIT_URL="${MAILPIT_URL:-http://localhost:8026}"
+# The report reader polls every 5 s in production; tests wait on it, so poll fast.
+export REPORT_READER_POLL_MS="${REPORT_READER_POLL_MS:-300}"
+export REPORT_OCR_PROVIDER="${REPORT_OCR_PROVIDER:-fake}"
 
 # ── Service management ───────────────────────────────────────────────────────
 
@@ -196,6 +199,7 @@ for suite in \
   "ai classify+summary|http://localhost:3004|apps/ai-content-service/test/ai-classify.e2e.ts" \
   "reports timeline|http://localhost:3004|apps/ai-content-service/test/reports-timeline.e2e.ts" \
   "report storage|http://localhost:3004|apps/ai-content-service/test/report-storage.e2e.ts" \
+  "reports|http://localhost:3004|apps/ai-content-service/test/reports.e2e.ts" \
   "booking profiles+invite|http://localhost:3003|apps/booking-service/test/booking-profile.e2e.ts" \
   "payments rbac|http://localhost:3005|apps/payment-service/test/payments-rbac.e2e.ts" \
   "bookings ownership|http://localhost:3003|apps/booking-service/test/bookings-ownership.e2e.ts" \
@@ -210,6 +214,10 @@ done
 [[ -f apps/booking-service/test/calendar-oauth-state.test.ts ]] && \
   run_suite "calendar oauth state" "http://localhost:3003" \
     bun test apps/booking-service/test/calendar-oauth-state.test.ts
+
+[[ -f apps/ai-content-service/test/report-reader.test.ts ]] && \
+  run_suite "report reader" "http://localhost:3004" \
+    bun test apps/ai-content-service/test/report-reader.test.ts
 
 [[ -f apps/gateway/test/health-summary.test.ts ]] && \
   run_suite "gateway health rules" "http://localhost:3000" \

@@ -1,6 +1,8 @@
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
+  NotFound,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -36,9 +38,9 @@ export class S3Service {
     contentType: string,
     maxSizeBytes: number = 50 * 1024 * 1024, // 50MB default
     bucket?: string,
+    expiresIn = 900,
   ): Promise<{ uploadUrl: string; key: string; expiresIn: number }> {
     const targetBucket = bucket || config.S3_DOCUMENTS_BUCKET;
-    const expiresIn = 900; // 15 minutes
 
     const command = new PutObjectCommand({
       Bucket: targetBucket,
@@ -60,6 +62,59 @@ export class S3Service {
     logger.debug({ key, contentType, bucket: targetBucket }, 'Generated upload presigned URL');
 
     return { uploadUrl, key, expiresIn };
+  }
+
+  /**
+   * Size and type of a stored object, or null when there is none.
+   *
+   * Other failures are thrown: "could not ask" must never read as "not there",
+   * or an outage would look like an upload that never happened.
+   */
+  async headObject(
+    key: string,
+    bucket?: string,
+  ): Promise<{ contentLength: number; contentType: string } | null> {
+    try {
+      const head = await s3Client.send(
+        new HeadObjectCommand({ Bucket: bucket || config.S3_DOCUMENTS_BUCKET, Key: key }),
+      );
+      return { contentLength: head.ContentLength ?? -1, contentType: head.ContentType ?? '' };
+    } catch (error) {
+      if (error instanceof NotFound || (error as { name?: string }).name === 'NotFound') {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  /** The whole object, for the report reader. Reports are capped at 50 MB. */
+  async getObjectBytes(key: string, bucket?: string): Promise<Uint8Array> {
+    const response = await s3Client.send(
+      new GetObjectCommand({ Bucket: bucket || config.S3_DOCUMENTS_BUCKET, Key: key }),
+    );
+    if (!response.Body) throw new Error('S3 returned no body');
+    return response.Body.transformToByteArray();
+  }
+
+  /**
+   * A short-lived download link that saves the file rather than rendering it,
+   * under the name it was uploaded with.
+   */
+  async generateAttachmentUrl(
+    key: string,
+    fileName: string,
+    expiresIn: number,
+  ): Promise<{ downloadUrl: string; expiresIn: number }> {
+    // Printable ASCII only, without quote or backslash: anything else could
+    // break out of the header value.
+    const safeName = fileName.replace(/[^\x20-\x7e]|["\\]/g, '_');
+    const command = new GetObjectCommand({
+      Bucket: config.S3_DOCUMENTS_BUCKET,
+      Key: key,
+      ResponseContentDisposition: `attachment; filename="${safeName}"`,
+    });
+    const downloadUrl = await getSignedUrl(s3Client, command, { expiresIn });
+    return { downloadUrl, expiresIn };
   }
 
   /**
@@ -128,6 +183,14 @@ export class S3Service {
     const timestamp = Date.now();
     const sanitized = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
     return `documents/${ownerId}/${timestamp}-${sanitized}`;
+  }
+
+  /**
+   * Key for a patient report. Ids only — no file name, no person's name —
+   * so the bucket listing and its access logs carry no health information.
+   */
+  buildReportKey(profileId: string, reportId: string): string {
+    return `reports/${profileId}/${reportId}`;
   }
 
   /**

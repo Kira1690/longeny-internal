@@ -39,6 +39,17 @@ export interface AuditConfig {
    * request it is recording.
    */
   sink?: (entry: AuditEntry) => void | Promise<void>;
+  /**
+   * Route param holding the resource id, when it is not `id`. Naming it also
+   * stops that id being mistaken for a profile id.
+   */
+  resourceParam?: string;
+  /**
+   * False when the handler writes its own success row before answering — a
+   * download link must not leave without its audit row — so only failures are
+   * recorded here.
+   */
+  recordSuccess?: boolean;
 }
 
 const auditLogger = createLogger('audit');
@@ -57,6 +68,9 @@ export const auditLog = (config: AuditConfig) =>
       const state = requestCtx(request);
       const params = (ctx as { params?: Record<string, string> }).params ?? {};
       const status = typeof set.status === 'number' ? set.status : 200;
+      const success = status >= 200 && status < 400;
+      if (success && config.recordSuccess === false) return;
+      const resourceId = config.resourceParam ? params[config.resourceParam] : params.id;
 
       const entry: AuditEntry = {
         action: config.action,
@@ -66,12 +80,17 @@ export const auditLog = (config: AuditConfig) =>
         actorRole: state.userRole || undefined,
         // Collection routes carry no id param; without this fallback their rows
         // land with a null profile_id, which is the column an access review filters on.
-        profileId: params.profileId ?? params.id ?? (state.activeProfileId || undefined),
-        resourceId: params.id ?? undefined,
+        profileId:
+          state.auditProfileId ||
+          params.profileId ||
+          (config.resourceParam ? undefined : params.id) ||
+          state.activeProfileId ||
+          undefined,
+        resourceId: resourceId ?? undefined,
         method: request.method,
         path: new URL(request.url).pathname,
         statusCode: status,
-        success: status >= 200 && status < 400,
+        success,
         durationMs: Date.now() - (state.auditStartTime || Date.now()),
         ip:
           request.headers.get('X-Forwarded-For')?.split(',')[0]?.trim() ||

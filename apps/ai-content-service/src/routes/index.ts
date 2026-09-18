@@ -12,6 +12,7 @@ import { PostOnboardingController } from '../controllers/post-onboarding.control
 import { ProviderController } from '../controllers/provider.controller.js';
 import { RagController } from '../controllers/rag.controller.js';
 import { RecommendationController } from '../controllers/recommendation.controller.js';
+import { ReportController } from '../controllers/report.controller.js';
 import { RroAiController } from '../controllers/rro-ai.controller.js';
 import { SchedulingController } from '../controllers/scheduling.controller.js';
 import { SessionController } from '../controllers/session.controller.js';
@@ -30,6 +31,8 @@ import { PostOnboardingService } from '../services/post-onboarding.service.js';
 import { ProfileAccessService } from '../services/profile-access.service.js';
 import { ProviderProfileService } from '../services/provider-profile.service.js';
 import { RecommendationService } from '../services/recommendation.service.js';
+import type { ReportReader } from '../services/report-reader/reader.js';
+import { ReportService } from '../services/report.service.js';
 import { RroAiService } from '../services/rro-ai.service.js';
 import { S3Service } from '../services/s3.service.js';
 import { SafetyService } from '../services/safety.service.js';
@@ -48,11 +51,12 @@ import { createPostOnboardingRoutes } from './post-onboarding.routes.js';
 import { createProviderRoutes } from './provider.routes.js';
 import { createRagRoutes } from './rag.routes.js';
 import { createRecommendationRoutes } from './recommendation.routes.js';
+import { createReportRoutes } from './report.routes.js';
 import { createRroAiRoutes } from './rro-ai.routes.js';
 import { createSchedulingRoutes } from './scheduling.routes.js';
 import { createSessionRoutes } from './session.routes.js';
 
-export function createRoutes() {
+export function createRoutes(reader: ReportReader | null = null) {
   // ── Initialize services (no PrismaClient — Drizzle db is module-level) ──
   const bedrockService = new BedrockService();
   const embeddingService = new EmbeddingService(bedrockService);
@@ -76,6 +80,7 @@ export function createRoutes() {
   const schedulingService = new SchedulingService();
   const notificationService = new NotificationService();
   const profileAccessService = new ProfileAccessService();
+  const reportService = new ReportService(s3Service, profileAccessService, reader);
   const intakeService = new IntakeService();
   const rroAiService = new RroAiService(intakeService);
 
@@ -83,6 +88,7 @@ export function createRoutes() {
   const recommendationController = new RecommendationController(recommendationService);
   const documentGenController = new DocumentGenController(documentGenService);
   const documentController = new DocumentController(documentService, profileAccessService);
+  const reportController = new ReportController(reportService);
   const internalController = new InternalController(null, embeddingService, documentService);
   const adminController = new AdminController(embeddingService, adminService);
   const onboardingController = new OnboardingController(
@@ -110,6 +116,7 @@ export function createRoutes() {
     .use(createDocumentGenRoutes(documentGenController))
     .use(createAdminRoutes(adminController))
     .use(createDocumentRoutes(documentController))
+    .use(createReportRoutes(reportController))
     .use(createInternalRoutes(internalController))
     .use(createMatchingRoutes(matchingController))
     .use(createPostOnboardingRoutes(postOnboardingController))

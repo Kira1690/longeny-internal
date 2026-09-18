@@ -49,6 +49,11 @@ export interface RequestContext {
   correlationId: string;
   requestStartTime: number;
   auditStartTime: number;
+  /**
+   * Subject of care an audited request touched, set by a handler that only
+   * learns it after loading the resource (a report named by its own id).
+   */
+  auditProfileId: string;
 }
 
 const contexts = new WeakMap<Request, RequestContext>();
@@ -69,6 +74,7 @@ export function requestCtx(request: Request): RequestContext {
       correlationId: '',
       requestStartTime: 0,
       auditStartTime: 0,
+      auditProfileId: '',
     };
     contexts.set(request, existing);
   }
@@ -104,6 +110,7 @@ export const requestContext = () =>
     .state('correlationId', '')
     .state('requestStartTime', 0)
     .state('auditStartTime', 0)
+    .state('auditProfileId', '')
     .derive({ as: 'scoped' }, ({ request }): { store: RequestContext } => ({
       store: requestCtx(request),
     }));

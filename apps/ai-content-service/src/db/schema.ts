@@ -1,4 +1,10 @@
-import type { RroPillar, RroState } from '@longeny/types';
+import type {
+  ReportPageMethod,
+  ReportProcessingStatus,
+  ReportReadMethod,
+  RroPillar,
+  RroState,
+} from '@longeny/types';
 import { sql } from 'drizzle-orm';
 import {
   bigint,
@@ -106,6 +112,24 @@ export const documentTypeEnum = pgEnum('DocumentType', [
 ]);
 
 export const docStatusEnum = pgEnum('DocStatus', ['processing', 'active', 'archived', 'deleted']);
+
+/**
+ * Care stage. Declared here, ahead of the RRO section that owns it, because a
+ * report records the stage its subject was in when it was uploaded.
+ */
+export const rroStateEnum = pgEnum('rro_state_value', ['intake', 'reverse', 'restore', 'optimise']);
+
+/** How far the reader has got with a report. See REPORT_PROCESSING_STATUSES. */
+export const reportProcessingStatusEnum = pgEnum('report_processing_status', [
+  'awaiting_upload',
+  'uploaded',
+  'reading',
+  'read',
+  'failed',
+  'not_applicable',
+]);
+/** How a report's text was obtained. See REPORT_READ_METHODS. */
+export const reportReadMethodEnum = pgEnum('report_read_method', ['text_layer', 'ocr', 'mixed']);
 
 export const accessPermissionEnum = pgEnum('AccessPermission', ['view', 'download']);
 
@@ -297,12 +321,70 @@ export const documents = pgTable(
     created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
     deleted_at: timestamp('deleted_at', { withTimezone: true }),
+
+    // ── Report processing ──
+    //
+    // Separate from `status`, which says whether a document is visible. These
+    // say what the reader has done with it.
+
+    /** The subject's care stage when the report was declared. Never updated. */
+    rro_state_at_upload: rroStateEnum('rro_state_at_upload'),
+    processing_status: reportProcessingStatusEnum('processing_status')
+      .default('awaiting_upload')
+      .notNull(),
+    read_method: reportReadMethodEnum('read_method'),
+    /** A reason safe to show the person. Never a stack trace or a raw provider error. */
+    processing_error: text('processing_error'),
+    /** Something to know about a successful read — pages that had no text, pages not read. */
+    processing_note: text('processing_note'),
+    page_count: integer('page_count'),
+    processed_at: timestamp('processed_at', { withTimezone: true }),
+    /** Reader bookkeeping: how many times a read was started, and when the current one began. */
+    processing_attempts: integer('processing_attempts').default(0).notNull(),
+    claimed_at: timestamp('claimed_at', { withTimezone: true }),
   },
   (t) => ({
     idx_owner: index('documents_owner_idx').on(t.owner_id, t.owner_type),
     idx_status: index('documents_status_idx').on(t.status),
     // The reports timeline reads one profile ordered by report date.
     idx_profile: index('documents_profile_idx').on(t.profile_id, t.reported_at),
+    // The reader's queue: only the rows it still has to pick up or reclaim.
+    idx_processing: index('documents_processing_queue_idx')
+      .on(t.processing_status, t.claimed_at)
+      .where(sql`${t.processing_status} IN ('uploaded', 'reading')`),
+  }),
+);
+
+/**
+ * The text of one page of a report, as the reader obtained it.
+ *
+ * Health data, under the same access rule as the report it belongs to, and
+ * never returned without that report's check. `profile_id` is copied from the
+ * report so the check never needs a join. Text read by machine: it is never
+ * treated as confirmed values.
+ */
+export const report_pages = pgTable(
+  'report_pages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    document_id: uuid('document_id')
+      .notNull()
+      .references(() => documents.id),
+    profile_id: uuid('profile_id').notNull(),
+    page_number: integer('page_number').notNull(),
+    /** A single page is read one way or the other, never `mixed`. */
+    method: reportReadMethodEnum('method').notNull(),
+    text: text('text').notNull(),
+    /** `[{ rows: string[][] }]` — tables as OCR found them. Empty for a text-layer page. */
+    tables: json('tables').default([]).notNull(),
+    /** Mean line confidence from OCR, 0–100. Null for a text-layer page. */
+    ocr_confidence: numeric('ocr_confidence', { precision: 5, scale: 2 }),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    unique_page: unique('report_pages_document_page_unique').on(t.document_id, t.page_number),
+    page_positive: check('report_pages_page_number_positive', sql`${t.page_number} >= 1`),
+    page_method: check('report_pages_method_not_mixed', sql`${t.method} <> 'mixed'`),
   }),
 );
 
@@ -409,7 +491,6 @@ export const processed_events = pgTable('processed_events', {
 // boundary, and the check that matters happens before the insert, not after.
 // ─────────────────────────────────────────────────────────────
 
-export const rroStateEnum = pgEnum('rro_state_value', ['intake', 'reverse', 'restore', 'optimise']);
 export const rroPillarEnum = pgEnum('rro_pillar', [
   'nutrition',
   'movement',
@@ -432,6 +513,24 @@ export const carePlanStatusEnum = pgEnum('care_plan_status', [
 // migration generation. These assertions fail to compile if a database enum and
 // the shared taxonomy disagree, in either direction.
 type MustExtend<Sub extends Super, Super> = Sub;
+
+type _DbProcessingInTaxonomy = MustExtend<
+  (typeof reportProcessingStatusEnum.enumValues)[number],
+  ReportProcessingStatus
+>;
+type _TaxonomyProcessingInDb = MustExtend<
+  ReportProcessingStatus,
+  (typeof reportProcessingStatusEnum.enumValues)[number]
+>;
+type _DbReadMethodInTaxonomy = MustExtend<
+  (typeof reportReadMethodEnum.enumValues)[number],
+  ReportReadMethod
+>;
+type _TaxonomyReadMethodInDb = MustExtend<
+  ReportReadMethod,
+  (typeof reportReadMethodEnum.enumValues)[number]
+>;
+type _PageMethodIsReadMethod = MustExtend<ReportPageMethod, ReportReadMethod>;
 
 type _DbStatesInTaxonomy = MustExtend<(typeof rroStateEnum.enumValues)[number], RroState>;
 type _TaxonomyStatesInDb = MustExtend<RroState, (typeof rroStateEnum.enumValues)[number]>;

@@ -104,7 +104,10 @@ export function createRoutes(): any {
   // not shadow a specific path registered earlier.
   const reportsProxy = new Elysia()
     .use(requireAuth())
-    .all('/api/v1/profiles/:profileId/reports', (ctx) => proxyRequest(ctx, AI_CONTENT_URL));
+    .all('/api/v1/profiles/:profileId/reports', (ctx) => proxyRequest(ctx, AI_CONTENT_URL))
+    // One report by its own id: details, confirm upload, text, download, access log.
+    .all('/api/v1/reports/:reportId', (ctx) => proxyRequest(ctx, AI_CONTENT_URL))
+    .all('/api/v1/reports/:reportId/*', (ctx) => proxyRequest(ctx, AI_CONTENT_URL));
 
   // ── Profile routes — multi-profile / family (require auth) ──
   // The service re-verifies the token and owns the "is this profile yours"

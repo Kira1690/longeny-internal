@@ -3,8 +3,10 @@ import { corsMiddleware, errorHandler, requestContext, requestLogger } from '@lo
 import { Elysia } from 'elysia';
 import { config } from './config/index.js';
 import { createRoutes } from './routes/index.js';
+import type { ReportReader } from './services/report-reader/reader.js';
 
-export function createApp() {
+/** `reader` is the background report reader; without one, confirmed reports wait. */
+export function createApp(reader: ReportReader | null = null) {
   const origins = config.CORS_ORIGIN.split(',').map((o: string) => o.trim());
 
   const app = new Elysia()
@@ -31,6 +33,10 @@ export function createApp() {
               description: 'RRO intake — the answers a classification derives from',
             },
             { name: 'rro-ai', description: 'RRO classifier and pre-consult summary' },
+            {
+              name: 'reports',
+              description: 'A person’s reports: upload, track, read text, download, access log',
+            },
           ],
         },
       }),
@@ -49,7 +55,7 @@ export function createApp() {
         uptime: process.uptime(),
       },
     }))
-    .use(createRoutes());
+    .use(createRoutes(reader));
 
   return app;
 }

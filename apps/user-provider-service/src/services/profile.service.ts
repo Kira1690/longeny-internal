@@ -107,26 +107,43 @@ export class ProfileService {
    * still active. The caller needs to scope a query, not to render a person.
    */
   async resolveForService(authId: string, profileId?: string) {
+    let resolved: {
+      profileId: string;
+      accountUserId: string;
+      relation: string;
+      isSelf: boolean;
+      status: string;
+    };
     if (!profileId) {
       const selfId = await this.getSelfProfileId(authId);
       const [self] = await db.select().from(profiles).where(eq(profiles.id, selfId)).limit(1);
-      return {
+      resolved = {
         profileId: selfId,
         accountUserId: self.account_user_id,
         relation: self.relation,
         isSelf: true,
         status: self.status,
       };
+    } else {
+      const { profile } = await this.assertOwnership(authId, profileId);
+      resolved = {
+        profileId: profile.id,
+        accountUserId: profile.account_user_id,
+        relation: profile.relation,
+        isSelf: profile.is_self,
+        status: profile.status,
+      };
     }
 
-    const { profile } = await this.assertOwnership(authId, profileId);
-    return {
-      profileId: profile.id,
-      accountUserId: profile.account_user_id,
-      relation: profile.relation,
-      isSelf: profile.is_self,
-      status: profile.status,
-    };
+    // The care stage travels with the ownership answer so a caller that
+    // records "what stage was this person in" (a report upload) needs no second
+    // call, and cannot read the stage of a profile it does not own.
+    const [state] = await db
+      .select({ current: rro_state.current_state })
+      .from(rro_state)
+      .where(eq(rro_state.profile_id, resolved.profileId))
+      .limit(1);
+    return { ...resolved, rroState: state?.current ?? null };
   }
 
   /** Ensure the account owner always has a canonical 'self' profile. */
