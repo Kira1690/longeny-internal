@@ -1,5 +1,4 @@
-import { BadRequestError, NotFoundError } from '@longeny/errors';
-import { UserRole } from '@longeny/types';
+import { BadRequestError } from '@longeny/errors';
 import { buildPaginationMeta, parsePaginationParams } from '@longeny/utils';
 import type { DocumentService } from '../services/document.service.js';
 import type { ProfileAccessService } from '../services/profile-access.service.js';
@@ -84,20 +83,11 @@ export class DocumentController {
   /**
    * GET /profiles/:profileId/reports
    *
-   * Two ways in, and only two: the account owns the profile, or a provider has
-   * an active booking with it. A provider with no engagement gets the same
-   * answer as a stranger — 404, which does not confirm the profile exists.
+   * The owner, or a provider with an active booking — see
+   * `ProfileAccessService.assertCanRead`.
    */
   reportsForProfile = async ({ params, query, store }: any) => {
-    const isProvider =
-      store.userRole === UserRole.PROVIDER || (store.userRoles ?? []).includes(UserRole.PROVIDER);
-
-    if (isProvider) {
-      const allowed = await this.profileAccess.providerHasAccess(store.userId, params.profileId);
-      if (!allowed) throw new NotFoundError('Profile');
-    } else {
-      await this.profileAccess.assertOwns(store.userId, params.profileId);
-    }
+    await this.profileAccess.assertCanRead(store, params.profileId);
 
     const pagination = parsePaginationParams(query);
     const { reports, total } = await this.documentService.getProfileReports(

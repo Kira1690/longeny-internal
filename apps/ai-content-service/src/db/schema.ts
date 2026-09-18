@@ -1,7 +1,10 @@
-import type { RroPillar, RroState } from '@longeny/types';
+import type { RangeSex, ReadingEntryMethod, RroPillar, RroState } from '@longeny/types';
+import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   bigint,
   boolean,
+  check,
   customType,
   index,
   integer,
@@ -655,5 +658,141 @@ export const onboarding_sessions = pgTable(
   (t) => ({
     idx_auth: index('onboarding_session_auth_idx').on(t.auth_id, t.created_at),
     idx_profile: index('onboarding_session_profile_idx').on(t.profile_id),
+  }),
+);
+
+// ─────────────────────────────────────────────────────────────
+// Biomarkers — Week 8: readings, reference ranges, benchmarks
+//
+// A report used to be only a file. These tables give it a body: the values it
+// contains, and the ranges those values are judged against. Scoring reads from
+// here and never writes back to the care state (plan/rro/week-08 §4).
+// ─────────────────────────────────────────────────────────────
+
+export const readingEntryMethodEnum = pgEnum('reading_entry_method', ['manual', 'extracted']);
+export const rangeSexEnum = pgEnum('range_sex', ['any', 'male', 'female']);
+
+type _DbEntryInTaxonomy = MustExtend<
+  (typeof readingEntryMethodEnum.enumValues)[number],
+  ReadingEntryMethod
+>;
+type _TaxonomyEntryInDb = MustExtend<
+  ReadingEntryMethod,
+  (typeof readingEntryMethodEnum.enumValues)[number]
+>;
+type _DbSexInTaxonomy = MustExtend<(typeof rangeSexEnum.enumValues)[number], RangeSex>;
+type _TaxonomySexInDb = MustExtend<RangeSex, (typeof rangeSexEnum.enumValues)[number]>;
+
+/**
+ * One measured value from one report.
+ *
+ * Never updated in place. A correction writes a new row naming the one it
+ * replaces in `supersedes_id`; the current value for a marker is the newest row
+ * that nothing supersedes. A benchmark or score computed yesterday therefore
+ * still has the input it was computed from.
+ *
+ * `document_id` is required: a value with no source file cannot answer "where
+ * did this number come from", which is the first question a clinician asks.
+ */
+export const biomarker_readings = pgTable(
+  'biomarker_readings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    profile_id: uuid('profile_id').notNull(),
+    document_id: uuid('document_id')
+      .notNull()
+      .references(() => documents.id),
+    /** Lower-case code shared with reference_ranges, e.g. `hba1c`, `ldl_c`. */
+    marker_code: varchar('marker_code', { length: 64 }).notNull(),
+    value: numeric('value', { precision: 12, scale: 4 }).notNull(),
+    /** As printed on the report. Compared to the range's unit, never converted. */
+    unit: varchar('unit', { length: 32 }).notNull(),
+    /** When the sample was taken, which is not when it was typed in. */
+    measured_at: timestamp('measured_at', { withTimezone: true }).notNull(),
+    entry_method: readingEntryMethodEnum('entry_method').notNull(),
+    /** Account that entered or confirmed it — audit only, never scope. */
+    entered_by_auth_id: uuid('entered_by_auth_id').notNull(),
+    supersedes_id: uuid('supersedes_id').references((): AnyPgColumn => biomarker_readings.id),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    idx_profile_marker: index('biomarker_reading_profile_marker_idx').on(
+      t.profile_id,
+      t.marker_code,
+      t.measured_at,
+    ),
+    idx_document: index('biomarker_reading_document_idx').on(t.document_id),
+    // A reading can be corrected once; a second correction corrects the correction.
+    unique_supersedes: unique('biomarker_reading_supersedes_unique').on(t.supersedes_id),
+    marker_code_format: check(
+      'biomarker_reading_marker_code_format',
+      sql`${t.marker_code} ~ '^[a-z][a-z0-9_]*$'`,
+    ),
+  }),
+);
+
+/**
+ * What "normal" is for one marker, for one group of people, according to one
+ * named source.
+ *
+ * `is_placeholder` defaults to true on purpose. Until the clinical ranges are
+ * supplied (VG-W8-1), every row here is a test value, and a row has to be
+ * deliberately marked real rather than accidentally left looking real. Every
+ * benchmark computed against a placeholder row is returned as `provisional`.
+ *
+ * Either normal bound may be absent (LDL has only an upper limit), but not both.
+ * The optimal band, when given, sits inside the normal band.
+ */
+export const reference_ranges = pgTable(
+  'reference_ranges',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    marker_code: varchar('marker_code', { length: 64 }).notNull(),
+    marker_name: varchar('marker_name', { length: 120 }).notNull(),
+    unit: varchar('unit', { length: 32 }).notNull(),
+    sex: rangeSexEnum('sex').default('any').notNull(),
+    /** Inclusive. Null means no lower age limit. */
+    age_min_years: integer('age_min_years'),
+    /** Inclusive. Null means no upper age limit. */
+    age_max_years: integer('age_max_years'),
+    normal_low: numeric('normal_low', { precision: 12, scale: 4 }),
+    normal_high: numeric('normal_high', { precision: 12, scale: 4 }),
+    optimal_low: numeric('optimal_low', { precision: 12, scale: 4 }),
+    optimal_high: numeric('optimal_high', { precision: 12, scale: 4 }),
+    /** The pillar this marker feeds when scoring. Null until decided. */
+    pillar: rroPillarEnum('pillar'),
+    /** Lab or guideline body — the answer to "according to whom". */
+    source: text('source').notNull(),
+    is_placeholder: boolean('is_placeholder').default(true).notNull(),
+    effective_from: timestamp('effective_from', { withTimezone: true }).defaultNow().notNull(),
+    /** Set instead of deleting, so an old benchmark can still name its range. */
+    retired_at: timestamp('retired_at', { withTimezone: true }),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    idx_marker: index('reference_range_marker_idx').on(t.marker_code, t.retired_at),
+    marker_code_format: check(
+      'reference_range_marker_code_format',
+      sql`${t.marker_code} ~ '^[a-z][a-z0-9_]*$'`,
+    ),
+    has_a_bound: check(
+      'reference_range_has_a_bound',
+      sql`${t.normal_low} IS NOT NULL OR ${t.normal_high} IS NOT NULL`,
+    ),
+    normal_ordered: check(
+      'reference_range_normal_ordered',
+      sql`${t.normal_low} IS NULL OR ${t.normal_high} IS NULL OR ${t.normal_low} <= ${t.normal_high}`,
+    ),
+    optimal_inside_normal: check(
+      'reference_range_optimal_inside_normal',
+      sql`(${t.optimal_low} IS NULL OR ${t.normal_low} IS NULL OR ${t.optimal_low} >= ${t.normal_low})
+        AND (${t.optimal_high} IS NULL OR ${t.normal_high} IS NULL OR ${t.optimal_high} <= ${t.normal_high})
+        AND (${t.optimal_low} IS NULL OR ${t.optimal_high} IS NULL OR ${t.optimal_low} <= ${t.optimal_high})`,
+    ),
+    age_ordered: check(
+      'reference_range_age_ordered',
+      sql`${t.age_min_years} IS NULL OR ${t.age_max_years} IS NULL OR ${t.age_min_years} <= ${t.age_max_years}`,
+    ),
+    source_named: check('reference_range_source_named', sql`length(trim(${t.source})) > 0`),
   }),
 );

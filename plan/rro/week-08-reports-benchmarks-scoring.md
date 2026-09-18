@@ -144,3 +144,39 @@ Nothing this week breaks that chain; it simply does not advance it.
 - Unit mismatch is an error, never a silent comparison.
 - Verified on the deployed server, not only locally — Week 7 lost three defects to that gap.
 - `typecheck` 0 · `lint` clean · E2E green on real infrastructure · migrated to `BraveLabs`.
+
+---
+
+## 8. Progress — 2026-09-18
+
+**Built in longeny-internal, not migrated.** Tested end to end on real Postgres; the full
+run is 13/14 suites green plus one stale Week 7 suite fixed (below).
+
+| Card | State | What exists |
+|---|---|---|
+| V-W8-1 | built, tested | `biomarker_readings` (append-only, corrections via `supersedes_id`, every value tied to a report by FK) and `reference_ranges` (source required, `is_placeholder` defaults **true**, retire instead of delete, check constraints for bound order and optimal-inside-normal). Migration `0004`. |
+| V-W8-3 | engine built, **ranges are placeholders** | Pure engine `services/benchmark/engine.ts` (24 unit tests). `GET /profiles/:id/benchmarks`, `GET /reference-ranges`, both through the gateway. 56 E2E checks. |
+| V-W8-2 | not started | Readings are written by SQL in the E2E until the entry API exists. |
+
+**Placeholder rule, as agreed on the 2026-09-18 call.** We do not have the clinical
+parameters. `seed-placeholder-ranges.ts` loads 7 test ranges for dev only, all
+`is_placeholder = true`; every verdict against one comes back `provisional: true`, and
+`meta.provisional` says so for the page. Real ranges arrive as rows — reviewed rows with
+`is_placeholder = false`, then `retired_at` on the placeholders. No code change.
+
+The table VG-W8-1 must fill, one row per marker: marker, unit, sex (any/male/female),
+age band, normal low/high, optimal low/high, pillar, source.
+
+**Found while building:**
+
+1. **Demographics are not available to ai-content.** Profile resolution carries no PII by
+   design, so sex- and age-specific ranges cannot be applied. The engine supports them; the
+   endpoint answers `no_reference / needs_demographics` rather than borrow someone else's
+   range, and `meta.demographics = "unavailable"`. Needs an HMAC route returning sex + age
+   band (not DOB) — not yet a card.
+2. **The ai-classify E2E had been red since 2026-09-10.** Section 4 submitted an empty
+   intake through the API and expected the classifier to refuse it; the Week 7 fix that
+   rejects empty intakes at submit made that impossible. The test now asserts the 400 and
+   seeds a legacy empty row directly to keep the classifier's refusal covered. 60/60.
+3. Reports and benchmarks now share one access rule, `ProfileAccessService.assertCanRead`
+   (owner, or provider with an active booking), instead of a copy in each controller.

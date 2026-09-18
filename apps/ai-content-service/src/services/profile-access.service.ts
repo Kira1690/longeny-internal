@@ -1,4 +1,5 @@
 import { NotFoundError, ServiceUnavailableError } from '@longeny/errors';
+import { UserRole } from '@longeny/types';
 import { ServiceCallError, createLogger, createServiceClient } from '@longeny/utils';
 import { config } from '../config/index.js';
 
@@ -92,5 +93,27 @@ export class ProfileAccessService {
       logger.error({ error, providerId, profileId }, 'Provider access check failed');
       return false;
     }
+  }
+
+  /**
+   * Read access to a profile's clinical record, for either kind of caller.
+   *
+   * Two ways in, and only two: the account owns the profile, or a provider has
+   * an active booking with it. A provider with no engagement gets the same
+   * answer as a stranger — 404, which does not confirm the profile exists.
+   */
+  async assertCanRead(
+    caller: { userId: string; userRole?: string; userRoles?: string[] },
+    profileId: string,
+  ): Promise<void> {
+    const isProvider =
+      caller.userRole === UserRole.PROVIDER || (caller.userRoles ?? []).includes(UserRole.PROVIDER);
+
+    if (isProvider) {
+      const allowed = await this.providerHasAccess(caller.userId, profileId);
+      if (!allowed) throw new NotFoundError('Profile');
+      return;
+    }
+    await this.assertOwns(caller.userId, profileId);
   }
 }

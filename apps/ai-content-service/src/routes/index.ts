@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia';
 import { AdminController } from '../controllers/admin.controller.js';
+import { BenchmarkController } from '../controllers/benchmark.controller.js';
 import { DocumentGenController } from '../controllers/document-gen.controller.js';
 import { DocumentController } from '../controllers/document.controller.js';
 import { IntakeController } from '../controllers/intake.controller.js';
@@ -17,6 +18,7 @@ import { SchedulingController } from '../controllers/scheduling.controller.js';
 import { SessionController } from '../controllers/session.controller.js';
 import { AdminService } from '../services/admin.service.js';
 import { BedrockService } from '../services/bedrock.service.js';
+import { BenchmarkService } from '../services/benchmark.service.js';
 import { DocumentGenService } from '../services/document-gen.service.js';
 import { DocumentService } from '../services/document.service.js';
 import { EmbeddingService } from '../services/embedding.service.js';
@@ -36,6 +38,7 @@ import { SafetyService } from '../services/safety.service.js';
 import { SchedulingService } from '../services/scheduling.service.js';
 import { SessionService } from '../services/session.service.js';
 import { createAdminRoutes } from './admin.routes.js';
+import { createBenchmarkRoutes } from './benchmark.routes.js';
 import { createDocumentGenRoutes } from './document-gen.routes.js';
 import { createDocumentRoutes } from './document.routes.js';
 import { createIntakeRoutes } from './intake.routes.js';
@@ -78,6 +81,7 @@ export function createRoutes() {
   const profileAccessService = new ProfileAccessService();
   const intakeService = new IntakeService();
   const rroAiService = new RroAiService(intakeService);
+  const benchmarkService = new BenchmarkService();
 
   // ── Initialize controllers ──
   const recommendationController = new RecommendationController(recommendationService);
@@ -99,6 +103,7 @@ export function createRoutes() {
   const notificationController = new NotificationController(notificationService);
   const intakeController = new IntakeController(intakeService, profileAccessService);
   const rroAiController = new RroAiController(rroAiService, profileAccessService);
+  const benchmarkController = new BenchmarkController(benchmarkService, profileAccessService);
 
   return new Elysia()
     .use(createOnboardingRoutes(onboardingController))
@@ -116,5 +121,6 @@ export function createRoutes() {
     .use(createSchedulingRoutes(schedulingController))
     .use(createNotificationRoutes(notificationController))
     .use(createIntakeRoutes(intakeController))
-    .use(createRroAiRoutes(rroAiController));
+    .use(createRroAiRoutes(rroAiController))
+    .use(createBenchmarkRoutes(benchmarkController));
 }

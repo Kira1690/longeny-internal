@@ -1,0 +1,56 @@
+import type { RequestContext } from '@longeny/middleware';
+import type { BenchmarkService } from '../services/benchmark.service.js';
+import type { ProfileAccessService } from '../services/profile-access.service.js';
+
+interface ProfileCtx {
+  params: { profileId: string };
+  store: RequestContext;
+}
+
+interface RangesCtx {
+  query: { marker?: string };
+}
+
+/**
+ * Benchmarks and the reference ranges behind them.
+ *
+ * A profile's benchmarks are clinical data and are read the way its reports
+ * are: by the owning account, or by a provider with an active booking. The
+ * range table is not about anyone and is readable by any authenticated caller
+ * with document access.
+ */
+export class BenchmarkController {
+  constructor(
+    private readonly benchmarks: BenchmarkService,
+    private readonly profileAccess: ProfileAccessService,
+  ) {}
+
+  forProfile = async ({ params, store }: ProfileCtx) => {
+    await this.profileAccess.assertCanRead(store, params.profileId);
+    const data = await this.benchmarks.profileBenchmarks(params.profileId);
+    return {
+      success: true,
+      data,
+      meta: {
+        // Profile resolution carries no PII, so sex- and age-specific ranges
+        // cannot be applied yet. Said here so a client can explain a
+        // `needs_demographics` verdict rather than show a bare blank.
+        demographics: 'unavailable',
+        provisional: data.some((b) => b.provisional),
+        timestamp: new Date().toISOString(),
+      },
+    };
+  };
+
+  referenceRanges = async ({ query }: RangesCtx) => {
+    const data = await this.benchmarks.listReferenceRanges(query.marker);
+    return {
+      success: true,
+      data,
+      meta: {
+        provisional: data.some((r) => r.provisional),
+        timestamp: new Date().toISOString(),
+      },
+    };
+  };
+}

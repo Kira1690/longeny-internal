@@ -256,17 +256,28 @@ check(
 
 console.log('\n4. An empty intake is refused, not guessed at');
 
-await fetch(`${BASE}/intake`, {
-  method: 'POST',
-  headers: { ...authHeaders, 'X-Active-Profile-Id': mumId },
-  body: JSON.stringify({
-    symptoms: [],
-    goals: [],
-    conditions: [],
-    medications: [],
-    pillarPriorities: [],
+r = await call(
+  await fetch(`${BASE}/intake`, {
+    method: 'POST',
+    headers: { ...authHeaders, 'X-Active-Profile-Id': mumId },
+    body: JSON.stringify({
+      symptoms: [],
+      goals: [],
+      conditions: [],
+      medications: [],
+      pillarPriorities: [],
+    }),
   }),
-});
+);
+check('the intake endpoint refuses an empty form at the door — 400', r.status === 400, r);
+
+// The endpoint no longer stores an empty intake, but rows written before it
+// refused them still exist. The classifier must still decline one rather than
+// guess, so the row is written the way those were: directly.
+await ai`
+  INSERT INTO intake_submissions (profile_id, submitted_by_auth_id, version)
+  VALUES (${mumId}::uuid, ${AUTH_ID}::uuid, 1)
+`;
 
 r = await call(await post('/internal/ai/classify', { profileId: mumId }));
 check('200 — a refusal is valid output, not an error', r.status === 200, r);
