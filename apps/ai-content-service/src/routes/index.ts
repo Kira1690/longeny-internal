@@ -33,6 +33,7 @@ import { PostOnboardingService } from '../services/post-onboarding.service.js';
 import { ProfileAccessService } from '../services/profile-access.service.js';
 import { ProviderProfileService } from '../services/provider-profile.service.js';
 import { ReadingsService } from '../services/readings.service.js';
+import { ScoreService } from '../services/score.service.js';
 import { RecommendationService } from '../services/recommendation.service.js';
 import { RroAiService } from '../services/rro-ai.service.js';
 import { S3Service } from '../services/s3.service.js';
@@ -86,6 +87,7 @@ export function createRoutes() {
   const rroAiService = new RroAiService(intakeService);
   const benchmarkService = new BenchmarkService();
   const readingsService = new ReadingsService();
+  const scoreService = new ScoreService(benchmarkService);
 
   // ── Initialize controllers ──
   const recommendationController = new RecommendationController(recommendationService);
@@ -107,7 +109,11 @@ export function createRoutes() {
   const notificationController = new NotificationController(notificationService);
   const intakeController = new IntakeController(intakeService, profileAccessService);
   const rroAiController = new RroAiController(rroAiService, profileAccessService);
-  const benchmarkController = new BenchmarkController(benchmarkService, profileAccessService);
+  const benchmarkController = new BenchmarkController(
+    benchmarkService,
+    profileAccessService,
+    scoreService,
+  );
   const readingsController = new ReadingsController(readingsService, profileAccessService);
 
   return new Elysia()

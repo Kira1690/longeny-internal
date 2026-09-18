@@ -193,6 +193,7 @@ for suite in \
   "benchmarks|http://localhost:3004|apps/ai-content-service/test/benchmarks.e2e.ts" \
   "readings|http://localhost:3004|apps/ai-content-service/test/readings.e2e.ts" \
   "trends|http://localhost:3004|apps/ai-content-service/test/trends.e2e.ts" \
+  "scores|http://localhost:3004|apps/ai-content-service/test/scores.e2e.ts" \
   "booking profiles+invite|http://localhost:3003|apps/booking-service/test/booking-profile.e2e.ts" \
   "payments rbac|http://localhost:3005|apps/payment-service/test/payments-rbac.e2e.ts" \
   "bookings ownership|http://localhost:3003|apps/booking-service/test/bookings-ownership.e2e.ts" \

@@ -103,6 +103,64 @@ const TREND_SHAPE: OpenApiFragment = {
   },
 };
 
+const SCORE_RULES =
+  '**Advisory only.** A score never moves a profile between care stages; that decision stays with a clinician.\n\nEach pillar scores 0–100 from the verdicts on its markers; the overall score is a weighted average of the pillars that have data. A pillar with no scorable readings is null and left out of the overall — missing labs are not bad labs. Readings with no reference, a unit mismatch or no pillar are listed under `unscored` with the reason.\n\n**Provisional.** The points per verdict and the pillar weights are placeholders until clinically decided, so every score is currently `provisional: true`. `scoring_version` names the rule set; a score computed under older rules keeps its version.';
+
+const CONTRIBUTION_SHAPE: OpenApiFragment = {
+  type: 'object',
+  properties: {
+    reading_id: { type: 'string', format: 'uuid' },
+    marker_code: { type: 'string' },
+    value: { type: 'number' },
+    status: { type: 'string', enum: [...BENCHMARK_STATUSES] },
+    range_id: { type: 'string', format: 'uuid', nullable: true },
+    points: { type: 'number', nullable: true },
+    excluded_reason: {
+      type: 'string',
+      enum: ['no_reference', 'unit_mismatch', 'no_pillar'],
+      nullable: true,
+    },
+  },
+};
+
+const SCORE_SHAPE: OpenApiFragment = {
+  type: 'object',
+  properties: {
+    id: { type: 'string', format: 'uuid' },
+    profile_id: { type: 'string', format: 'uuid' },
+    scoring_version: { type: 'string', example: 'placeholder-2026-09.1' },
+    overall: { type: 'number', nullable: true, example: 71.5 },
+    pillars: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          pillar: { type: 'string', enum: [...RRO_PILLARS] },
+          score: { type: 'number', nullable: true },
+          scored_markers: { type: 'integer' },
+          contributions: { type: 'array', items: CONTRIBUTION_SHAPE },
+        },
+      },
+    },
+    unscored: { type: 'array', items: CONTRIBUTION_SHAPE },
+    provisional: { type: 'boolean' },
+    advisory: { type: 'boolean', enum: [true] },
+    computed_at: { type: 'string', format: 'date-time' },
+    stale: { type: 'boolean' },
+  },
+};
+
+const scoreErrors: OpenApiFragment = {
+  400: errorDoc('Profile id is not a UUID', 'VALIDATION_ERROR'),
+  401: errorDoc('Missing or invalid token', 'UNAUTHORIZED'),
+  403: errorDoc('Token lacks the required permission', 'FORBIDDEN'),
+  404: errorDoc(
+    'No such profile, not this account’s profile, or no active booking for this provider',
+    'NOT_FOUND',
+  ),
+  503: errorDoc('Profile ownership could not be verified', 'SERVICE_UNAVAILABLE'),
+};
+
 const BENCHMARK_EXAMPLE = [
   {
     marker_code: 'hba1c',
@@ -225,6 +283,50 @@ export function createBenchmarkRoutes(controller: BenchmarkController) {
       },
     });
 
+  const profileScores = new Elysia({ prefix: '/profiles' })
+    .use(requireAuth({ onRevocationCheckFailure: 'closed' }))
+    .use(
+      auditLog({
+        action: 'scores.access',
+        resourceType: 'rro_score',
+        purpose: 'care_delivery',
+        sink: writePhiAccessLog,
+      }),
+    )
+    .post('/:profileId/scores', controller.computeScore, {
+      beforeHandle: permissionGuard('documents:read'),
+      params: t.Object({ profileId: t.String({ format: 'uuid' }) }),
+      detail: {
+        tags: TAGS,
+        summary: 'Compute the pillar and overall RRO score now',
+        description: `${SCORE_RULES}\n\nStores the result so it can be shown again exactly as computed. If nothing has changed since the last score, that score is returned (200, \`meta.reused: true\`) rather than a duplicate stored; otherwise a new one is stored (201).`,
+        ...bearer,
+        responses: {
+          200: okDoc('Nothing changed — the previous score', SCORE_SHAPE),
+          201: okDoc('A new score', SCORE_SHAPE),
+          ...scoreErrors,
+        },
+      },
+    })
+    .get('/:profileId/scores', controller.latestScore, {
+      beforeHandle: permissionGuard('documents:read'),
+      params: t.Object({ profileId: t.String({ format: 'uuid' }) }),
+      detail: {
+        tags: TAGS,
+        summary: 'The most recent stored score',
+        description: `${SCORE_RULES}\n\n\`stale: true\` means the readings, the ranges or the scoring rules have changed since it was computed; \`POST\` to compute a fresh one.`,
+        ...bearer,
+        responses: {
+          200: okDoc('Latest score', SCORE_SHAPE),
+          ...scoreErrors,
+          404: errorDoc(
+            'No such profile, not readable by this caller, or no score yet',
+            'NOT_FOUND',
+          ),
+        },
+      },
+    });
+
   const ranges = new Elysia({ prefix: '/reference-ranges' })
     .use(requireAuth({ onRevocationCheckFailure: 'closed' }))
     .get('', controller.referenceRanges, {
@@ -253,5 +355,5 @@ export function createBenchmarkRoutes(controller: BenchmarkController) {
       },
     });
 
-  return new Elysia().use(profileBenchmarks).use(profileTrends).use(ranges);
+  return new Elysia().use(profileBenchmarks).use(profileTrends).use(profileScores).use(ranges);
 }

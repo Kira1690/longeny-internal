@@ -1,6 +1,7 @@
 import type { RequestContext } from '@longeny/middleware';
 import type { BenchmarkService } from '../services/benchmark.service.js';
 import type { ProfileAccessService } from '../services/profile-access.service.js';
+import type { ScoreService } from '../services/score.service.js';
 
 interface ProfileCtx {
   params: { profileId: string };
@@ -23,6 +24,7 @@ export class BenchmarkController {
   constructor(
     private readonly benchmarks: BenchmarkService,
     private readonly profileAccess: ProfileAccessService,
+    private readonly scores: ScoreService,
   ) {}
 
   forProfile = async ({ params, store }: ProfileCtx) => {
@@ -54,6 +56,24 @@ export class BenchmarkController {
         timestamp: new Date().toISOString(),
       },
     };
+  };
+
+  /** Advisory. Computing a score never moves the profile between care stages. */
+  computeScore = async ({
+    params,
+    store,
+    set,
+  }: ProfileCtx & { set: { status?: number | string } }) => {
+    await this.profileAccess.assertCanRead(store, params.profileId);
+    const { created, data } = await this.scores.compute(params.profileId, store.userId);
+    set.status = created ? 201 : 200;
+    return { success: true, data, meta: { reused: !created, timestamp: new Date().toISOString() } };
+  };
+
+  latestScore = async ({ params, store }: ProfileCtx) => {
+    await this.profileAccess.assertCanRead(store, params.profileId);
+    const data = await this.scores.latest(params.profileId);
+    return { success: true, data };
   };
 
   referenceRanges = async ({ query }: RangesCtx) => {

@@ -796,3 +796,34 @@ export const reference_ranges = pgTable(
     source_named: check('reference_range_source_named', sql`length(trim(${t.source})) > 0`),
   }),
 );
+
+/**
+ * A computed score, kept as it was shown.
+ *
+ * Scores are derived and could be recomputed at any time, but "what did the
+ * score say when the clinician looked at it" is a question with one answer, and
+ * this row is it: the rule version, the result with its full explanation, and a
+ * fingerprint of exactly which readings and ranges went in. When the inputs
+ * change, the fingerprint no longer matches and the stored score is stale.
+ *
+ * Advisory only. Nothing that writes this table touches the care state.
+ */
+export const rro_scores = pgTable(
+  'rro_scores',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    profile_id: uuid('profile_id').notNull(),
+    scoring_version: varchar('scoring_version', { length: 40 }).notNull(),
+    overall: numeric('overall', { precision: 4, scale: 1 }),
+    result: json('result').notNull(),
+    /** sha256 over the scoring version and every input reading and range. */
+    input_fingerprint: varchar('input_fingerprint', { length: 64 }).notNull(),
+    provisional: boolean('provisional').notNull(),
+    /** Account that asked for it — audit only. */
+    computed_by_auth_id: uuid('computed_by_auth_id').notNull(),
+    created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    idx_profile: index('rro_score_profile_idx').on(t.profile_id, t.created_at),
+  }),
+);

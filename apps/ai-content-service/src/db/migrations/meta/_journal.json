@@ -36,6 +36,13 @@
       "when": 1789719993735,
       "tag": "0004_biomarker_readings_reference_ranges",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789731064583,
+      "tag": "0005_rro_scores",
+      "breakpoints": true
     }
   ]
 }
