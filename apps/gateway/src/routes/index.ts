@@ -110,6 +110,7 @@ export function createRoutes(): any {
     .all('/api/v1/profiles/:profileId/reports', (ctx) => proxyRequest(ctx, AI_CONTENT_URL))
     // Benchmarks are judged in ai-content, next to the readings they judge.
     .all('/api/v1/profiles/:profileId/benchmarks', (ctx) => proxyRequest(ctx, AI_CONTENT_URL))
+    .all('/api/v1/profiles/:profileId/trends', (ctx) => proxyRequest(ctx, AI_CONTENT_URL))
     .all('/api/v1/reference-ranges', (ctx) => proxyRequest(ctx, AI_CONTENT_URL))
     .all('/api/v1/reports/:documentId/readings', (ctx) => proxyRequest(ctx, AI_CONTENT_URL))
     .all('/api/v1/readings/:readingId/corrections', (ctx) => proxyRequest(ctx, AI_CONTENT_URL));

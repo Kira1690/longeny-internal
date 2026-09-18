@@ -42,6 +42,20 @@ export class BenchmarkController {
     };
   };
 
+  trends = async ({ params, query, store }: ProfileCtx & { query: { marker?: string } }) => {
+    await this.profileAccess.assertCanRead(store, params.profileId);
+    const data = await this.benchmarks.profileTrends(params.profileId, query.marker);
+    return {
+      success: true,
+      data,
+      meta: {
+        demographics: 'unavailable',
+        provisional: data.some((t) => t.provisional),
+        timestamp: new Date().toISOString(),
+      },
+    };
+  };
+
   referenceRanges = async ({ query }: RangesCtx) => {
     const data = await this.benchmarks.listReferenceRanges(query.marker);
     return {

@@ -70,6 +70,39 @@ const BENCHMARK_SHAPE: OpenApiFragment = {
   },
 };
 
+const TREND_SHAPE: OpenApiFragment = {
+  type: 'object',
+  properties: {
+    marker_code: { type: 'string', example: 'hba1c' },
+    marker_name: { type: 'string', nullable: true },
+    unit: { type: 'string', nullable: true },
+    direction: { type: 'string', enum: ['rising', 'falling', 'flat'], nullable: true },
+    change: { type: 'number', nullable: true, description: 'Latest minus previous' },
+    change_percent: { type: 'number', nullable: true },
+    toward_range: {
+      type: 'string',
+      enum: ['improving', 'worsening', 'unchanged'],
+      nullable: true,
+    },
+    provisional: { type: 'boolean' },
+    excluded_for_unit: { type: 'integer' },
+    points: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          reading_id: { type: 'string', format: 'uuid' },
+          value: { type: 'number' },
+          measured_at: { type: 'string', format: 'date-time' },
+          document_id: { type: 'string', format: 'uuid' },
+          status: { type: 'string', enum: [...BENCHMARK_STATUSES] },
+        },
+      },
+    },
+    range: { ...RANGE_SHAPE, nullable: true },
+  },
+};
+
 const BENCHMARK_EXAMPLE = [
   {
     marker_code: 'hba1c',
@@ -150,6 +183,48 @@ export function createBenchmarkRoutes(controller: BenchmarkController) {
       },
     });
 
+  const profileTrends = new Elysia({ prefix: '/profiles' })
+    .use(requireAuth({ onRevocationCheckFailure: 'closed' }))
+    .use(
+      auditLog({
+        action: 'trends.read',
+        resourceType: 'biomarker',
+        purpose: 'care_delivery',
+        sink: writePhiAccessLog,
+      }),
+    )
+    .get('/:profileId/trends', controller.trends, {
+      beforeHandle: permissionGuard('documents:read'),
+      params: t.Object({ profileId: t.String({ format: 'uuid' }) }),
+      query: t.Object({
+        marker: t.Optional(
+          t.String({
+            pattern: MARKER_CODE,
+            maxLength: 64,
+            description: 'One marker code; omit for every marker the profile has readings for',
+          }),
+        ),
+      }),
+      detail: {
+        tags: TAGS,
+        summary: 'Direction of travel per marker',
+        description:
+          'Every current reading per marker, oldest sample first, each with its own verdict so a chart can colour it.\n\n- `direction` is arithmetic: `rising`, `falling` or `flat`, comparing the latest two samples. Null with fewer than two.\n- `toward_range` says whether the latest move went towards the target band (the optimal band, or the normal band when there is no optimal one): `improving`, `worsening` or `unchanged`. Null when there is no usable range — rising is good for some markers and bad for others, and it is never guessed.\n- Samples in a different unit from the newest one are left out and counted in `excluded_for_unit`; values are never converted.\n- `provisional` is true when `toward_range` was judged against a placeholder range.\n\nRead by the owning account, or by a provider with an active booking.',
+        ...bearer,
+        responses: {
+          200: okDoc('Trends, one per marker', { type: 'array', items: TREND_SHAPE }),
+          400: errorDoc('Profile id or marker code is malformed', 'VALIDATION_ERROR'),
+          401: errorDoc('Missing or invalid token', 'UNAUTHORIZED'),
+          403: errorDoc('Token lacks the required permission', 'FORBIDDEN'),
+          404: errorDoc(
+            'No such profile, not this account’s profile, or no active booking for this provider',
+            'NOT_FOUND',
+          ),
+          503: errorDoc('Profile ownership could not be verified', 'SERVICE_UNAVAILABLE'),
+        },
+      },
+    });
+
   const ranges = new Elysia({ prefix: '/reference-ranges' })
     .use(requireAuth({ onRevocationCheckFailure: 'closed' }))
     .get('', controller.referenceRanges, {
@@ -178,5 +253,5 @@ export function createBenchmarkRoutes(controller: BenchmarkController) {
       },
     });
 
-  return new Elysia().use(profileBenchmarks).use(ranges);
+  return new Elysia().use(profileBenchmarks).use(profileTrends).use(ranges);
 }

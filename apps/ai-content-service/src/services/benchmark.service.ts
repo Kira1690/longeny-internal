@@ -1,7 +1,8 @@
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { reference_ranges } from '../db/schema.js';
-import { type RangeInput, type Subject, benchmark } from './benchmark/engine.js';
+import { type RangeInput, type Subject, benchmark, selectRange } from './benchmark/engine.js';
+import { computeTrend } from './benchmark/trend.js';
 
 type RangeRow = typeof reference_ranges.$inferSelect;
 
@@ -108,6 +109,105 @@ export class BenchmarkService {
       ...row,
       measured_at: new Date(row.measured_at),
     }));
+  }
+
+  /**
+   * Every current reading for a profile — corrections applied, deleted reports
+   * dropped — oldest sample first. Optionally one marker.
+   */
+  async readingHistory(profileId: string, markerCode?: string): Promise<CurrentReading[]> {
+    const rows = await db.execute(sql`
+      SELECT r.id, r.marker_code, r.value, r.unit, r.measured_at, r.document_id, r.entry_method
+      FROM biomarker_readings r
+      JOIN documents d ON d.id = r.document_id
+      WHERE r.profile_id = ${profileId}
+        ${markerCode ? sql`AND r.marker_code = ${markerCode}` : sql``}
+        AND d.deleted_at IS NULL
+        AND d.status <> 'deleted'
+        AND NOT EXISTS (
+          SELECT 1 FROM biomarker_readings s WHERE s.supersedes_id = r.id
+        )
+      ORDER BY r.marker_code, r.measured_at, r.created_at
+    `);
+    return (rows as unknown as CurrentReading[]).map((row) => ({
+      ...row,
+      measured_at: new Date(row.measured_at),
+    }));
+  }
+
+  /** Active ranges for a set of markers, as engine input and as display rows. */
+  private async rangesFor(markers: string[]) {
+    if (markers.length === 0)
+      return { ranges: [] as RangeInput[], byId: new Map<string, RangeRow>() };
+    const rows = await db
+      .select()
+      .from(reference_ranges)
+      .where(
+        and(isNull(reference_ranges.retired_at), inArray(reference_ranges.marker_code, markers)),
+      );
+    return { ranges: rows.map(toRangeInput), byId: new Map(rows.map((row) => [row.id, row])) };
+  }
+
+  /**
+   * Direction of travel per marker. Each point carries its own verdict, so a
+   * chart can colour it, and the trend says whether the latest move went
+   * towards the target band or away from it.
+   */
+  async profileTrends(profileId: string, markerCode?: string, subject: Subject = {}) {
+    const history = await this.readingHistory(profileId, markerCode);
+    const byMarker = new Map<string, CurrentReading[]>();
+    for (const reading of history) {
+      const list = byMarker.get(reading.marker_code) ?? [];
+      list.push(reading);
+      byMarker.set(reading.marker_code, list);
+    }
+
+    const { ranges, byId } = await this.rangesFor([...byMarker.keys()]);
+
+    return [...byMarker.entries()].map(([marker, readings]) => {
+      const selected = selectRange(marker, ranges, subject);
+      const range = 'range' in selected ? selected.range : null;
+      const trend = computeTrend(
+        readings.map((r) => ({
+          readingId: r.id,
+          value: Number(r.value),
+          unit: r.unit,
+          measuredAt: r.measured_at,
+        })),
+        range,
+      );
+      const rangeRow = range ? byId.get(range.id) : undefined;
+      const kept = new Set(trend.points.map((p) => p.readingId));
+
+      return {
+        marker_code: marker,
+        marker_name: rangeRow?.marker_name ?? null,
+        unit: trend.points[trend.points.length - 1]?.unit ?? null,
+        direction: trend.direction,
+        change: trend.change,
+        change_percent: trend.changePercent,
+        toward_range: trend.towardRange,
+        provisional: trend.provisional,
+        excluded_for_unit: trend.excludedForUnit,
+        points: readings
+          .filter((r) => kept.has(r.id))
+          .map((r) => {
+            const verdict = benchmark(
+              { markerCode: marker, value: Number(r.value), unit: r.unit },
+              ranges,
+              subject,
+            );
+            return {
+              reading_id: r.id,
+              value: Number(r.value),
+              measured_at: r.measured_at.toISOString(),
+              document_id: r.document_id,
+              status: verdict.status,
+            };
+          }),
+        range: rangeRow ? presentRange(rangeRow) : null,
+      };
+    });
   }
 
   async profileBenchmarks(profileId: string, subject: Subject = {}) {
