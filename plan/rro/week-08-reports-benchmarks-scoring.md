@@ -53,6 +53,8 @@ Each arrow is a card. The last one deliberately stops short of acting — see §
 | # | Card | h |
 |---|---|---|
 | M-W8-2 | Report storage hardening — the bucket holds patient labs now | 5 |
+| P-W7-1 | built; **expected answers are drafts** | 40 classifier fixtures (10 reverse, 10 restore, 10 optimise, 4 intake, 2 refusals, 2 injection, 2 mixed), each `review: 'draft'` until VG-W7-1 agrees them. `eval/run-classifier-eval.ts [rules|bedrock]` parses every output against the service's own contract. **Rules baseline: 36/40 strict, 40/40 lenient, top pillar 19/22, 0 contract-invalid.** It never answers `intake` — that is the model's first bar. |
+| P-W7-5 | eval built | Summary prompt already existed; 8 red-flag fixtures now score it. Rules baseline finds 5/6 flags at the right severity, invents 0 — misses "can't catch my breath" because it matches words, not meaning. |
 | M-W8-3 | Week 8 deploy and server verification | 4 |
 | M-W8-4 | Gateway health honesty | 6 |
 | M-W8-5 | Switch RRO provider to Bedrock — **blocked on client billing** | 1 |

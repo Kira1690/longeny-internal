@@ -219,6 +219,10 @@ done
   run_suite "gateway health rules" "http://localhost:3000" \
     bun test apps/gateway/test/health-summary.test.ts
 
+[[ -f apps/ai-content-service/test/eval-scoring.test.ts ]] && \
+  run_suite "eval scorers" "http://localhost:3004" \
+    bun test apps/ai-content-service/test/eval-scoring.test.ts
+
 # Pure engines — benchmark, trend and scoring rules
 for t in apps/ai-content-service/test/*-engine.test.ts; do
   [[ -f "$t" ]] && run_suite "$(basename "$t" .test.ts)" "http://localhost:3004" bun test "$t"
