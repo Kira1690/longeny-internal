@@ -86,7 +86,16 @@ export class ReportService {
 
   // ── Access ──
 
-  private async load(reportId: string, { includeDeleted = false } = {}): Promise<DocumentRow> {
+  /**
+   * The report, if it may be shown at all. A deleted one is looked up anyway so
+   * the audit row still names whose report was asked for — a request for a
+   * removed report is exactly the kind an access review wants to see.
+   */
+  private async load(
+    caller: Caller,
+    reportId: string,
+    { includeDeleted = false } = {},
+  ): Promise<DocumentRow> {
     const [row] = await db
       .select()
       .from(documents)
@@ -95,26 +104,19 @@ export class ReportService {
           eq(documents.id, reportId),
           eq(documents.owner_type, 'user'),
           sql`${documents.profile_id} IS NOT NULL`,
-          includeDeleted ? undefined : ne(documents.status, 'deleted'),
         ),
       )
       .limit(1);
     if (!row) throw new NotFoundError('Report');
-    return row;
-  }
-
-  /**
-   * The subject of care goes on the audit row as soon as it is known — before
-   * the access check, so a refused attempt records whose report was tried.
-   */
-  private noteProfile(caller: Caller, row: DocumentRow) {
+    // Before any check, so a refused attempt records whose report was tried.
     if (caller.request) requestCtx(caller.request).auditProfileId = row.profile_id as string;
+    if (row.status === 'deleted' && !includeDeleted) throw new NotFoundError('Report');
+    return row;
   }
 
   /** Owner or booked provider. */
   async forRead(caller: Caller, reportId: string): Promise<DocumentRow> {
-    const row = await this.load(reportId);
-    this.noteProfile(caller, row);
+    const row = await this.load(caller, reportId);
     try {
       await this.profileAccess.assertCanRead(caller, row.profile_id as string);
     } catch (error) {
@@ -130,8 +132,7 @@ export class ReportService {
     reportId: string,
     opts: { includeDeleted?: boolean } = {},
   ): Promise<DocumentRow> {
-    const row = await this.load(reportId, opts);
-    this.noteProfile(caller, row);
+    const row = await this.load(caller, reportId, opts);
     if (isProvider(caller)) throw new NotFoundError('Report');
     try {
       await this.profileAccess.assertOwns(caller.userId, row.profile_id as string);

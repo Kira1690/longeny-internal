@@ -782,6 +782,17 @@ try {
   check('its text is kept for the audit record', kept === 1, kept);
   r = await call('DELETE', `/reports/${text.id}`);
   check('removing it again → 404', r.status === 404, r);
+  await Bun.sleep(300); // audit rows are written just after each response
+  const afterDelete = await ai`
+    SELECT profile_id FROM phi_access_log
+     WHERE resource_type = 'report' AND resource_id = ${text.id} AND success = false
+       AND actor_id = ${OWNER} AND action IN ('reports.view', 'reports.delete')
+  `;
+  check(
+    'asking for a removed report is still recorded against the father',
+    afterDelete.length >= 2 && afterDelete.every((a: any) => a.profile_id === dad),
+    afterDelete,
+  );
 
   // ── 13. Only through the gateway ───────────────────────────────────────────
 
